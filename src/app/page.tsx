@@ -6,7 +6,17 @@ export default function Home() {
       <h1>Charter AI</h1>
       <p>AI相談サービス</p>
 
-      <Link href="/dev">アプリを開く</Link>
+      <Link href="/dev">
+        <button
+          style={{
+            padding: "12px 20px",
+            fontSize: "16px",
+            cursor: "pointer",
+          }}
+        >
+          アプリを開く
+        </button>
+      </Link>
     </main>
   );
 }
