@@ -209,8 +209,8 @@ router.push(`/${tenantSlug}/chat/${data.id}`);
       <h1>Charter AI ({tenant?.name})</h1>
 
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <button onClick={() => createThread("love")}>💗 恋愛相談</button>
-        <button onClick={() => createThread("career")}>💼 キャリア相談</button>
+        <button onClick={() => createThread("love")}>💪 さやか先生AI</button>
+        <button onClick={() => createThread("career")}> 📝 行動記録</button>
 
         <div style={{ marginLeft: 18 }}>
           <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>使用する憲章</div>
