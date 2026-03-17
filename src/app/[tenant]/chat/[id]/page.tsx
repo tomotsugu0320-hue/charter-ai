@@ -1,553 +1,525 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { generateReply, detectActionType, type Mode } from "@/lib/reply";
 
+type Mode = "standard" | "buddy" | "sayaka";
 
 type Entry = {
   id: string;
   role: "user" | "ai";
   content: string;
-  mode: Mode;
   created_at: string;
-  did_action: boolean | null;
-  charter_id: string | null;
+  mode: Mode;
 };
 
-type SuggestionRow = {
-  entry_id: string;
-  failure_reason: string | null;
-  success_score: number | null;
-  completed: boolean | null;
-};
+const INSTRUCTOR_MENUS = [
+  "腹筋20回",
+  "ストレッチ5分",
+  "スクワット10回",
+] as const;
+
+function parseScoreFromText(text: string): number | null {
+  const t = text.trim();
+
+  if (/簡単|楽|ラク/.test(t)) return 3;
+  if (/普通|ちょうど|ちょうどよかった|普通だった/.test(t)) return 2;
+  if (/きつい|しんどい|疲れた|重い/.test(t)) return 1;
+
+  return null;
+}
+
+function isNoiseText(text: string) {
+  const t = text.trim();
+
+  return (
+    t === "簡単" ||
+    t === "普通" ||
+    t === "きつい" ||
+    t === "今日はやめる" ||
+    t === "やってみる" ||
+    t === "疲れた" ||
+    t === "やる気ない" ||
+    t === "何やればいい？" ||
+    t === "何やればいい?" ||
+    t === "ちょうどよかった"
+  );
+}
+
+function looksLikeTrainingAction(text: string) {
+  return /(腹筋|腕立て|伏せ|スクワット|ストレッチ|歩いた|歩く|分|回|セット|やった|した)/.test(
+    text.trim()
+  );
+}
+
+function normalizeMenuInput(text: string) {
+  const t = text.trim();
+
+  if (/やった$|した$/.test(t)) return t;
+  return `${t}やった`;
+}
 
 export default function ChatPage() {
   const params = useParams<{ tenant: string; id: string }>();
-  const router = useRouter();
 
-  const tenantSlug = params.tenant;
-  const threadId = params.id;
+  const tenantSlug = params?.tenant ?? "dev";
+  const threadId = params?.id ?? "";
+  const mode: Mode = tenantSlug === "dev" ? "buddy" : "sayaka";
 
   const [entries, setEntries] = useState<Entry[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const [failureReasonMap, setFailureReasonMap] =
-    useState<Record<string, string | null>>({});
-
-  const [suggestionEntryMap, setSuggestionEntryMap] =
-    useState<Record<string, boolean>>({});
-
-  const [failedEntryId, setFailedEntryId] = useState<string | null>(null);
-
-const [showSuccessScoreFor, setShowSuccessScoreFor] = useState<string | null>(null);
-
-
-const [successScoreMap, setSuccessScoreMap] =
-  useState<Record<string, number | null>>({});
-
-
-const [completedMap, setCompletedMap] =
-  useState<Record<string, boolean>>({});
-
-
-  const failureReasons = [
-    "空腹",
-    "時間がない",
-    "疲れている",
-    "やる気が出ない",
-  ];
-
-
-
-
-
-
-
-const loadEntries = async () => {
-  const { data, error } = await supabase
-    .from("entries")
-    .select("*")
-    .eq("thread_id", threadId)
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    console.error("load entries error:", error.message);
-    return;
-  }
-
-  const entryList = (data ?? []) as Entry[];
-  setEntries(entryList);
-
-  const entryIds = entryList.map((e) => e.id);
-
-  if (entryIds.length === 0) {
-    setFailureReasonMap({});
-    setSuggestionEntryMap({});
-    setSuccessScoreMap({});
-    setCompletedMap({});
-    return;
-  }
-
-  const { data: suggestions, error: sError } = await supabase
-    .from("action_suggestions")
-    .select("entry_id, failure_reason, success_score, completed")
-    .in("entry_id", entryIds);
-
-  if (sError) {
-    console.error("suggestions load error:", sError.message);
-    return;
-  }
-
-  const failureMap: Record<string, string | null> = {};
-  const suggestionMap: Record<string, boolean> = {};
-  const successMap: Record<string, number | null> = {};
-  const completedMapLocal: Record<string, boolean> = {};
-
-  for (const id of entryIds) {
-    failureMap[id] = null;
-    suggestionMap[id] = false;
-    successMap[id] = null;
-    completedMapLocal[id] = false;
-  }
-
-  for (const row of (suggestions ?? []) as SuggestionRow[]) {
-    failureMap[row.entry_id] = row.failure_reason ?? null;
-    suggestionMap[row.entry_id] = true;
-    successMap[row.entry_id] = row.success_score ?? null;
-    completedMapLocal[row.entry_id] = row.completed === true;
-  }
-
-  setFailureReasonMap(failureMap);
-  setSuggestionEntryMap(suggestionMap);
-  setSuccessScoreMap(successMap);
-  setCompletedMap(completedMapLocal);
-};
-
-
-
-
-
-
-useEffect(() => {
-  if (!threadId) return;
-  void loadEntries();
-}, [threadId]);
-
-const lastAiEntryId = [...entries]
-  .reverse()
-  .find((e) => e.role === "ai")?.id;
-
-const saveSuccessScore = async (entryId: string, score: number) => {
-  const { error } = await supabase
-    .from("action_suggestions")
-    .update({
-      completed: true,
-      failure_reason: null,
-      success_score: score,
-    })
-    .eq("entry_id", entryId);
-
-  if (error) {
-    console.error("saveSuccessScore error:", error.message);
-    return;
-  }
-
-  setShowSuccessScoreFor(null);
-  await loadEntries();
-};
-
-
-
-const sendMessage = async () => {
-  if (!input.trim()) return;
-
-  setLoading(true);
-
-  try {
-    const userText = input.trim();
-    const hour = new Date().getHours();
-
-    const currentTimeBucket: "morning" | "afternoon" | "night" =
-  hour < 12 ? "morning" : hour < 18 ? "afternoon" : "night";
-
-
-    const mode: Mode = tenantSlug === "dev" ? "buddy" : "sayaka";
-
-    const { error: uError } = await supabase
-      .from("entries")
-      .insert({
-        thread_id: threadId,
-        role: "user",
-        content: userText,
-        mode,
-      });
-
-    if (uError) {
-      console.error("insert user error:", uError.message);
-      return;
-    }
-
-    const { data: recentActions, error: rError } = await supabase
-      .from("action_suggestions")
-.select("action_type, action_text, completed, failure_reason, success_score, created_at")
-
-      .eq("thread_id", threadId)
-      .order("created_at", { ascending: false })
-      .limit(10);
-
-    if (rError) {
-      console.error("recent actions load error:", rError.message);
-    }
-
-    const successStats = (() => {
-      const rows = recentActions ?? [];
-
-      const byType: Record<
-        string,
-        { total: number; success: number; easy: number; normal: number; hard: number }
-      > = {};
-
-      for (const row of rows) {
-        const type = row.action_type ?? "other";
-
-        if (!byType[type]) {
-          byType[type] = {
-            total: 0,
-            success: 0,
-            easy: 0,
-            normal: 0,
-            hard: 0,
-          };
-        }
-
-        byType[type].total += 1;
-
-        if (row.completed === true) {
-          byType[type].success += 1;
-
-          if (row.success_score === 3) byType[type].easy += 1;
-          if (row.success_score === 2) byType[type].normal += 1;
-          if (row.success_score === 1) byType[type].hard += 1;
-        }
-      }
-
-      const rates: Record<
-        string,
-        {
-          total: number;
-          success: number;
-          success_rate: number;
-          easy: number;
-          normal: number;
-          hard: number;
-        }
-      > = {};
-
-      for (const [type, v] of Object.entries(byType)) {
-        rates[type] = {
-          total: v.total,
-          success: v.success,
-          success_rate: v.total > 0 ? v.success / v.total : 0,
-          easy: v.easy,
-          normal: v.normal,
-          hard: v.hard,
-        };
-      }
-
-      return rates;
-    })();
-
-
-const actionSuccessRates = Object.fromEntries(
-  Object.entries(successStats).map(([type, v]) => [type, v.success_rate])
-);
-
-
-
-
-const actionSuccessRatesByTime = (() => {
-  const rows = recentActions ?? [];
-
-  const bucketMap: Record<
-    string,
-    {
-      action_type: string;
-      time_bucket: string;
-      attempt_count: number;
-      success_count: number;
-    }
-  > = {};
-
-  for (const row of rows) {
-    const actionType = row.action_type ?? "other";
-
-    const createdAt = row.created_at ? new Date(row.created_at) : null;
-    const h = createdAt ? createdAt.getHours() : null;
-
-    const timeBucket =
-      h === null ? "night" : h < 12 ? "morning" : h < 18 ? "afternoon" : "night";
-
-    const key = `${actionType}_${timeBucket}`;
-
-    if (!bucketMap[key]) {
-      bucketMap[key] = {
-        action_type: actionType,
-        time_bucket: timeBucket,
-        attempt_count: 0,
-        success_count: 0,
-      };
-    }
-
-    bucketMap[key].attempt_count += 1;
-
-    if (row.completed === true) {
-      bucketMap[key].success_count += 1;
-    }
-  }
-
-  return Object.values(bucketMap).map((v) => ({
-    action_type: v.action_type,
-    time_bucket: v.time_bucket,
-    attempt_count: v.attempt_count,
-    success_count: v.success_count,
-    success_rate: v.attempt_count > 0 ? v.success_count / v.attempt_count : 0,
-  }));
-})();
-
-
-
-
-const replyText = generateReply(
-  mode,
-  userText,
-  null,
-  {
-    recent_actions: recentActions ?? [],
-    success_stats: successStats,
-    action_success_rates: actionSuccessRates,
-    current_time_bucket: currentTimeBucket,
-    action_success_rates_by_time: actionSuccessRatesByTime,
-  }
-);
-
-
-    const { data: aiEntry, error: aError } = await supabase
-      .from("entries")
-      .insert({
-        thread_id: threadId,
-        role: "ai",
-        content: replyText,
-        mode,
-      })
-      .select()
-      .single();
-
-    if (aError || !aiEntry) {
-      console.error("insert ai error:", aError?.message ?? "unknown");
-      return;
-    }
-
-    const looksLikeNotDoneInput =
-      /できなかった|やってない|無理だった|何もできなかった/.test(userText);
-
-
-
-const shouldSaveSuggestion =
-  looksLikeNotDoneInput ||
-  /(してみますか|やってみますか|やろうか|やってみる|試してみますか|決めてみましょうか|続けてみますか|整えてみますか|にしてみますか|だけにしてみますか|休めますか)/.test(
-    replyText
-  );
-
-    if (shouldSaveSuggestion) {
-      const detectedActionType = detectActionType(replyText);
-
-      const { error: sError } = await supabase
-        .from("action_suggestions")
-        .insert({
-          thread_id: threadId,
-          entry_id: aiEntry.id,
-          action_text: replyText,
-          action_type: detectedActionType,
-          difficulty: 1,
-          completed: false,
-        });
-
-      if (sError) {
-        console.error("insert suggestion error:", sError.message);
+  const [pendingAction, setPendingAction] = useState(false);
+  const [scoreTarget, setScoreTarget] = useState<string | null>(null);
+  const [streak, setStreak] = useState(0);
+
+  const [userMenuOptions, setUserMenuOptions] = useState<string[]>([]);
+
+  const lastAiId = useMemo(() => {
+    return [...entries].reverse().find((e) => e.role === "ai")?.id ?? null;
+  }, [entries]);
+
+  const getTodayTrainingItems = () => {
+    const today = new Date().toISOString().slice(0, 10);
+
+    const filtered = entries.filter((e) => {
+      if (e.role !== "user") return false;
+      if (!e.created_at?.startsWith(today)) return false;
+      if (isNoiseText(e.content)) return false;
+      return looksLikeTrainingAction(e.content);
+    });
+
+    const uniqueMap = new Map<string, Entry>();
+    for (const item of filtered) {
+      const key = item.content.trim();
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, item);
       }
     }
 
-    setInput("");
-    await loadEntries();
-  } finally {
-    setLoading(false);
-  }
-};
-
-
-  const markDone = async (entryId: string) => {
-    const { error } = await supabase
-      .from("action_suggestions")
-      .update({
-        completed: true,
-        failure_reason: null,
-      })
-      .eq("entry_id", entryId);
-
-    if (error) {
-      console.error("markDone error:", error.message);
-      return;
-    }
-
-    await loadEntries();
+    return Array.from(uniqueMap.values());
   };
 
+  const buildTodaySummaryMessage = (nextStreak: number) => {
+    const items = getTodayTrainingItems();
 
+    const list =
+      items.length > 0
+        ? items.map((e) => `・${e.content}`).join("\n")
+        : "・まだ記録はありません";
 
-const markFailed = async (entryId: string, reason: string) => {
-  const { error } = await supabase
-    .from("action_suggestions")
-    .update({
-      completed: false,
-      failure_reason: reason,
-    })
-    .eq("entry_id", entryId);
+    return `いいですね✨
+その調子です。
 
-  if (error) {
-    console.error("markFailed error:", error.message);
-    return;
-  }
+今日の記録
+${list}
 
-  setFailedEntryId(null);
-  await loadEntries();
-};
+今日で${nextStreak}回目です。
+
+この流れで、もう一つ軽くやってみましょうか？`;
+  };
+
+  const loadEntries = async () => {
+    if (!threadId) return;
+
+    const { data, error } = await supabase
+      .from("entries")
+      .select("id, role, content, created_at, mode")
+      .eq("thread_id", threadId)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error(
+        "loadEntries error:",
+        error.message,
+        error.details,
+        error.hint,
+        error.code
+      );
+      return;
+    }
+
+    setEntries((data ?? []) as Entry[]);
+  };
+
+  const loadUserMenuOptions = async () => {
+    if (!threadId) return;
+
+    const { data, error } = await supabase
+      .from("entries")
+      .select("content, created_at")
+      .eq("thread_id", threadId)
+      .eq("role", "user")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error(
+        "loadUserMenuOptions error:",
+        error.message,
+        error.details,
+        error.hint,
+        error.code
+      );
+      return;
+    }
+
+    const candidates = (data ?? [])
+      .map((row) => row.content.trim())
+      .filter((text) => !isNoiseText(text))
+      .filter((text) => looksLikeTrainingAction(text))
+      .map((text) => text.replace(/やった$|した$/g, "").trim());
+
+    const unique = Array.from(new Set(candidates)).filter(Boolean);
+
+    setUserMenuOptions(unique.slice(0, 10));
+  };
+
+  useEffect(() => {
+    if (!threadId) return;
+    void loadEntries();
+    void loadUserMenuOptions();
+  }, [threadId]);
+
+  const insertEntry = async (role: "user" | "ai", content: string) => {
+    if (!threadId) {
+      console.error("insertEntry error: threadId missing");
+      return null;
+    }
+
+    const payload = {
+      thread_id: threadId,
+      role,
+      content,
+      mode,
+    };
+
+    const { data, error } = await supabase
+      .from("entries")
+      .insert(payload)
+      .select("id, role, content, created_at, mode")
+      .single();
+
+    if (error) {
+      console.error(
+        "insertEntry error:",
+        error.message,
+        error.details,
+        error.hint,
+        error.code
+      );
+      console.error("payload was:", payload);
+      return null;
+    }
+
+    return data as Entry;
+  };
+
+  const buildTrainingPrompt = () => {
+    const instructorList = INSTRUCTOR_MENUS.map((item) => `・${item}`).join("\n");
+
+    const userList =
+      userMenuOptions.length > 0
+        ? userMenuOptions.map((item) => `・${item}`).join("\n")
+        : "・まだありません";
+
+    return `何をやりますか？
+
+先生のおすすめ
+${instructorList}
+
+あなたが最近やったメニュー
+${userList}
+
+下のボタンから選ぶか、別の内容はテキストに入力して送信してください。`;
+  };
+
+  const startTraining = async () => {
+    setLoading(true);
+
+    try {
+      await loadUserMenuOptions();
+
+      await insertEntry("ai", buildTrainingPrompt());
+
+      setPendingAction(true);
+      await loadEntries();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveScore = async (score: number) => {
+    if (!threadId) return;
+
+    setLoading(true);
+
+    try {
+      let label = "";
+      if (score === 3) label = "簡単";
+      if (score === 2) label = "普通";
+      if (score === 1) label = "きつい";
+
+      await insertEntry("user", label);
+
+      await loadEntries();
+
+      const newStreak = streak + 1;
+      setStreak(newStreak);
+
+      const summaryMessage = buildTodaySummaryMessage(newStreak);
+      await insertEntry("ai", summaryMessage);
+
+      setScoreTarget(null);
+      await loadEntries();
+      await loadUserMenuOptions();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendMessage = async () => {
+    const text = input.trim();
+
+    if (!threadId) {
+      console.error("sendMessage blocked: threadId missing");
+      return;
+    }
+
+    if (!text) return;
+
+    setLoading(true);
+
+    try {
+      if (scoreTarget) {
+        const parsedScore = parseScoreFromText(text);
+
+        if (parsedScore !== null) {
+          setInput("");
+          await saveScore(parsedScore);
+          return;
+        }
+      }
+
+      const userEntry = await insertEntry("user", text);
+      if (!userEntry) return;
+
+      setInput("");
+      await loadEntries();
+
+      if (pendingAction) {
+        const ai = await insertEntry("ai", "いいですね✨ 強さはどうでしたか？");
+
+        if (ai) {
+          setScoreTarget(ai.id);
+        }
+
+        setPendingAction(false);
+        await loadEntries();
+        await loadUserMenuOptions();
+        return;
+      }
+
+      if (scoreTarget) {
+        await insertEntry(
+          "ai",
+          "強さはどうでしたか？ 「簡単・普通・きつい」か、近い言い方で教えてください✨"
+        );
+        await loadEntries();
+        return;
+      }
+
+      await insertEntry("ai", "いいですね✨ この流れで、もう一つ軽くやってみますか？");
+      await loadEntries();
+      await loadUserMenuOptions();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ marginBottom: 16 }}>
-        <button onClick={() => router.push(`/${tenantSlug}`)}>
-          ← トップへ戻る
-        </button>
+    <div style={{ maxWidth: 720, margin: "0 auto", padding: 24 }}>
+      <h2>AIトレーニングコーチ</h2>
+
+      <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 12 }}>
+        tenant: {tenantSlug} / threadId: {threadId || "(missing)"} / mode: {mode}
       </div>
 
-      <div style={{ marginBottom: 24 }}>
-        {entries.map((e) => (
-          <div key={e.id} style={{ marginBottom: 12 }}>
-            <div>
-              <b>{e.role === "user" ? "あなた" : "AI"}：</b>
-              {e.content}
-            </div>
+      <div
+        style={{
+          border: "1px solid #ddd",
+          borderRadius: 12,
+          padding: 16,
+          marginBottom: 20,
+        }}
+      >
+        {entries.length === 0 ? (
+          <div style={{ opacity: 0.6 }}>まだ記録がありません。</div>
+        ) : (
+          entries.map((entry) => {
+            const isAi = entry.role === "ai";
+            const isLastAi = entry.id === lastAiId;
 
-            {e.role === "ai" && failureReasonMap[e.id] != null && (
+            const isActionChoicePrompt = entry.content.includes("何をやりますか");
+            const isScorePrompt = entry.content.includes("強さはどうでしたか");
+            const isGeneralPrompt = !isActionChoicePrompt && !isScorePrompt;
+
+            return (
               <div
+                key={entry.id}
                 style={{
-                  marginTop: 6,
-                  fontSize: 12,
-                  opacity: 0.7,
+                  marginBottom: 12,
+                  background: isAi ? "#f3f4f6" : "#fef9c3",
+                  padding: 10,
+                  borderRadius: 10,
                 }}
               >
-                できなかった理由：{failureReasonMap[e.id]}
-              </div>
-            )}
+                <b>{isAi ? "AI" : "あなた"}：</b>
+                <div style={{ whiteSpace: "pre-line" }}>{entry.content}</div>
 
-            {e.role === "ai" && successScoreMap[e.id] != null && (
-              <div
-                style={{
-                  marginTop: 6,
-                  fontSize: 12,
-                  opacity: 0.7,
-                }}
-              >
-                やった：
-                {successScoreMap[e.id] === 3
-                  ? "簡単"
-                  : successScoreMap[e.id] === 2
-                  ? "普通"
-                  : "きつい"}
-              </div>
-            )}
+                {isAi && isLastAi && !scoreTarget && isGeneralPrompt && (
+                  <div style={{ marginTop: 8 }}>
+                    <button
+                      onClick={() => void startTraining()}
+                      style={{ marginRight: 8 }}
+                      disabled={loading}
+                    >
+                      やってみる
+                    </button>
 
-            {e.role === "ai" &&
-              e.id === lastAiEntryId &&
-              suggestionEntryMap[e.id] &&
-              !completedMap[e.id] && (
-                <div style={{ marginTop: 8 }}>
-                  <button
-                    onClick={() => {
-                      setShowSuccessScoreFor(e.id);
-                      setFailedEntryId(null);
-                    }}
-                  >
-                    やった
-                  </button>{" "}
-                  <button
-                    onClick={() => {
-                      setFailedEntryId(e.id);
-                      setShowSuccessScoreFor(null);
-                    }}
-                  >
-                    できなかった
-                  </button>
+                    <button
+                      disabled={loading}
+                      onClick={async () => {
+                        setLoading(true);
+                        try {
+                          await insertEntry("user", "今日はやめる");
+                          await loadEntries();
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                    >
+                      今日はやめる
+                    </button>
+                  </div>
+                )}
 
-                  {showSuccessScoreFor === e.id && (
-                    <div style={{ marginTop: 8 }}>
-                      <button
-                        onClick={() => void saveSuccessScore(e.id, 3)}
-                        style={{ marginRight: 6, padding: "6px 10px", borderRadius: 8 }}
-                      >
-                        簡単
-                      </button>
-                      <button
-                        onClick={() => void saveSuccessScore(e.id, 2)}
-                        style={{ marginRight: 6, padding: "6px 10px", borderRadius: 8 }}
-                      >
-                        普通
-                      </button>
-                      <button
-                        onClick={() => void saveSuccessScore(e.id, 1)}
-                        style={{ padding: "6px 10px", borderRadius: 8 }}
-                      >
-                        きつい
-                      </button>
+                {isAi && isLastAi && !scoreTarget && isActionChoicePrompt && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ marginBottom: 8, fontSize: 13, opacity: 0.8 }}>
+                      先生のおすすめ
                     </div>
-                  )}
 
-                  {failedEntryId === e.id && (
-                    <div style={{ marginTop: 8 }}>
-                      {failureReasons.map((reason) => (
-                        <button
-                          key={reason}
-                          onClick={() => void markFailed(e.id, reason)}
-                          style={{
-                            marginRight: 6,
-                            marginBottom: 6,
-                            padding: "6px 10px",
-                            borderRadius: 8,
-                          }}
-                        >
-                          {reason}
-                        </button>
-                      ))}
+                    {INSTRUCTOR_MENUS.map((menu) => (
+                      <button
+                        key={`inst-${menu}`}
+                        onClick={() => {
+                          setInput(normalizeMenuInput(menu));
+                        }}
+                        style={{ marginRight: 8, marginBottom: 8 }}
+                        disabled={loading}
+                      >
+                        {menu}
+                      </button>
+                    ))}
+
+                    {userMenuOptions.length > 0 && (
+                      <>
+                        <div style={{ marginTop: 8, marginBottom: 8, fontSize: 13, opacity: 0.8 }}>
+                          あなたが最近やったメニュー
+                        </div>
+
+                        {userMenuOptions.map((menu) => (
+                          <button
+                            key={`user-${menu}`}
+                            onClick={() => {
+                              setInput(normalizeMenuInput(menu));
+                            }}
+                            style={{ marginRight: 8, marginBottom: 8 }}
+                            disabled={loading}
+                          >
+                            {menu}
+                          </button>
+                        ))}
+                      </>
+                    )}
+
+                    <div
+                      style={{
+                        marginTop: 8,
+                        fontSize: 13,
+                        opacity: 0.7,
+                      }}
+                    >
+                      別の内容はテキストに入力して送信
                     </div>
-                  )}
-                </div>
-              )}
-          </div>
-        ))}
+                  </div>
+                )}
+
+                {scoreTarget === entry.id && (
+                  <div style={{ marginTop: 8 }}>
+                    <button
+                      onClick={() => void saveScore(3)}
+                      disabled={loading}
+                      style={{ marginRight: 6 }}
+                    >
+                      簡単
+                    </button>
+
+                    <button
+                      onClick={() => void saveScore(2)}
+                      disabled={loading}
+                      style={{ marginRight: 6 }}
+                    >
+                      普通
+                    </button>
+
+                    <button onClick={() => void saveScore(1)} disabled={loading}>
+                      きつい
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 8 }}>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          style={{ flex: 1 }}
+          placeholder={
+            pendingAction ? "やった内容を書いてください" : "今日やったことを書いてみよう"
+          }
+          style={{
+            flex: 1,
+            padding: 10,
+            borderRadius: 8,
+            border: "1px solid #ccc",
+          }}
+          disabled={loading || !threadId}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              void sendMessage();
+            }
+          }}
         />
 
-        <button onClick={() => void sendMessage()} disabled={loading}>
-          送信
+        <button
+          onClick={() => void sendMessage()}
+          disabled={loading || !threadId}
+          style={{
+            background: "#111827",
+            color: "#fff",
+            padding: "10px 16px",
+            borderRadius: 8,
+          }}
+        >
+          {loading ? "送信中..." : "送信"}
         </button>
       </div>
     </div>

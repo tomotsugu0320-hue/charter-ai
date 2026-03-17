@@ -5,66 +5,66 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { v4 as uuidv4 } from "uuid";
 
+type Category = "training" | "habit";
+type Tone = "standard" | "buddy" | "sayaka";
 
+type TenantRow = {
+  id: string;
+  slug: string;
+  name: string;
+};
 
 type ThreadRow = {
   id: string;
-  category: "love" | "career";
+  category: Category;
   created_at: string;
   charter_id: string | null;
 };
 
-
 type CharterRow = {
   id: string;
   name: string;
-  tone: "standard" | "buddy" | "sayaka";
+  tone: Tone;
 };
 
 export default function Home() {
   const router = useRouter();
 
-const tenantSlug =
-  typeof window !== "undefined"
-    ? window.location.pathname.split("/")[1] || "dev"
-    : "dev";
+  const tenantSlug = useMemo(() => {
+    if (typeof window === "undefined") return "dev";
+    return window.location.pathname.split("/")[1] || "dev";
+  }, []);
 
   const [sessionId, setSessionId] = useState<string | null>(null);
-
+  const [tenant, setTenant] = useState<TenantRow | null>(null);
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [charters, setCharters] = useState<CharterRow[]>([]);
-  const [selectedCharterId, setSelectedCharterId] = useState<string>("");
+  const [warning, setWarning] = useState("");
+  const [selectedCharterId, setSelectedCharterId] = useState("");
 
-  const charterNameById = useMemo(() => {
-    const m = new Map<string, CharterRow>();
-    for (const c of charters) m.set(c.id, c);
-    return m;
+  const charterById = useMemo(() => {
+    const map = new Map<string, CharterRow>();
+    for (const charter of charters) {
+      map.set(charter.id, charter);
+    }
+    return map;
   }, [charters]);
 
+  const getTenantBySlug = async (slug: string): Promise<TenantRow | null> => {
+    const { data, error } = await supabase
+      .from("tenants")
+      .select("id, slug, name")
+      .eq("slug", slug)
+      .single();
 
+    if (error) {
+      console.error("tenant load error:", error.message);
+      return null;
+    }
 
+    return data as TenantRow;
+  };
 
-const getTenantBySlug = async (slug: string) => {
-  const { data, error } = await supabase
-    .from("tenants")
-    .select("*")
-    .eq("slug", slug)
-    .single();
-
-  if (error) {
-    console.error("tenant load error:", error.message);
-    return null;
-  }
-
-  return data;
-};
-
-
-const [tenant, setTenant] = useState<any>(null);
-
-
-
-  // 憲章一覧ロード
   const loadCharters = async () => {
     const { data, error } = await supabase
       .from("charters")
@@ -79,17 +79,42 @@ const [tenant, setTenant] = useState<any>(null);
     const list = (data ?? []) as CharterRow[];
     setCharters(list);
 
-    // 初期選択：localStorage → なければ先頭
-    const saved = localStorage.getItem("selected_charter_id") ?? "";
-    const exists = saved && list.some((c) => c.id === saved);
+    const savedCharterId = localStorage.getItem("selected_charter_id") ?? "";
+    const exists = savedCharterId
+      ? list.some((charter) => charter.id === savedCharterId)
+      : false;
 
-    const initial = exists ? saved : list[0]?.id ?? "";
-    setSelectedCharterId(initial);
+    const initialCharterId = exists ? savedCharterId : (list[0]?.id ?? "");
+    setSelectedCharterId(initialCharterId);
 
-    if (initial) localStorage.setItem("selected_charter_id", initial);
+    if (initialCharterId) {
+      localStorage.setItem("selected_charter_id", initialCharterId);
+    }
   };
 
-  // 相談履歴ロード
+  const calculateWarning = (list: ThreadRow[]) => {
+    if (list.length === 0) {
+      setWarning("⚠️ まだ記録がありません。まず1件、記録してみましょう。");
+      return;
+    }
+
+    const latestCreatedAt = new Date(list[0].created_at).getTime();
+    const now = Date.now();
+    const diffDays = Math.floor((now - latestCreatedAt) / (1000 * 60 * 60 * 24));
+
+    if (diffDays >= 3) {
+      setWarning("⚠️ 3日間記録がありません。短くてもいいので行動を記録しましょう。");
+      return;
+    }
+
+    if (diffDays >= 2) {
+      setWarning("⚠️ 2日間記録がありません。軽くでもいいので記録を再開しましょう。");
+      return;
+    }
+
+    setWarning("");
+  };
+
   const loadThreads = async (sid: string) => {
     const { data, error } = await supabase
       .from("threads")
@@ -101,141 +126,188 @@ const [tenant, setTenant] = useState<any>(null);
       console.error("load threads error:", error.message);
       return;
     }
-    setThreads((data ?? []) as ThreadRow[]);
+
+    const list = (data ?? []) as ThreadRow[];
+    setThreads(list);
+    calculateWarning(list);
   };
 
-
-
-
-const getTenantIdBySlug = async (slug: string) => {
-  const { data, error } = await supabase
-    .from("tenants")
-    .select("id")
-    .eq("slug", slug)
-    .single();
-
-  if (error) {
-    console.error("get tenant error:", error.message);
-    return null;
-  }
-
-  return data.id as string;
-};
-
-
-
-
-  // 起動時：session_id 確保＋憲章ロード＋履歴ロード
   useEffect(() => {
     const boot = async () => {
+      const tenantData = await getTenantBySlug(tenantSlug);
 
-const tenantSlug =
-  typeof window !== "undefined"
-    ? window.location.pathname.split("/")[1]
-    : "dev";
-
-const tenantData = await getTenantBySlug(tenantSlug);
-
-if (!tenantData) {
-  alert("tenant が見つかりません");
-  return;
-}
-
-setTenant(tenantData);
-
-      await loadCharters();
-
-      const existing = localStorage.getItem("session_id");
-      if (existing) {
-        setSessionId(existing);
-        await loadThreads(existing);
+      if (!tenantData) {
+        alert("tenant が見つかりません");
         return;
       }
 
-      const newId = uuidv4();
-      localStorage.setItem("session_id", newId);
-      setSessionId(newId);
+      setTenant(tenantData);
 
-      const { error } = await supabase.from("sessions").upsert({ id: newId });
-      if (error) console.error("session upsert error:", error.message);
+      await loadCharters();
 
-      await loadThreads(newId);
+      let sid = localStorage.getItem("session_id");
+
+      if (!sid) {
+        sid = uuidv4();
+        localStorage.setItem("session_id", sid);
+
+        const { error } = await supabase.from("sessions").upsert({ id: sid });
+        if (error) {
+          console.error("session upsert error:", error.message);
+        }
+      }
+
+      setSessionId(sid);
+      await loadThreads(sid);
     };
 
     void boot();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [tenantSlug]);
 
+  const createThread = async (category: Category) => {
+    if (!sessionId) {
+      alert("session_id がありません");
+      return;
+    }
 
-const createThread = async (category: "love" | "career") => {
-  if (!sessionId) return;
+    if (!tenant) {
+      alert("tenant の読み込み前です");
+      return;
+    }
 
+    const { data, error } = await supabase
+      .from("threads")
+      .insert({
+        session_id: sessionId,
+        category,
+        tenant_id: tenant.id,
+        charter_id: selectedCharterId || null,
+      })
+      .select("id")
+      .single();
 
-const tenantSlug =
-  typeof window !== "undefined"
-    ? window.location.pathname.split("/")[1]
-    : "dev";
+    if (error) {
+      console.error("create thread error:", error.message);
+      alert("スレッド作成に失敗しました");
+      return;
+    }
 
-  const tenantId = await getTenantIdBySlug(tenantSlug);
+    await loadThreads(sessionId);
+    router.push(`/${tenantSlug}/chat/${data.id}`);
+  };
 
-  if (!tenantId) {
-    alert("tenants.id の取得に失敗しました");
-    return;
-  }
-
-  const { data, error } = await supabase
-    .from("threads")
-    .insert({
-      session_id: sessionId,
-      category,
-      tenant_id: tenantId,
-      charter_id: selectedCharterId || null,
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    console.error("create thread error:", error.message);
-    return;
-  }
-
-  await loadThreads(sessionId);
-router.push(`/${tenantSlug}/chat/${data.id}`);
-};
-
+  const handleCharterChange = (value: string) => {
+    setSelectedCharterId(value);
+    localStorage.setItem("selected_charter_id", value);
+  };
 
   return (
     <div style={{ padding: 40 }}>
-      <h1>Charter AI ({tenant?.name})</h1>
+      <h1>Charter AI ({tenant?.name ?? "..."})</h1>
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <button onClick={() => createThread("love")}>💪 さやか先生AI</button>
-        <button onClick={() => createThread("career")}> 📝 行動記録</button>
+      <p style={{ opacity: 0.8, marginTop: 8, marginBottom: 0 }}>
+        トレーニングや食事を記録すると、AIコーチが継続をサポートします。
+      </p>
 
-        <div style={{ marginLeft: 18 }}>
-          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>使用する憲章</div>
+      {warning && (
+        <div
+          style={{
+            marginTop: 12,
+            padding: "12px 14px",
+            borderRadius: 10,
+            background: "#fff7ed",
+            border: "1px solid #fdba74",
+            color: "#9a3412",
+            maxWidth: 520,
+            fontWeight: 600,
+          }}
+        >
+          {warning}
+        </div>
+      )}
+
+      <div
+        style={{
+          marginTop: 18,
+          padding: 18,
+          border: "1px solid #e5e7eb",
+          borderRadius: 16,
+          background: "#fafafa",
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+          maxWidth: 520,
+        }}
+      >
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button
+            onClick={() => createThread("training")}
+            style={{
+              padding: "10px 16px",
+              borderRadius: 10,
+              background: "#fff7ed",
+              border: "1px solid #fdba74",
+              cursor: "pointer",
+              fontSize: 16,
+              fontWeight: 600,
+            }}
+          >
+            💪 トレーニング
+          </button>
+
+          <button
+            onClick={() => createThread("habit")}
+            style={{
+              padding: "10px 16px",
+              borderRadius: 10,
+              border: "1px solid #d1d5db",
+              background: "#fff",
+              cursor: "pointer",
+              fontSize: 16,
+              fontWeight: 600,
+            }}
+          >
+            🍽 食事
+          </button>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            padding: "12px 14px",
+            border: "1px solid #ddd",
+            borderRadius: 12,
+            background: "#fff",
+            maxWidth: 320,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+          }}
+        >
+          <div style={{ fontSize: 12, opacity: 0.7 }}>AIコーチ</div>
+
           <select
             value={selectedCharterId}
-            onChange={(e) => {
-              const id = e.target.value;
-              setSelectedCharterId(id);
-              localStorage.setItem("selected_charter_id", id);
-            }}
-            style={{
-              minWidth: 320,
-              padding: "10px 12px",
-              borderRadius: 10,
-              border: "1px solid #ccc",
-              background: "white",
-            }}
+            onChange={(e) => handleCharterChange(e.target.value)}
             disabled={charters.length === 0}
+            style={{
+              border: "none",
+              outline: "none",
+              fontSize: 16,
+              background: "#f8fafc",
+              borderWidth: 4,
+              borderStyle: "solid",
+              borderColor: "#e2e8f0",
+              cursor: "pointer",
+              padding: 4,
+            }}
           >
             {charters.length === 0 ? (
               <option value="">（憲章がありません）</option>
             ) : (
-              charters.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}（{c.tone}）
+              charters.map((charter) => (
+                <option key={charter.id} value={charter.id}>
+                  {charter.name}（{charter.tone}）
                 </option>
               ))
             )}
@@ -243,37 +315,48 @@ router.push(`/${tenantSlug}/chat/${data.id}`);
         </div>
       </div>
 
-      <hr style={{ margin: "30px 0" }} />
+      <hr style={{ margin: "26px 0 20px 0" }} />
 
-      <h2>あなたの相談履歴</h2>
+      <h2>あなたの記録一覧</h2>
 
       {threads.length === 0 ? (
         <p style={{ opacity: 0.6 }}>まだスレッドがありません。</p>
       ) : (
         <ul style={{ listStyle: "none", padding: 0 }}>
-          {threads.map((t) => {
-            const c = t.charter_id ? charterNameById.get(t.charter_id) : null;
-            const charterLabel = c ? `憲章：${c.name}` : "憲章：（未設定）";
+          {threads.map((thread) => {
+            const charter = thread.charter_id
+              ? charterById.get(thread.charter_id)
+              : null;
+
+            const charterLabel = charter
+              ? `憲章：${charter.name}`
+              : "憲章：（未設定）";
+
+
+
+
+const title =
+  thread.category === "training"
+    ? "💪 トレーニング記録"
+    : "🍽 食事記録";
 
             return (
-              <li key={t.id} style={{ marginBottom: 10 }}>
+              <li key={thread.id} style={{ marginBottom: 10 }}>
                 <button
-onClick={() => router.push(`/${tenant?.slug ?? "dev"}/chat/${t.id}`)}
+                  onClick={() => router.push(`/${tenantSlug}/chat/${thread.id}`)}
                   style={{
                     width: "100%",
                     textAlign: "left",
                     padding: "10px 12px",
                     borderRadius: 10,
                     border: "1px solid #ccc",
-                    background: "white",
+                    background: "#fff",
                     cursor: "pointer",
                   }}
                 >
-                  <div style={{ fontWeight: 700 }}>
-                    {t.category === "love" ? "💗 恋愛相談" : "💼 キャリア相談"}
-                  </div>
+                  <div style={{ fontWeight: 700 }}>{title}</div>
                   <div style={{ opacity: 0.7, marginTop: 4 }}>
-                    {new Date(t.created_at).toLocaleString()} / {charterLabel}
+                    {new Date(thread.created_at).toLocaleString()} / {charterLabel}
                   </div>
                 </button>
               </li>
