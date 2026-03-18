@@ -25,7 +25,6 @@ const INSTRUCTOR_MENUS = [
 function detectCategory(text: string): Category {
   const t = text.trim();
 
-  // レッスン系を最優先
   if (
     /ヨガ|ボディジャム|ボディコンバット|ボディパンプ|ピラティス|レッスン|スタジオ/.test(
       t
@@ -34,32 +33,17 @@ function detectCategory(text: string): Category {
     return "レッスン";
   }
 
-  // 有酸素
   if (/分|時間|走|ラン|ウォーク|歩|有酸素|スカッシュ/.test(t)) {
     return "有酸素";
   }
 
-  // それ以外は筋トレ
   return "筋トレ";
-}
-
-function parseScoreFromText(text: string): number | null {
-  const t = text.trim();
-
-  if (/簡単|楽|ラク/.test(t)) return 3;
-  if (/普通|ちょうど|ちょうどよかった|普通だった/.test(t)) return 2;
-  if (/きつい|しんどい|疲れた|重い/.test(t)) return 1;
-
-  return null;
 }
 
 function isNoiseText(text: string) {
   const t = text.trim();
 
   return (
-    t === "簡単" ||
-    t === "普通" ||
-    t === "きつい" ||
     t === "今日はやめる" ||
     t === "やってみる" ||
     t === "疲れた" ||
@@ -132,32 +116,34 @@ export default function ChatPage() {
   const mode: Mode = tenantSlug === "dev" ? "buddy" : "sayaka";
 
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [previousItems, setPreviousItems] = useState<Entry[]>([]);
   const [input, setInput] = useState("");
   const [lessonInput, setLessonInput] = useState("");
   const [loading, setLoading] = useState(false);
-
   const [pendingAction, setPendingAction] = useState(false);
-  const [scoreTarget, setScoreTarget] = useState<string | null>(null);
-  const [streak, setStreak] = useState(0);
-
   const [userMenuOptions, setUserMenuOptions] = useState<string[]>([]);
 
   const lastAiId = useMemo(() => {
     return [...entries].reverse().find((e) => e.role === "ai")?.id ?? null;
   }, [entries]);
 
-  const getTodayTrainingItems = () => {
+  const getTodayKey = () => {
     const now = new Date();
-    const today =
+    return (
       now.getFullYear() +
       "-" +
       String(now.getMonth() + 1).padStart(2, "0") +
       "-" +
-      String(now.getDate()).padStart(2, "0");
+      String(now.getDate()).padStart(2, "0")
+    );
+  };
+
+  const getTodayTrainingItems = () => {
+    const todayKey = getTodayKey();
 
     return entries.filter((e) => {
       if (e.role !== "user") return false;
-      if (!e.created_at?.startsWith(today)) return false;
+      if (!e.created_at?.startsWith(todayKey)) return false;
       if (isNoiseText(e.content)) return false;
       return looksLikeTrainingAction(e.content);
     });
@@ -174,6 +160,16 @@ export default function ChatPage() {
   const cardioItems = todayItems.filter((e) => getCategory(e) === "有酸素");
   const lessonItems = todayItems.filter((e) => getCategory(e) === "レッスン");
 
+  const previousStrengthItems = previousItems.filter(
+    (e) => getCategory(e) === "筋トレ"
+  );
+  const previousCardioItems = previousItems.filter(
+    (e) => getCategory(e) === "有酸素"
+  );
+  const previousLessonItems = previousItems.filter(
+    (e) => getCategory(e) === "レッスン"
+  );
+
   const strengthGroupedItems = Object.values(
     strengthItems.reduce((acc, item) => {
       const key = normalize(item.content);
@@ -187,26 +183,18 @@ export default function ChatPage() {
     }, {} as Record<string, any>)
   );
 
-  const buildTodaySummaryMessage = (nextStreak: number) => {
-    const items = getTodayTrainingItems();
+  const previousStrengthGroupedItems = Object.values(
+    previousStrengthItems.reduce((acc, item) => {
+      const key = normalize(item.content);
 
-    const list =
-      items.length > 0
-        ? items.map((e) => `・${e.content}`).join("\n")
-        : "・まだ記録はありません";
+      if (!acc[key]) {
+        acc[key] = { ...item, count: 0 };
+      }
 
-    return `いいですね✨
-その調子です。
-
-
-
-今日の記録
-${list}
-
-今日で${nextStreak}回目です。
-
-この流れで、もう一つ軽くやってみましょうか？`;
-  };
+      acc[key].count += 1;
+      return acc;
+    }, {} as Record<string, any>)
+  );
 
   const loadEntries = async () => {
     if (!threadId) return;
@@ -229,6 +217,59 @@ ${list}
     }
 
     setEntries((data ?? []) as Entry[]);
+  };
+
+  const loadPreviousItems = async () => {
+    if (!threadId) return;
+
+    const { data, error } = await supabase
+      .from("entries")
+      .select("id, role, content, created_at, mode, category")
+      .eq("thread_id", threadId)
+      .eq("role", "user")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error(
+        "loadPreviousItems error:",
+        error.message,
+        error.details,
+        error.hint,
+        error.code
+      );
+      return;
+    }
+
+    const rows = (data ?? []) as Entry[];
+
+    const validRows = rows.filter((e) => {
+      if (isNoiseText(e.content)) return false;
+      return looksLikeTrainingAction(e.content);
+    });
+
+    if (validRows.length === 0) {
+      setPreviousItems([]);
+      return;
+    }
+
+    const byDate = new Map<string, Entry[]>();
+
+    for (const row of validRows) {
+      const day = row.created_at.slice(0, 10);
+      if (!byDate.has(day)) byDate.set(day, []);
+      byDate.get(day)!.push(row);
+    }
+
+    const sortedDays = Array.from(byDate.keys()).sort().reverse();
+    const todayKey = getTodayKey();
+    const previousDay = sortedDays.find((day) => day !== todayKey);
+
+    if (!previousDay) {
+      setPreviousItems([]);
+      return;
+    }
+
+    setPreviousItems(byDate.get(previousDay) ?? []);
   };
 
   const loadUserMenuOptions = async () => {
@@ -258,14 +299,24 @@ ${list}
       .map((row) => row.content.trim())
       .filter(Boolean);
 
-    const lessonUnique = Array.from(new Set(lessonCandidates));
-    setUserMenuOptions(lessonUnique.slice(0, 10));
+    const freqMap: Record<string, number> = {};
+
+    lessonCandidates.forEach((item) => {
+      freqMap[item] = (freqMap[item] || 0) + 1;
+    });
+
+    const sorted = Object.entries(freqMap)
+      .sort((a, b) => b[1] - a[1])
+      .map(([item]) => item);
+
+    setUserMenuOptions(sorted.slice(0, 10));
   };
 
   useEffect(() => {
     if (!threadId) return;
     void loadEntries();
     void loadUserMenuOptions();
+    void loadPreviousItems();
   }, [threadId]);
 
   const insertEntry = async (
@@ -339,34 +390,6 @@ ${userList}
     }
   };
 
-  const saveScore = async (score: number) => {
-    if (!threadId) return;
-
-    setLoading(true);
-
-    try {
-      let label = "";
-      if (score === 3) label = "簡単";
-      if (score === 2) label = "普通";
-      if (score === 1) label = "きつい";
-
-      await insertEntry("user", label, "筋トレ");
-      await loadEntries();
-
-      const newStreak = streak + 1;
-      setStreak(newStreak);
-
-      const summaryMessage = buildTodaySummaryMessage(newStreak);
-      await insertEntry("ai", summaryMessage);
-
-      setScoreTarget(null);
-      await loadEntries();
-      await loadUserMenuOptions();
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const sendLesson = async () => {
     const text = lessonInput.trim();
     if (!text) return;
@@ -380,8 +403,14 @@ ${userList}
       await loadEntries();
       await loadUserMenuOptions();
 
-      await insertEntry("ai", "いいですね✨ レッスン記録しました！");
+      await insertEntry(
+        "ai",
+        `ナイス👍 ${text}、いいトレーニングです。
+このあと何をやりますか？`
+      );
+
       await loadEntries();
+      await loadPreviousItems();
     } finally {
       setLoading(false);
     }
@@ -400,16 +429,6 @@ ${userList}
     setLoading(true);
 
     try {
-      if (scoreTarget) {
-        const parsedScore = parseScoreFromText(text);
-
-        if (parsedScore !== null) {
-          setInput("");
-          await saveScore(parsedScore);
-          return;
-        }
-      }
-
       const category = detectCategory(text);
       const userEntry = await insertEntry("user", text, category);
 
@@ -418,44 +437,19 @@ ${userList}
       setInput("");
       await loadEntries();
 
-      if (pendingAction) {
-        const ai = await insertEntry("ai", "いいですね✨ 強さはどうでしたか？");
+      await insertEntry(
+        "ai",
+        "ナイス👍 いい流れです。このあと何をやりますか？"
+      );
 
-        if (ai) {
-          setScoreTarget(ai.id);
-        }
-
-        setPendingAction(false);
-        await loadEntries();
-        await loadUserMenuOptions();
-        return;
-      }
-
-      if (scoreTarget) {
-        await insertEntry(
-          "ai",
-          "強さはどうでしたか？ 「簡単・普通・きつい」か、近い言い方で教えてください✨"
-        );
-        await loadEntries();
-        return;
-      }
-
-      await insertEntry("ai", "いいですね✨ この流れで、もう一つ軽くやってみますか？");
+      setPendingAction(false);
       await loadEntries();
       await loadUserMenuOptions();
+      await loadPreviousItems();
     } finally {
       setLoading(false);
     }
   };
-
-
-
-
-
-
-
-
-
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: 24 }}>
@@ -482,8 +476,7 @@ ${userList}
             const isLastAi = entry.id === lastAiId;
 
             const isActionChoicePrompt = entry.content.includes("何をやりますか");
-            const isScorePrompt = entry.content.includes("強さはどうでしたか");
-            const isGeneralPrompt = !isActionChoicePrompt && !isScorePrompt;
+            const isGeneralPrompt = !isActionChoicePrompt;
 
             return (
               <div
@@ -498,7 +491,7 @@ ${userList}
                 <b>{isAi ? "AI" : "あなた"}：</b>
                 <div style={{ whiteSpace: "pre-line" }}>{entry.content}</div>
 
-                {isAi && isLastAi && !scoreTarget && isGeneralPrompt && (
+                {isAi && isLastAi && isGeneralPrompt && (
                   <div style={{ marginTop: 8 }}>
                     <button
                       onClick={() => void startTraining()}
@@ -525,7 +518,7 @@ ${userList}
                   </div>
                 )}
 
-                {isAi && isLastAi && !scoreTarget && isActionChoicePrompt && (
+                {isAi && isLastAi && isActionChoicePrompt && (
                   <div style={{ marginTop: 8 }}>
                     <Card title="先生のおすすめ">
                       {INSTRUCTOR_MENUS.map((menu) => (
@@ -570,37 +563,89 @@ ${userList}
                     </div>
                   </div>
                 )}
-
-                {scoreTarget === entry.id && (
-                  <div style={{ marginTop: 8 }}>
-                    <button
-                      onClick={() => void saveScore(3)}
-                      disabled={loading}
-                      style={{ marginRight: 6 }}
-                    >
-                      簡単
-                    </button>
-
-                    <button
-                      onClick={() => void saveScore(2)}
-                      disabled={loading}
-                      style={{ marginRight: 6 }}
-                    >
-                      普通
-                    </button>
-
-                    <button onClick={() => void saveScore(1)} disabled={loading}>
-                      きつい
-                    </button>
-                  </div>
-                )}
               </div>
             );
           })
         )}
       </div>
 
-      {/* 入力画面 */}
+      <div style={{ marginBottom: 12 }}>
+        <div
+          style={{
+            fontSize: 18,
+            fontWeight: 700,
+            color: "#111827",
+            marginBottom: 6,
+          }}
+        >
+          🔥 今日のトレーニング
+        </div>
+
+        <div
+          style={{
+            fontSize: 14,
+            color: "#6b7280",
+            marginBottom: 8,
+          }}
+        >
+          🔥コツコツが一番強い。前回の続き、いっちゃう？
+        </div>
+
+        <div style={{ marginBottom: 8 }}>
+          <a
+            href="#previous-record"
+            style={{
+              fontSize: 12,
+              color: "#2563eb",
+              textDecoration: "none",
+            }}
+          >
+            前回を見る
+          </a>
+        </div>
+      </div>
+
+      {/* 入力画面：筋トレ・有酸素を上 */}
+      <div style={{ marginBottom: 8, fontSize: 13, color: "#6b7280" }}>
+        例：スクワット10回、ストレッチ5分、ウォーキング20分
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="いま、何やった？（例：スクワット10回）"
+          style={{
+            flex: 1,
+            padding: 10,
+            borderRadius: 8,
+            border: "1px solid #ccc",
+          }}
+          disabled={loading || !threadId}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              void sendMessage();
+            }
+          }}
+        />
+
+        <button
+          onClick={() => void sendMessage()}
+          disabled={loading || !threadId}
+          style={{
+            background: "#111827",
+            color: "#fff",
+            padding: "10px 16px",
+            borderRadius: 8,
+            border: "none",
+          }}
+        >
+          {loading ? "送信中..." : "👉 ナイス積み上げ！"}
+        </button>
+      </div>
+
+      {/* レッスン入力：下 */}
       <div style={{ marginBottom: 12 }}>
         <div style={{ fontSize: 13, marginBottom: 6 }}>レッスン</div>
 
@@ -657,50 +702,9 @@ ${userList}
               border: "none",
             }}
           >
-            追加
+            {loading ? "送信中..." : "👉 ナイス積み上げ！"}
           </button>
         </div>
-      </div>
-
-      <div style={{ marginBottom: 8, fontSize: 13, color: "#6b7280" }}>
-        例：スクワット10回、ストレッチ5分
-      </div>
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={
-            pendingAction ? "やった内容を書いてください" : "今日やったことを書いてみよう"
-          }
-          style={{
-            flex: 1,
-            padding: 10,
-            borderRadius: 8,
-            border: "1px solid #ccc",
-          }}
-          disabled={loading || !threadId}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              void sendMessage();
-            }
-          }}
-        />
-
-        <button
-          onClick={() => void sendMessage()}
-          disabled={loading || !threadId}
-          style={{
-            background: "#111827",
-            color: "#fff",
-            padding: "10px 16px",
-            borderRadius: 8,
-            border: "none",
-          }}
-        >
-          {loading ? "送信中..." : "送信"}
-        </button>
       </div>
 
       {/* 今日の記録 */}
@@ -837,7 +841,151 @@ ${userList}
           )}
         </div>
       </Card>
+
+      {/* 前回の記録 */}
+      <Card title="前回の記録">
+        <div id="previous-record">
+          {previousItems.length === 0 ? (
+            <div style={{ fontSize: 14, color: "#6b7280" }}>
+              まだ前回の記録はありません。
+            </div>
+          ) : (
+            <>
+              <div style={{ marginBottom: 16 }}>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: "#374151",
+                    marginBottom: 8,
+                  }}
+                >
+                  筋トレ
+                </div>
+
+                {previousStrengthItems.length === 0 ? (
+                  <div style={{ fontSize: 14, color: "#6b7280" }}>
+                    記録なし
+                  </div>
+                ) : (
+                  <>
+                    {previousStrengthGroupedItems.map((item) => (
+                      <div
+                        key={item.content}
+                        style={{
+                          marginBottom: 6,
+                          color: "#dc2626",
+                          fontSize: 14,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {(() => {
+                          const base = normalize(item.content);
+                          const count = item.count;
+                          const reps = extractCount(item.content);
+                          const total = reps * count;
+
+                          if (count > 1 && reps > 0) {
+                            return `${base}（${count}セット） 合計${total}回`;
+                          }
+
+                          return base;
+                        })()}
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+
+              <div
+                style={{
+                  height: 1,
+                  background: "#e5e7eb",
+                  margin: "12px 0 16px",
+                }}
+              />
+
+              <div style={{ marginBottom: 16 }}>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: "#374151",
+                    marginBottom: 8,
+                  }}
+                >
+                  有酸素
+                </div>
+
+                {previousCardioItems.length === 0 ? (
+                  <div style={{ fontSize: 14, color: "#6b7280" }}>
+                    記録なし
+                  </div>
+                ) : (
+                  <>
+                    {previousCardioItems.map((item) => (
+                      <div
+                        key={item.id}
+                        style={{
+                          marginBottom: 6,
+                          color: "#dc2626",
+                          fontSize: 14,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {item.content}
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+
+              <div
+                style={{
+                  height: 1,
+                  background: "#e5e7eb",
+                  margin: "12px 0 16px",
+                }}
+              />
+
+              <div>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: "#374151",
+                    marginBottom: 8,
+                  }}
+                >
+                  レッスン
+                </div>
+
+                {previousLessonItems.length === 0 ? (
+                  <div style={{ fontSize: 14, color: "#6b7280" }}>
+                    記録なし
+                  </div>
+                ) : (
+                  <>
+                    {previousLessonItems.map((item) => (
+                      <div
+                        key={item.id}
+                        style={{
+                          marginBottom: 6,
+                          color: "#dc2626",
+                          fontSize: 14,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {item.content}
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </Card>
     </div>
   );
-
 }
