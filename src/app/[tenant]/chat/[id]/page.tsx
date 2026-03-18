@@ -198,6 +198,8 @@ export default function ChatPage() {
     return `いいですね✨
 その調子です。
 
+
+
 今日の記録
 ${list}
 
@@ -446,6 +448,15 @@ ${userList}
     }
   };
 
+
+
+
+
+
+
+
+
+
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: 24 }}>
       <h2>AIトレーニングコーチ</h2>
@@ -454,6 +465,7 @@ ${userList}
         tenant: {tenantSlug} / threadId: {threadId || "(missing)"} / mode: {mode}
       </div>
 
+      {/* AIとの会話 */}
       <div
         style={{
           border: "1px solid #ddd",
@@ -588,6 +600,110 @@ ${userList}
         )}
       </div>
 
+      {/* 入力画面 */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 13, marginBottom: 6 }}>レッスン</div>
+
+        {userMenuOptions.length > 0 && (
+          <div style={{ marginBottom: 8 }}>
+            {userMenuOptions.map((menu) => (
+              <button
+                key={menu}
+                onClick={() => setLessonInput(menu)}
+                style={{
+                  marginRight: 6,
+                  marginBottom: 6,
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  border: "1px solid #d1d5db",
+                  background: "#fff",
+                }}
+                disabled={loading}
+              >
+                {menu}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            placeholder="例：ボディコンバット45分"
+            value={lessonInput}
+            onChange={(e) => setLessonInput(e.target.value)}
+            style={{
+              flex: 1,
+              padding: 10,
+              borderRadius: 8,
+              border: "1px solid #ccc",
+            }}
+            disabled={loading || !threadId}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                void sendLesson();
+              }
+            }}
+          />
+
+          <button
+            onClick={() => void sendLesson()}
+            disabled={loading || !threadId}
+            style={{
+              background: "#111827",
+              color: "#fff",
+              padding: "10px 16px",
+              borderRadius: 8,
+              border: "none",
+            }}
+          >
+            追加
+          </button>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 8, fontSize: 13, color: "#6b7280" }}>
+        例：スクワット10回、ストレッチ5分
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={
+            pendingAction ? "やった内容を書いてください" : "今日やったことを書いてみよう"
+          }
+          style={{
+            flex: 1,
+            padding: 10,
+            borderRadius: 8,
+            border: "1px solid #ccc",
+          }}
+          disabled={loading || !threadId}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              void sendMessage();
+            }
+          }}
+        />
+
+        <button
+          onClick={() => void sendMessage()}
+          disabled={loading || !threadId}
+          style={{
+            background: "#111827",
+            color: "#fff",
+            padding: "10px 16px",
+            borderRadius: 8,
+            border: "none",
+          }}
+        >
+          {loading ? "送信中..." : "送信"}
+        </button>
+      </div>
+
+      {/* 今日の記録 */}
       <Card title="今日の記録">
         <div style={{ marginBottom: 16 }}>
           <div
@@ -721,108 +837,7 @@ ${userList}
           )}
         </div>
       </Card>
-
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 13, marginBottom: 6 }}>レッスン</div>
-
-        {userMenuOptions.length > 0 && (
-          <div style={{ marginBottom: 8 }}>
-            {userMenuOptions.map((menu) => (
-              <button
-                key={menu}
-                onClick={() => setLessonInput(menu)}
-                style={{
-                  marginRight: 6,
-                  marginBottom: 6,
-                  padding: "6px 10px",
-                  borderRadius: 8,
-                  border: "1px solid #d1d5db",
-                  background: "#fff",
-                }}
-                disabled={loading}
-              >
-                {menu}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            placeholder="例：ボディコンバット45分"
-            value={lessonInput}
-            onChange={(e) => setLessonInput(e.target.value)}
-            style={{
-              flex: 1,
-              padding: 10,
-              borderRadius: 8,
-              border: "1px solid #ccc",
-            }}
-            disabled={loading || !threadId}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                void sendLesson();
-              }
-            }}
-          />
-
-          <button
-            onClick={() => void sendLesson()}
-            disabled={loading || !threadId}
-            style={{
-              background: "#111827",
-              color: "#fff",
-              padding: "10px 16px",
-              borderRadius: 8,
-              border: "none",
-            }}
-          >
-            追加
-          </button>
-        </div>
-      </div>
-
-      <div style={{ marginBottom: 8, fontSize: 13, color: "#6b7280" }}>
-        例：スクワット10回、ストレッチ5分
-      </div>
-
-      <div style={{ display: "flex", gap: 8 }}>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={
-            pendingAction ? "やった内容を書いてください" : "今日やったことを書いてみよう"
-          }
-          style={{
-            flex: 1,
-            padding: 10,
-            borderRadius: 8,
-            border: "1px solid #ccc",
-          }}
-          disabled={loading || !threadId}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              void sendMessage();
-            }
-          }}
-        />
-
-        <button
-          onClick={() => void sendMessage()}
-          disabled={loading || !threadId}
-          style={{
-            background: "#111827",
-            color: "#fff",
-            padding: "10px 16px",
-            borderRadius: 8,
-            border: "none",
-          }}
-        >
-          {loading ? "送信中..." : "送信"}
-        </button>
-      </div>
     </div>
   );
+
 }
