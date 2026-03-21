@@ -358,6 +358,19 @@ export default function ChatPage() {
     return data as Entry;
   };
 
+  const addOneMoreSet = async (content: string) => {
+    if (!threadId) return;
+
+    setLoading(true);
+    try {
+      await insertEntry("user", content, "筋トレ");
+      await loadEntries();
+      await loadPreviousItems();
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const buildTrainingPrompt = () => {
     const instructorList = INSTRUCTOR_MENUS.map((item) => `・${item}`).join("\n");
 
@@ -459,7 +472,6 @@ ${userList}
         tenant: {tenantSlug} / threadId: {threadId || "(missing)"} / mode: {mode}
       </div>
 
-      {/* AIとの会話 */}
       <div
         style={{
           border: "1px solid #ddd",
@@ -605,7 +617,6 @@ ${userList}
         </div>
       </div>
 
-      {/* 入力画面：筋トレ・有酸素を上 */}
       <div style={{ marginBottom: 8, fontSize: 13, color: "#6b7280" }}>
         例：スクワット10回、ストレッチ5分、ウォーキング20分
       </div>
@@ -645,7 +656,6 @@ ${userList}
         </button>
       </div>
 
-      {/* レッスン入力：下 */}
       <div style={{ marginBottom: 12 }}>
         <div style={{ fontSize: 13, marginBottom: 6 }}>レッスン</div>
 
@@ -707,7 +717,6 @@ ${userList}
         </div>
       </div>
 
-      {/* 今日の記録 */}
       <Card title="今日の記録">
         <div style={{ marginBottom: 16 }}>
           <div
@@ -731,24 +740,49 @@ ${userList}
                 <div
                   key={item.content}
                   style={{
-                    marginBottom: 6,
-                    color: "#dc2626",
-                    fontSize: 14,
-                    fontWeight: 600,
+                    marginBottom: 10,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
                   }}
                 >
-                  {(() => {
-                    const base = normalize(item.content);
-                    const count = item.count;
-                    const reps = extractCount(item.content);
-                    const total = reps * count;
+                  <div
+                    style={{
+                      color: "#dc2626",
+                      fontSize: 14,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {(() => {
+                      const base = normalize(item.content);
+                      const count = item.count;
+                      const reps = extractCount(item.content);
+                      const total = reps * count;
 
-                    if (count > 1 && reps > 0) {
-                      return `${base}（${count}セット） 合計${total}回`;
-                    }
+                      if (count > 1 && reps > 0) {
+                        return `${base}（${count}セット） 合計${total}回`;
+                      }
 
-                    return base;
-                  })()}
+                      return base;
+                    })()}
+                  </div>
+
+                  <button
+                    onClick={() => void addOneMoreSet(item.content)}
+                    disabled={loading}
+                    style={{
+                      background: "#111827",
+                      color: "#fff",
+                      padding: "6px 10px",
+                      borderRadius: 8,
+                      border: "none",
+                      fontSize: 12,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    ＋1セット
+                  </button>
                 </div>
               ))}
             </>
@@ -842,7 +876,6 @@ ${userList}
         </div>
       </Card>
 
-      {/* 前回の記録 */}
       <Card title="前回の記録">
         <div id="previous-record">
           {previousItems.length === 0 ? (
