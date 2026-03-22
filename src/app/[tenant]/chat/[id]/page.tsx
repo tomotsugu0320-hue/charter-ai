@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 type Mode = "standard" | "buddy" | "sayaka";
-type Category = "筋トレ" | "有酸素" | "レッスン";
+type Category = "筋トレ" | "有酸素" | "レッスン" | "メモ";
 
 type Entry = {
   id: string;
@@ -22,8 +22,22 @@ const INSTRUCTOR_MENUS = [
   "スクワット10回",
 ] as const;
 
+function toHalfWidth(str: string) {
+  return str.replace(/[０-９]/g, (s) =>
+    String.fromCharCode(s.charCodeAt(0) - 0xfee0)
+  );
+}
+
 function detectCategory(text: string): Category {
-  const t = text.trim();
+  const t = toHalfWidth(text).trim();
+
+  if (
+    /疲れ|きつい|吐き|体調|痛い|違和感|眠い|だるい|重い|食後|気持ち悪|しんどい/.test(
+      t
+    )
+  ) {
+    return "メモ";
+  }
 
   if (
     /ヨガ|ボディジャム|ボディコンバット|ボディパンプ|ピラティス|レッスン|スタジオ/.test(
@@ -56,23 +70,24 @@ function isNoiseText(text: string) {
 
 function looksLikeTrainingAction(text: string) {
   return /腹筋|腕立て|伏せ|スクワット|ストレッチ|歩いた|歩く|分|時間|回|セット|やった|した|ラン|ウォーク|スカッシュ|ヨガ|ボディジャム|ボディコンバット|レッスン|スタジオ/.test(
-    text.trim()
+    toHalfWidth(text).trim()
   );
 }
 
 function normalizeMenuInput(text: string) {
-  const t = text.trim();
+  const t = toHalfWidth(text).trim();
   if (/やった$|した$/.test(t)) return t;
   return `${t}やった`;
 }
 
 function extractCount(text: string) {
-  const match = text.match(/(\d+)回/);
+  const normalized = toHalfWidth(text);
+  const match = normalized.match(/(\d+)回/);
   return match ? Number(match[1]) : 0;
 }
 
 function normalize(text: string) {
-  return text.replace(/やった|した/g, "").trim();
+  return toHalfWidth(text).replace(/やった|した/g, "").trim();
 }
 
 function Card({
@@ -119,9 +134,13 @@ export default function ChatPage() {
   const [previousItems, setPreviousItems] = useState<Entry[]>([]);
   const [input, setInput] = useState("");
   const [lessonInput, setLessonInput] = useState("");
+  const [memoInput, setMemoInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [pendingAction, setPendingAction] = useState(false);
   const [userMenuOptions, setUserMenuOptions] = useState<string[]>([]);
+  const [selectedPreviousMenu, setSelectedPreviousMenu] = useState("");
+
+  const trainingInputRef = useRef<HTMLInputElement | null>(null);
 
   const lastAiId = useMemo(() => {
     return [...entries].reverse().find((e) => e.role === "ai")?.id ?? null;
@@ -138,18 +157,19 @@ export default function ChatPage() {
     );
   };
 
-  const getTodayTrainingItems = () => {
+  const getTodayDisplayItems = () => {
     const todayKey = getTodayKey();
 
     return entries.filter((e) => {
       if (e.role !== "user") return false;
       if (!e.created_at?.startsWith(todayKey)) return false;
       if (isNoiseText(e.content)) return false;
+      if (e.category === "メモ") return true;
       return looksLikeTrainingAction(e.content);
     });
   };
 
-  const todayItems = getTodayTrainingItems();
+  const todayItems = getTodayDisplayItems();
 
   const getCategory = (e: Entry): Category => {
     if (e.category) return e.category;
@@ -159,6 +179,7 @@ export default function ChatPage() {
   const strengthItems = todayItems.filter((e) => getCategory(e) === "筋トレ");
   const cardioItems = todayItems.filter((e) => getCategory(e) === "有酸素");
   const lessonItems = todayItems.filter((e) => getCategory(e) === "レッスン");
+  const memoItems = todayItems.filter((e) => getCategory(e) === "メモ");
 
   const previousStrengthItems = previousItems.filter(
     (e) => getCategory(e) === "筋トレ"
@@ -169,6 +190,34 @@ export default function ChatPage() {
   const previousLessonItems = previousItems.filter(
     (e) => getCategory(e) === "レッスン"
   );
+  const previousMemoItems = previousItems.filter(
+    (e) => getCategory(e) === "メモ"
+  );
+
+
+const previousTrainingOptions = useMemo(() => {
+  const freqMap: Record<string, number> = {};
+
+  previousItems
+    .filter((e) => {
+      const category = getCategory(e);
+      return category === "筋トレ" || category === "有酸素";
+    })
+    .map((e) => toHalfWidth(e.content).trim())
+    .filter(Boolean)
+    .forEach((content) => {
+      freqMap[content] = (freqMap[content] || 0) + 1;
+    });
+
+  return Object.entries(freqMap)
+    .sort((a, b) => b[1] - a[1]) // ←ここが重要（多い順）
+    .map(([content]) => content);
+}, [previousItems]);
+
+
+
+  const previousTrainingTopOptions = previousTrainingOptions.slice(0, 7);
+  const previousTrainingMoreOptions = previousTrainingOptions.slice(7);
 
   const strengthGroupedItems = Object.values(
     strengthItems.reduce((acc, item) => {
@@ -244,6 +293,7 @@ export default function ChatPage() {
 
     const validRows = rows.filter((e) => {
       if (isNoiseText(e.content)) return false;
+      if (e.category === "メモ") return true;
       return looksLikeTrainingAction(e.content);
     });
 
@@ -332,7 +382,7 @@ export default function ChatPage() {
     const payload = {
       thread_id: threadId,
       role,
-      content,
+      content: toHalfWidth(content),
       mode,
       category,
     };
@@ -356,19 +406,6 @@ export default function ChatPage() {
     }
 
     return data as Entry;
-  };
-
-  const addOneMoreSet = async (content: string) => {
-    if (!threadId) return;
-
-    setLoading(true);
-    try {
-      await insertEntry("user", content, "筋トレ");
-      await loadEntries();
-      await loadPreviousItems();
-    } finally {
-      setLoading(false);
-    }
   };
 
   const buildTrainingPrompt = () => {
@@ -404,7 +441,7 @@ ${userList}
   };
 
   const sendLesson = async () => {
-    const text = lessonInput.trim();
+    const text = toHalfWidth(lessonInput).trim();
     if (!text) return;
 
     setLoading(true);
@@ -429,8 +466,25 @@ ${userList}
     }
   };
 
+  const sendMemo = async () => {
+    const text = toHalfWidth(memoInput).trim();
+    if (!text) return;
+
+    setLoading(true);
+
+    try {
+      await insertEntry("user", text, "メモ");
+      await insertEntry("ai", "いい気づき👍 次に活かそう");
+      setMemoInput("");
+      await loadEntries();
+      await loadPreviousItems();
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const sendMessage = async () => {
-    const text = input.trim();
+    const text = toHalfWidth(input).trim();
 
     if (!threadId) {
       console.error("sendMessage blocked: threadId missing");
@@ -462,6 +516,26 @@ ${userList}
     } finally {
       setLoading(false);
     }
+  };
+
+  const jumpToTrainingInput = () => {
+    requestAnimationFrame(() => {
+      trainingInputRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      trainingInputRef.current?.focus();
+    });
+  };
+
+  const usePreviousTrainingMenu = (content: string) => {
+    setInput(normalizeMenuInput(content));
+    jumpToTrainingInput();
+  };
+
+  const useTodayTrainingMenu = (content: string) => {
+    setInput(toHalfWidth(content));
+    jumpToTrainingInput();
   };
 
   return (
@@ -538,6 +612,7 @@ ${userList}
                           key={`inst-${menu}`}
                           onClick={() => {
                             setInput(normalizeMenuInput(menu));
+                            jumpToTrainingInput();
                           }}
                           style={{ marginRight: 8, marginBottom: 8 }}
                           disabled={loading}
@@ -554,6 +629,7 @@ ${userList}
                             key={`user-${menu}`}
                             onClick={() => {
                               setInput(normalizeMenuInput(menu));
+                              jumpToTrainingInput();
                             }}
                             style={{ marginRight: 8, marginBottom: 8 }}
                             disabled={loading}
@@ -617,14 +693,79 @@ ${userList}
         </div>
       </div>
 
+      {previousTrainingOptions.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: "#374151",
+              marginBottom: 8,
+            }}
+          >
+            前回のメニュー
+          </div>
+
+          <div style={{ marginBottom: 8 }}>
+            {previousTrainingTopOptions.map((menu) => (
+              <button
+                key={menu}
+                onClick={() => usePreviousTrainingMenu(menu)}
+                style={{
+                  marginRight: 6,
+                  marginBottom: 6,
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  border: "1px solid #d1d5db",
+                  background: "#fff",
+                  cursor: "pointer",
+                }}
+                disabled={loading}
+              >
+                {menu}
+              </button>
+            ))}
+          </div>
+
+          {previousTrainingMoreOptions.length > 0 && (
+            <select
+              value={selectedPreviousMenu}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSelectedPreviousMenu(value);
+                if (value) {
+                  usePreviousTrainingMenu(value);
+                }
+              }}
+              style={{
+                width: "100%",
+                padding: 10,
+                borderRadius: 8,
+                border: "1px solid #d1d5db",
+                background: "#fff",
+              }}
+              disabled={loading}
+            >
+              <option value="">他の前回メニューを選ぶ</option>
+              {previousTrainingMoreOptions.map((menu) => (
+                <option key={menu} value={menu}>
+                  {menu}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
+
       <div style={{ marginBottom: 8, fontSize: 13, color: "#6b7280" }}>
         例：スクワット10回、ストレッチ5分、ウォーキング20分
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
         <input
+          ref={trainingInputRef}
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => setInput(toHalfWidth(e.target.value))}
           placeholder="いま、何やった？（例：スクワット10回）"
           style={{
             flex: 1,
@@ -685,7 +826,7 @@ ${userList}
           <input
             placeholder="例：ボディコンバット45分"
             value={lessonInput}
-            onChange={(e) => setLessonInput(e.target.value)}
+            onChange={(e) => setLessonInput(toHalfWidth(e.target.value))}
             style={{
               flex: 1,
               padding: 10,
@@ -717,6 +858,42 @@ ${userList}
         </div>
       </div>
 
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 13, marginBottom: 6 }}>📝 今日のメモ</div>
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <textarea
+            placeholder="今日の気づき・体調など（例：食後できつかった）"
+            value={memoInput}
+            onChange={(e) => setMemoInput(toHalfWidth(e.target.value))}
+            style={{
+              flex: 1,
+              minHeight: 72,
+              padding: 10,
+              borderRadius: 8,
+              border: "1px solid #ccc",
+              resize: "vertical",
+            }}
+            disabled={loading || !threadId}
+          />
+
+          <button
+            onClick={() => void sendMemo()}
+            disabled={loading || !threadId}
+            style={{
+              background: "#111827",
+              color: "#fff",
+              padding: "10px 16px",
+              borderRadius: 8,
+              border: "none",
+              alignSelf: "flex-start",
+            }}
+          >
+            {loading ? "送信中..." : "📝 記録する"}
+          </button>
+        </div>
+      </div>
+
       <Card title="今日の記録">
         <div style={{ marginBottom: 16 }}>
           <div
@@ -737,23 +914,27 @@ ${userList}
           ) : (
             <>
               {strengthGroupedItems.map((item) => (
-                <div
+                <button
                   key={item.content}
+                  onClick={() => useTodayTrainingMenu(item.content)}
+                  disabled={loading}
                   style={{
-                    marginBottom: 10,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    gap: 12,
+                    width: "100%",
+                    marginBottom: 8,
+                    padding: "12px 14px",
+                    borderRadius: 10,
+                    border: "1px solid #cbd5e1",
+                    background: "#f8fafc",
+                    color: "#dc2626",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: "pointer",
                   }}
                 >
-                  <div
-                    style={{
-                      color: "#dc2626",
-                      fontSize: 14,
-                      fontWeight: 600,
-                    }}
-                  >
+                  <span>
                     {(() => {
                       const base = normalize(item.content);
                       const count = item.count;
@@ -766,24 +947,17 @@ ${userList}
 
                       return base;
                     })()}
-                  </div>
-
-                  <button
-                    onClick={() => void addOneMoreSet(item.content)}
-                    disabled={loading}
+                  </span>
+                  <span
                     style={{
-                      background: "#111827",
-                      color: "#fff",
-                      padding: "6px 10px",
-                      borderRadius: 8,
-                      border: "none",
+                      color: "#2563eb",
                       fontSize: 12,
-                      whiteSpace: "nowrap",
+                      fontWeight: 700,
                     }}
                   >
-                    ＋1セット
-                  </button>
-                </div>
+                    これ使う
+                  </span>
+                </button>
               ))}
             </>
           )}
@@ -840,7 +1014,7 @@ ${userList}
           }}
         />
 
-        <div>
+        <div style={{ marginBottom: 16 }}>
           <div
             style={{
               fontSize: 14,
@@ -866,6 +1040,49 @@ ${userList}
                     color: "#dc2626",
                     fontSize: 14,
                     fontWeight: 600,
+                  }}
+                >
+                  {item.content}
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+
+        <div
+          style={{
+            height: 1,
+            background: "#e5e7eb",
+            margin: "12px 0 16px",
+          }}
+        />
+
+        <div>
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: "#374151",
+              marginBottom: 8,
+            }}
+          >
+            メモ
+          </div>
+
+          {memoItems.length === 0 ? (
+            <div style={{ fontSize: 14, color: "#6b7280" }}>
+              今日はまだメモなし。
+            </div>
+          ) : (
+            <>
+              {memoItems.map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    marginBottom: 8,
+                    color: "#374151",
+                    fontSize: 14,
+                    lineHeight: 1.6,
                   }}
                 >
                   {item.content}
@@ -981,7 +1198,7 @@ ${userList}
                 }}
               />
 
-              <div>
+              <div style={{ marginBottom: 16 }}>
                 <div
                   style={{
                     fontSize: 14,
@@ -1007,6 +1224,49 @@ ${userList}
                           color: "#dc2626",
                           fontSize: 14,
                           fontWeight: 600,
+                        }}
+                      >
+                        {item.content}
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+
+              <div
+                style={{
+                  height: 1,
+                  background: "#e5e7eb",
+                  margin: "12px 0 16px",
+                }}
+              />
+
+              <div>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: "#374151",
+                    marginBottom: 8,
+                  }}
+                >
+                  メモ
+                </div>
+
+                {previousMemoItems.length === 0 ? (
+                  <div style={{ fontSize: 14, color: "#6b7280" }}>
+                    記録なし
+                  </div>
+                ) : (
+                  <>
+                    {previousMemoItems.map((item) => (
+                      <div
+                        key={item.id}
+                        style={{
+                          marginBottom: 8,
+                          color: "#374151",
+                          fontSize: 14,
+                          lineHeight: 1.6,
                         }}
                       >
                         {item.content}
