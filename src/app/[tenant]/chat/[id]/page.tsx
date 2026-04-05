@@ -876,15 +876,17 @@ async function loadStanceStats(issueId: string) {
       const data = await res.json();
 
 const matchedIssues = data.matches
-  .map((m: any) => {
+.map((m: { title: string; reason?: string }) => {
     const issue = issues.find((i) => i.title === m.title);
     if (!issue) return null;
     return { ...issue, reason: m.reason };
   })
   .filter(Boolean);
 
+const newIssueTitles: string[] = Array.isArray(data.newIssues)
+  ? data.newIssues.filter((t: any) => typeof t === "string")
+  : [];
 
-const newIssueTitles = Array.isArray(data.newIssues) ? data.newIssues : [];
 
 setSuggestedIssuesMap((prev) => ({
   ...prev,
