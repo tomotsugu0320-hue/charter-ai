@@ -50,10 +50,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+
 const rawText = suggestion.proposed_text;
 
 // ② 仮タイトル（今はそのまま）
-const title = rawText;
+let title = rawText;
+
+// 簡易論点生成（仮ロジック）
+if (rawText.includes("消費税")) {
+  title = "消費税は減税すべきか？";
+}
+
 const slug = makeSlug(title);
 
 

@@ -30,7 +30,7 @@ export default function ForumPage() {
   const [error, setError] = useState<string | null>(null);
 const [popularThreads, setPopularThreads] = useState<any[]>([]);
 const [activeThreads, setActiveThreads] = useState<any[]>([]);
-
+const [generatedIssue, setGeneratedIssue] = useState<string | null>(null);
 
 useEffect(() => {
   (async () => {
@@ -51,49 +51,62 @@ useEffect(() => {
 }, []);
 
 
+const handleSubmit = async () => {
+  const trimmed = text.trim();
 
+  if (!trimmed) {
+    setError("入力してから投稿して。");
+    return;
+  }
 
+  setLoading(true);
+  setError(null);
 
+  try {
+    // 👇 追加（ここ！！）
+    const issueRes = await fetch("/api/forum/generate-issue", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ content: trimmed }),
+    });
 
-  const handleSubmit = async () => {
-    const trimmed = text.trim();
+    const { issue } = await issueRes.json();
+      setGeneratedIssue(issue);
 
-    if (!trimmed) {
-      setError("入力してから投稿して。");
-      return;
+    console.log("[generated issue]", issue);
+
+    // ここで今はログだけでOK（後でDBに入れる）
+
+    // 👇 既存処理
+    const res = await fetch("/api/forum/thread-suggestions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text: trimmed }),
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      throw new Error(result?.error || "APIエラー");
     }
 
-    setLoading(true);
-    setError(null);
+    setSuggestions(result.suggestions ?? []);
+    setShouldCreate(result.shouldCreate ?? false);
+    setSuggestionId(result.suggestionId ?? null);
+    setRawResult(result);
 
-    try {
-      const res = await fetch("/api/forum/thread-suggestions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ text: trimmed }),
-      });
+  } catch (e: any) {
+    console.error(e);
+    setError(e?.message || "送信に失敗した");
+  } finally {
+    setLoading(false);
+  }
+};
 
-      const result = await res.json();
-
-      if (!res.ok) {
-        throw new Error(result?.error || "APIエラー");
-      }
-
-      console.log("[thread-suggestions result]", result);
-
-      setSuggestions(result.suggestions ?? []);
-      setShouldCreate(result.shouldCreate ?? false);
-      setSuggestionId(result.suggestionId ?? null);
-      setRawResult(result);
-    } catch (e: any) {
-      console.error(e);
-      setError(e?.message || "送信に失敗した");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <main
@@ -208,6 +221,21 @@ useEffect(() => {
         >
           投稿したい内容
         </label>
+
+{generatedIssue && (
+  <div
+    style={{
+      marginBottom: 12,
+      padding: 10,
+      background: "#f0f4ff",
+      borderRadius: 8,
+      fontSize: 14,
+      fontWeight: 600,
+    }}
+  >
+    🧠 論点：{generatedIssue}
+  </div>
+)}
 
         <textarea
           id="forum-text"
