@@ -206,7 +206,7 @@ const visibleActiveThreads = activeThreads.filter(
 
 
       <p style={{ color: "#555", marginBottom: 20 }}>
-        考えをそのまま書いてください。似ている議論があれば提案します。
+        AIが論点を整理し、既存の議論とつなげます。
       </p>
 
       <div
