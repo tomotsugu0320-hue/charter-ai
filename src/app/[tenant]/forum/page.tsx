@@ -108,6 +108,12 @@ const handleSubmit = async () => {
 };
 
 
+const popularIds = new Set(popularThreads.map((t) => t.id));
+
+const visibleActiveThreads = activeThreads.filter(
+  (t) => !popularIds.has(t.id)
+);
+
   return (
     <main
       style={{
@@ -164,7 +170,7 @@ const handleSubmit = async () => {
     📈 議論が活発なスレ
   </h2>
 
-  {activeThreads.map((t) => (
+{visibleActiveThreads.map((t) => (
     <div
       key={t.id}
       style={{
@@ -233,7 +239,10 @@ const handleSubmit = async () => {
       fontWeight: 600,
     }}
   >
-    🧠 論点：{generatedIssue}
+🧠 この話の論点：
+<div style={{ marginTop: 4, fontWeight: 700 }}>
+  {generatedIssue}
+</div>
   </div>
 )}
 
