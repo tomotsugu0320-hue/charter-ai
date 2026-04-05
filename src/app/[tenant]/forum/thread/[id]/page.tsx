@@ -851,6 +851,7 @@ opacity: (() => {
   if (score >= 40) return 0.6;
   return 0.4;
 })(),
+}}
                               >
                                 <div style={{ fontWeight: 700, marginBottom: 6 }}>
                                   💬 意見
