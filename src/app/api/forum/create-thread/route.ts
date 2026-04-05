@@ -65,6 +65,59 @@ const slug = makeSlug(title);
 
 
 // ③ forum_threads 作成
+
+// 既存スレ検索（論点一致）
+const { data: existing } = await supabase
+  .from("forum_threads")
+  .select("id")
+  .eq("title", title)
+  .limit(1)
+  .maybeSingle();
+
+if (existing) {
+  return NextResponse.json({
+    success: true,
+    threadId: existing.id,
+  });
+}
+
+// 🔽 類似一致（ここから追加）
+
+const { data: allThreads } = await supabase
+  .from("forum_threads")
+  .select("id, title");
+
+function isSimilar(a: string, b: string) {
+  const normalize = (s: string) =>
+    s.replace(/[？?]/g, "").toLowerCase();
+
+  const na = normalize(a);
+  const nb = normalize(b);
+
+  return na.includes(nb) || nb.includes(na);
+}
+
+let matched = null;
+
+if (allThreads) {
+  for (const t of allThreads) {
+    if (isSimilar(t.title, title)) {
+      matched = t;
+      break;
+    }
+  }
+}
+
+if (matched) {
+  return NextResponse.json({
+    success: true,
+    threadId: matched.id,
+  });
+}
+
+// 🔼 類似一致ここまで
+
+// ③ forum_threads 作成
 const { data: thread, error: threadError } = await supabase
   .from("forum_threads")
   .insert({
@@ -75,12 +128,12 @@ const { data: thread, error: threadError } = await supabase
   .select("id")
   .single();
 
-    if (threadError || !thread) {
-      return NextResponse.json(
-        { success: false, error: threadError?.message },
-        { status: 500 }
-      );
-    }
+if (threadError || !thread) {
+  return NextResponse.json(
+    { success: false, error: threadError?.message },
+    { status: 500 }
+  );
+}
 
     const threadId = thread.id;
 
