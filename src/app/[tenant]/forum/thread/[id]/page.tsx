@@ -838,8 +838,19 @@ export default function ForumThreadPage({ params }: PageProps) {
                                   borderRadius: 10,
                                   border: "1px solid #ddd",
                                   background: "#fff",
-                                  opacity: isLowScore ? 0.45 : 1,
-                                }}
+
+opacity: (() => {
+  const score = op.opinion.logic_score ?? 0;
+
+  if (hideLowScore && score > 0 && score < 60) {
+    return 0.3;
+  }
+
+  if (score >= 80) return 1;
+  if (score >= 60) return 0.8;
+  if (score >= 40) return 0.6;
+  return 0.4;
+})(),
                               >
                                 <div style={{ fontWeight: 700, marginBottom: 6 }}>
                                   💬 意見
@@ -850,7 +861,15 @@ export default function ForumThreadPage({ params }: PageProps) {
                                       color: "#2e7d32",
                                     }}
                                   >
-                                    {op.opinion.logic_score ?? "未評価"}
+{op.opinion.logic_score ?? "未評価"}
+
+<span style={{ marginLeft: 6 }}>
+  {(op.opinion.logic_score ?? 0) >= 80
+    ? "🔥 強い"
+    : (op.opinion.logic_score ?? 0) >= 60
+    ? "👍 普通"
+    : "⚠️ 弱い"}
+</span>
                                   </span>
                                 </div>
 
@@ -1013,7 +1032,19 @@ export default function ForumThreadPage({ params }: PageProps) {
                                           <div
                                             key={child.id}
                                             style={{
-                                              opacity: childLowScore ? 0.45 : 1,
+
+opacity: (() => {
+  const score = child.logic_score ?? 0;
+
+  if (hideLowScore && score > 0 && score < 60) {
+    return 0.3;
+  }
+
+  if (score >= 80) return 1;
+  if (score >= 60) return 0.8;
+  if (score >= 40) return 0.6;
+  return 0.4;
+})(),
                                             }}
                                           >
                                             <div
@@ -1026,8 +1057,18 @@ export default function ForumThreadPage({ params }: PageProps) {
                                                     : "#555",
                                               }}
                                             >
-                                              {roleLabel(child.post_role)}（
-                                              {child.logic_score ?? "未評価"}）
+
+{roleLabel(child.post_role)}（
+  {child.logic_score ?? "未評価"}
+）
+
+<span style={{ marginLeft: 6 }}>
+  {(child.logic_score ?? 0) >= 80
+    ? "🔥 強い"
+    : (child.logic_score ?? 0) >= 60
+    ? "👍 普通"
+    : "⚠️ 弱い"}
+</span>
                                             </div>
                                             <div>{child.content}</div>
                                           </div>
