@@ -928,7 +928,7 @@ const normalizedExistingTitles = issues.map((i) =>
   i.title.replace(/\s/g, "").toLowerCase()
 );
 
-const filteredNewIssueTitles = newIssueTitles.filter((title) => {
+const filteredNewIssueTitles = newIssueTitles.filter((title: string) => {
   const normalized = title.replace(/\s/g, "").toLowerCase();
 
   return !normalizedExistingTitles.some((existing) =>
