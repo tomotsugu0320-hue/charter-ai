@@ -16,6 +16,7 @@ type Entry = {
   stance_label?: string | null;
 };
 
+
 type Issue = {
   id: string;
   thread_id: string;
@@ -27,7 +28,9 @@ type Issue = {
   side_b?: string | null;
   core_conflict?: string | null;
   reason_type: string | string[] | null;
+  reason?: string | null;
 };
+
 
 type PostIssue = {
   id: string;
