@@ -3,9 +3,15 @@
 "use client";
 
 import { useState } from "react";
-import type { MacroStructure } from "@/types/macro";
+import { useRouter } from "next/navigation";
+
+type MacroStructure = {
+  goal: string;
+  nodes: string[];
+};
 
 export default function MacroPage() {
+const router = useRouter();
   const [goal, setGoal] = useState("");
   const [result, setResult] = useState<MacroStructure | null>(null);
   const [loading, setLoading] = useState(false);
@@ -103,38 +109,24 @@ export default function MacroPage() {
 
           <div>
             <h2>論点</h2>
-            <ul>
-              {result.issues.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h2>ボトルネック</h2>
-            <ul>
-              {result.bottlenecks.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h2>レバー</h2>
-            <ul>
-              {result.levers.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h2>副作用</h2>
-            <ul>
-              {result.sideEffects.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
+<ul>
+  {result.nodes.map((item) => (
+    <li
+      key={item}
+      style={{
+        cursor: "pointer",
+        padding: "6px 0",
+        borderBottom: "1px solid #eee",
+      }}
+      onClick={() => {
+        console.log("node clicked:", item);
+router.push(`/dev/forum?keyword=${item}&goal=${result.goal}`);
+      }}
+    >
+      ■ {item}
+    </li>
+  ))}
+</ul>
           </div>
         </section>
       )}

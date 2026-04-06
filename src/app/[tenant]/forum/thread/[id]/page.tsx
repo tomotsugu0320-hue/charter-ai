@@ -85,6 +85,35 @@ const POST_ROLE_OPTIONS: PostRoleOption[] = [
   { value: "explanation", label: "解説" },
 ];
 
+
+function splitContent(content: string) {
+  if (!content) {
+    return {
+      claim: "",
+      premises: [],
+      reasons: [],
+    };
+  }
+
+  // 超シンプル分解（あとでAIに置換）
+  const sentences = content
+    .split(/[。！？\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const claim = sentences[0] ?? "";
+
+  const premises = sentences.slice(1, 3);
+  const reasons = sentences.slice(3);
+
+  return {
+    claim,
+    premises,
+    reasons,
+  };
+}
+
+
 function formatDate(value?: string) {
   if (!value) return "";
   const d = new Date(value);
@@ -124,6 +153,7 @@ export default function ForumThreadPage({ params }: PageProps) {
   const [conflicts, setConflicts] = useState<
     { opinion: string; rebuttal: string }[]
   >([]);
+const [explanations, setExplanations] = useState<Record<string, string>>({});
 
   const [tenant, setTenant] = useState("");
   const [threadId, setThreadId] = useState("");
@@ -436,6 +466,7 @@ export default function ForumThreadPage({ params }: PageProps) {
 
       const result = await res.json();
 
+
       if (!res.ok) {
         throw new Error(result?.error || "読込失敗");
       }
@@ -516,7 +547,6 @@ export default function ForumThreadPage({ params }: PageProps) {
       setPredictionFlag(false);
       setPredictionTarget("");
       setPredictionDeadline("");
-      await loadThread();
     } catch (e: any) {
       console.error(e);
       setError(e?.message || "投稿失敗");
@@ -527,6 +557,9 @@ export default function ForumThreadPage({ params }: PageProps) {
   }
 
   async function handleFeedback(postId: string, feedbackType: string) {
+
+console.log("clicked", postId, feedbackType);
+
     if (!threadId) {
       alert("threadIdがない。");
       return;
@@ -536,25 +569,38 @@ export default function ForumThreadPage({ params }: PageProps) {
     setError(null);
 
     try {
-      const res = await fetch("/api/forum/feedback", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          threadId,
-          postId,
-          feedbackType,
-        }),
-      });
+const res = await fetch("/api/forum/feedback", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    threadId,
+    postId,
+    feedbackType,
+  }),
+});
 
-      const result = await res.json();
+const result = await res.json();
 
-      if (!res.ok) {
-        throw new Error(result?.error || "feedback保存失敗");
-      }
 
-      await loadThread();
+console.log("explanation:", result.explanation);
+
+
+if (!res.ok) {
+  throw new Error(result?.error || "feedback保存失敗");
+}
+
+
+if (result.explanation) {
+  setExplanations((prev) => ({
+    ...prev,
+    [String(postId)]: result.explanation,
+  }));
+}
+
+
+// await loadThread(); ← 消す
+
+
     } catch (e: any) {
       console.error(e);
       setError(e?.message || "feedback保存失敗");
@@ -720,6 +766,88 @@ export default function ForumThreadPage({ params }: PageProps) {
             )}
           </section>
 
+<section
+  style={{
+    marginTop: 24,
+    border: "1px solid #ddd",
+    borderRadius: 16,
+    padding: 20,
+    background: "#fff",
+  }}
+>
+  <h2
+    style={{
+      margin: 0,
+      marginBottom: 12,
+      fontSize: 24,
+      fontWeight: 800,
+    }}
+  >
+    主な論点
+  </h2>
+
+  <div style={{ color: "#444", lineHeight: 1.8 }}>
+    {summary?.key_points?.issues?.length ? (
+      <ul style={{ margin: 0, paddingLeft: 20 }}>
+        {summary.key_points.issues.map((item, index) => (
+          <li key={`${item}-${index}`}>{item}</li>
+        ))}
+      </ul>
+    ) : (
+      <div style={{ color: "#666" }}>まだ論点は整理されていない。</div>
+    )}
+  </div>
+
+
+</section>
+
+
+<section
+  style={{
+    marginTop: 24,
+    border: "1px solid #ddd",
+    borderRadius: 16,
+    padding: 20,
+    background: "#fff",
+  }}
+>
+  <h2
+    style={{
+      margin: 0,
+      marginBottom: 12,
+      fontSize: 24,
+      fontWeight: 800,
+    }}
+  >
+    主な対立
+  </h2>
+
+  {conflicts && conflicts.length > 0 ? (
+    <div style={{ display: "grid", gap: 10 }}>
+      {conflicts.map((c, i) => (
+        <div
+          key={i}
+          style={{
+            padding: 10,
+            borderRadius: 8,
+            background: "#fafafa",
+            border: "1px solid #eee",
+          }}
+        >
+          <div style={{ color: "#b71c1c", fontWeight: 700 }}>
+            A：{c.opinion}
+          </div>
+          <div style={{ color: "#0d47a1", fontWeight: 700 }}>
+            B：{c.rebuttal}
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div style={{ color: "#666" }}>対立はまだ抽出されていない。</div>
+  )}
+</section>
+
           <section
             style={{
               marginTop: 24,
@@ -875,130 +1003,165 @@ opacity: (() => {
                                 </div>
 
                                 <div style={{ marginBottom: 8 }}>
-                                  {op.opinion.content}
+                                 {(() => {
+  const { claim, premises, reasons } = splitContent(op.opinion.content);
+
+  return (
+    <div>
+      {/* 主張 */}
+      <div style={{ marginBottom: 6 }}>
+        <div style={{ fontWeight: 800 }}>主張</div>
+        <div>{claim}</div>
+      </div>
+
+      {/* 前提 */}
+      {premises.length > 0 && (
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontWeight: 800 }}>前提</div>
+          <ul style={{ paddingLeft: 20 }}>
+            {premises.map((p, i) => (
+              <li key={i}>{p}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 根拠 */}
+      {reasons.length > 0 && (
+        <div>
+          <div style={{ fontWeight: 800 }}>根拠</div>
+          <ul style={{ paddingLeft: 20 }}>
+            {reasons.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+})()}
                                 </div>
 
-                                <div
-                                  style={{
-                                    marginBottom: 10,
-                                    display: "flex",
-                                    flexWrap: "wrap",
-                                    gap: 8,
-                                  }}
-                                >
-                                  <button
-                                    onClick={() =>
-                                      handleFeedback(op.opinion.id, "term_unknown")
-                                    }
-                                    disabled={feedbackLoadingPostId === op.opinion.id}
-                                    style={{
-                                      border: "1px solid #ccc",
-                                      borderRadius: 999,
-                                      padding: "6px 10px",
-                                      background: "#fff",
-                                      fontSize: 12,
-                                      cursor:
-                                        feedbackLoadingPostId === op.opinion.id
-                                          ? "default"
-                                          : "pointer",
-                                    }}
-                                  >
-                                    ❓ 言葉がわからん (
-                                    {op.opinion.feedback_counts?.term_unknown ?? 0})
-                                  </button>
+<div
+  style={{
+    marginBottom: 10,
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 8,
+  }}
+>
+  <button
+    onClick={() => handleFeedback(op.opinion.id, "term_unknown")}
+    disabled={feedbackLoadingPostId === op.opinion.id}
+    style={{
+      border: "1px solid #ccc",
+      borderRadius: 999,
+      padding: "6px 10px",
+      background: "#fff",
+      fontSize: 12,
+      cursor:
+        feedbackLoadingPostId === op.opinion.id ? "default" : "pointer",
+    }}
+  >
+    ❓ 言葉がわからん ({op.opinion.feedback_counts?.term_unknown ?? 0})
+  </button>
 
-                                  <button
-                                    onClick={() =>
-                                      handleFeedback(op.opinion.id, "premise_unknown")
-                                    }
-                                    disabled={feedbackLoadingPostId === op.opinion.id}
-                                    style={{
-                                      border: "1px solid #ccc",
-                                      borderRadius: 999,
-                                      padding: "6px 10px",
-                                      background: "#fff",
-                                      fontSize: 12,
-                                      cursor:
-                                        feedbackLoadingPostId === op.opinion.id
-                                          ? "default"
-                                          : "pointer",
-                                    }}
-                                  >
-                                    ❓ 前提がわからん (
-                                    {op.opinion.feedback_counts?.premise_unknown ?? 0})
-                                  </button>
+  <button
+    onClick={() => handleFeedback(op.opinion.id, "premise_unknown")}
+    disabled={feedbackLoadingPostId === op.opinion.id}
+    style={{
+      border: "1px solid #ccc",
+      borderRadius: 999,
+      padding: "6px 10px",
+      background: "#fff",
+      fontSize: 12,
+      cursor:
+        feedbackLoadingPostId === op.opinion.id ? "default" : "pointer",
+    }}
+  >
+    ❓ 前提がわからん ({op.opinion.feedback_counts?.premise_unknown ?? 0})
+  </button>
 
-                                  <button
-                                    onClick={() =>
-                                      handleFeedback(
-                                        op.opinion.id,
-                                        "conclusion_unknown"
-                                      )
-                                    }
-                                    disabled={feedbackLoadingPostId === op.opinion.id}
-                                    style={{
-                                      border: "1px solid #ccc",
-                                      borderRadius: 999,
-                                      padding: "6px 10px",
-                                      background: "#fff",
-                                      fontSize: 12,
-                                      cursor:
-                                        feedbackLoadingPostId === op.opinion.id
-                                          ? "default"
-                                          : "pointer",
-                                    }}
-                                  >
-                                    ❓ 結論がわからん (
-                                    {op.opinion.feedback_counts?.conclusion_unknown ?? 0})
-                                  </button>
+  <button
+    onClick={() => handleFeedback(op.opinion.id, "conclusion_unknown")}
+    disabled={feedbackLoadingPostId === op.opinion.id}
+    style={{
+      border: "1px solid #ccc",
+      borderRadius: 999,
+      padding: "6px 10px",
+      background: "#fff",
+      fontSize: 12,
+      cursor:
+        feedbackLoadingPostId === op.opinion.id ? "default" : "pointer",
+    }}
+  >
+    ❓ 結論がわからん ({op.opinion.feedback_counts?.conclusion_unknown ?? 0})
+  </button>
 
-                                  <button
-                                    onClick={() =>
-                                      handleFeedback(op.opinion.id, "evidence_unknown")
-                                    }
-                                    disabled={feedbackLoadingPostId === op.opinion.id}
-                                    style={{
-                                      border: "1px solid #ccc",
-                                      borderRadius: 999,
-                                      padding: "6px 10px",
-                                      background: "#fff",
-                                      fontSize: 12,
-                                      cursor:
-                                        feedbackLoadingPostId === op.opinion.id
-                                          ? "default"
-                                          : "pointer",
-                                    }}
-                                  >
-                                    ❓ 根拠がわからん (
-                                    {op.opinion.feedback_counts?.evidence_unknown ?? 0})
-                                  </button>
+  <button
+    onClick={() => handleFeedback(op.opinion.id, "evidence_unknown")}
+    disabled={feedbackLoadingPostId === op.opinion.id}
+    style={{
+      border: "1px solid #ccc",
+      borderRadius: 999,
+      padding: "6px 10px",
+      background: "#fff",
+      fontSize: 12,
+      cursor:
+        feedbackLoadingPostId === op.opinion.id ? "default" : "pointer",
+    }}
+  >
+    ❓ 根拠がわからん ({op.opinion.feedback_counts?.evidence_unknown ?? 0})
+  </button>
 
-                                  <button
-                                    onClick={() =>
-                                      handleFeedback(
-                                        op.opinion.id,
-                                        "counterargument_unknown"
-                                      )
-                                    }
-                                    disabled={feedbackLoadingPostId === op.opinion.id}
-                                    style={{
-                                      border: "1px solid #ccc",
-                                      borderRadius: 999,
-                                      padding: "6px 10px",
-                                      background: "#fff",
-                                      fontSize: 12,
-                                      cursor:
-                                        feedbackLoadingPostId === op.opinion.id
-                                          ? "default"
-                                          : "pointer",
-                                    }}
-                                  >
-                                    ❓ 反対意見がわからん (
-                                    {op.opinion.feedback_counts?.counterargument_unknown ??
-                                      0}
-                                    )
-                                  </button>
-                                </div>
+  <button
+    onClick={() => handleFeedback(op.opinion.id, "counterargument_unknown")}
+    disabled={feedbackLoadingPostId === op.opinion.id}
+    style={{
+      border: "1px solid #ccc",
+      borderRadius: 999,
+      padding: "6px 10px",
+      background: "#fff",
+      fontSize: 12,
+      cursor:
+        feedbackLoadingPostId === op.opinion.id ? "default" : "pointer",
+    }}
+  >
+    ❓ 反対意見がわからん ({op.opinion.feedback_counts?.counterargument_unknown ?? 0})
+  </button>
+</div>
+
+{feedbackLoadingPostId === op.opinion.id && !explanations[op.opinion.id] && (
+  <div
+    style={{
+      marginTop: 8,
+      fontSize: 12,
+      color: "#666",
+    }}
+  >
+    説明を生成中...
+  </div>
+)}
+
+{explanations[op.opinion.id] && (
+  <div
+    style={{
+      marginTop: 8,
+      padding: 10,
+      borderRadius: 8,
+      background: "#f0f4ff",
+      border: "1px solid #ccd",
+      fontSize: 13,
+      lineHeight: 1.6,
+    }}
+  >
+    <div style={{ fontWeight: 700, marginBottom: 4 }}>
+      AI解説
+    </div>
+    <div>{explanations[op.opinion.id]}</div>
+  </div>
+)}
+
 
                                 {op.children.length > 0 && (
                                   <details style={{ marginTop: 10 }}>
