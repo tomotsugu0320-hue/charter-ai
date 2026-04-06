@@ -93,23 +93,25 @@ setGeneratedIssue({
   return (
     <main style={{ maxWidth: 760, margin: "0 auto", padding: 24 }}>
       <h1 style={{ fontSize: 28, fontWeight: 800 }}>AI掲示板</h1>
+
 <div
   style={{
     marginTop: 16,
-    padding: 12,
-    borderRadius: 8,
-    background: "#f0f4ff",
-    border: "1px solid #ccd",
+    padding: 16,
+    borderRadius: 12,
+    background: "#1a1a1a",
+    border: "1px solid #333",
+    color: "#fff",
   }}
 >
-  <div style={{ fontSize: 12, color: "#666" }}>
-    この掲示板の使い方
+  <div style={{ fontWeight: 800, marginBottom: 6 }}>
+    これは「正解を出す掲示板」ではありません。
   </div>
 
-  <div style={{ fontWeight: 700, marginTop: 4 }}>
-    ① 結論や疑問を書く  
-    ② AIが論点として整理  
-    ③ みんなで前提・根拠を深掘り
+  <div style={{ fontSize: 14, color: "#ccc" }}>
+    考えを分解し、前提と根拠のズレを見える化する場所です。
+    <br />
+    議論が噛み合わない原因は「前提のズレ」にあります。
   </div>
 </div>
 
@@ -119,11 +121,12 @@ setGeneratedIssue({
       marginTop: 16,
       padding: 12,
       borderRadius: 8,
-      background: "#f5f5f5",
-      border: "1px solid #ddd",
+      background: "#1a1a1a",
+      border: "1px solid #333",
+      color: "#fff",
     }}
   >
-    <div style={{ fontSize: 12, color: "#666" }}>
+    <div style={{ fontSize: 12, color: "#aaa" }}>
       マクロから渡されたゴール
     </div>
     <div style={{ fontWeight: 700 }}>{goal}</div>
@@ -136,16 +139,18 @@ setGeneratedIssue({
       marginTop: 12,
       padding: 12,
       borderRadius: 8,
-      background: "#fafafa",
-      border: "1px solid #eee",
+      background: "#1a1a1a",
+      border: "1px solid #333",
+      color: "#fff",
     }}
   >
-    <div style={{ fontSize: 12, color: "#666" }}>
+    <div style={{ fontSize: 12, color: "#aaa" }}>
       注目している論点
     </div>
     <div style={{ fontWeight: 700 }}>{keyword}</div>
   </div>
 )}
+
 
       {/* 人気スレ */}
 <section style={{ marginTop: 24 }}>
@@ -160,12 +165,14 @@ setGeneratedIssue({
   {filteredPopularThreads.map((t) => (
     <div
       key={t.id}
-      style={{
-        border: "1px solid #ddd",
-        borderRadius: 10,
-        padding: 12,
-        marginBottom: 8,
-      }}
+style={{
+  border: "1px solid #333",
+  background: "#111",
+  borderRadius: 10,
+  padding: 12,
+  marginBottom: 8,
+  color: "#fff",
+}}
     >
 
 <Link
@@ -183,9 +190,9 @@ setGeneratedIssue({
 
 
 {t.assumption && (
-  <div style={{ fontSize: 12, color: "#555", marginTop: 4 }}>
-    前提：{t.assumption}
-  </div>
+<div style={{ fontSize: 12, color: "#bbb", marginTop: 4 }}>
+  前提：{t.assumption}
+</div>
 )}
 
 {t.evidence && (
@@ -193,10 +200,9 @@ setGeneratedIssue({
     🧾 根拠：{t.evidence}
   </div>
 )}
-
-      <div style={{ fontSize: 12, color: "#666" }}>
-        平均スコア: {t.avg_logic_score} / 投稿数: {t.post_count}
-      </div>
+<div style={{ fontSize: 12, color: "#aaa" }}>
+  平均スコア: {t.avg_logic_score} / 投稿数: {t.post_count}
+</div>
     </div>
   ))}
 </section>
@@ -215,12 +221,16 @@ setGeneratedIssue({
   {filteredActiveThreads.map((t) => (
     <div
       key={t.id}
-      style={{
-        border: "1px solid #ddd",
-        borderRadius: 10,
-        padding: 12,
-        marginBottom: 8,
-      }}
+
+style={{
+  border: "1px solid #333",
+  background: "#111",
+  borderRadius: 10,
+  padding: 12,
+  marginBottom: 8,
+  color: "#fff",
+}}
+
     >
 <Link
   href={`/${tenant}/forum/thread/${t.id}`}
@@ -236,9 +246,9 @@ setGeneratedIssue({
 </Link>
 
 {t.assumption && (
-  <div style={{ fontSize: 12, color: "#555", marginTop: 4 }}>
-    前提：{t.assumption}
-  </div>
+<div style={{ fontSize: 12, color: "#bbb", marginTop: 4 }}>
+  前提：{t.assumption}
+</div>
 )}
 
 {t.evidence && (
@@ -246,9 +256,9 @@ setGeneratedIssue({
     🧾 根拠：{t.evidence}
   </div>
 )}
-      <div style={{ fontSize: 12, color: "#666" }}>
-        投稿数: {t.post_count} / 平均スコア: {t.avg_logic_score}
-      </div>
+<div style={{ fontSize: 12, color: "#aaa" }}>
+  投稿数: {t.post_count} / 平均スコア: {t.avg_logic_score}
+</div>
     </div>
   ))}
 </section>
@@ -258,35 +268,40 @@ setGeneratedIssue({
 <div style={{ marginBottom: 12 }}>
   <a
     href={`/${tenant}/macro`}
-    style={{
-      display: "inline-block",
-      padding: "10px 14px",
-      borderRadius: 8,
-      background: "#f5f5f5",
-      border: "1px solid #ddd",
-      color: "#111",
-      fontWeight: 700,
-      textDecoration: "none",
-    }}
+style={{
+  width: "100%",
+  border: "1px solid #333",
+  borderRadius: 8,
+  padding: 12,
+  fontSize: 16,
+  background: "#1a1a1a",
+  color: "#fff",
+}}
   >
     このテーマをマクロで整理する
   </a>
 </div>
 
       <section style={{ marginTop: 32 }}>
-        <p style={{ marginBottom: 8, color: "#666" }}>
-考えをそのまま書いてください。
-AIが自動で整理します。
-        </p>
+<div style={{ marginBottom: 10 }}>
+  <div style={{ color: "#fff", fontWeight: 700 }}>
+    議論が噛み合わない原因は「前提のズレ」です。
+  </div>
+
+  <div style={{ color: "#aaa", fontSize: 13, marginTop: 4 }}>
+    あなたの考えを書くと、それを分解して見える化します。
+  </div>
+</div>
 
 {generatedIssue && (
   <div
     style={{
-      background: "#f0f4ff",
+background: "#1a1a1a",
+border: "1px solid #333",
+color: "#fff",
       padding: 12,
       borderRadius: 8,
       marginBottom: 12,
-      border: "1px solid #ccd",
     }}
   >
     <div style={{ fontWeight: 800, marginBottom: 8 }}>AI整理結果</div>
@@ -320,7 +335,10 @@ AIが自動で整理します。
 <textarea
   value={text}
   onChange={(e) => setText(e.target.value)}
-  placeholder="考えをそのまま書いてください"
+placeholder={`例：
+消費税は減税すべき。
+日本は需要不足であり、消費税は消費を抑えるため。`}
+
   rows={5}
   style={{
     width: "100%",
@@ -347,8 +365,8 @@ AIが自動で整理します。
         >
           {loading ? "処理中..." : "構造化して投稿する"}
         </button>
-<p style={{ fontSize: 12, color: "#666", marginTop: 6 }}>
-投稿すると、AIが論点として整理します
+<p style={{ fontSize: 12, color: "#aaa", marginTop: 6 }}>
+投稿すると、主張・前提・根拠に分解されます
 </p>
       </section>
     </main>
