@@ -18,12 +18,16 @@ export default function ForumPage() {
 
   const [popularThreads, setPopularThreads] = useState<any[]>([]);
   const [activeThreads, setActiveThreads] = useState<any[]>([]);
+const [relatedThreads, setRelatedThreads] = useState<any[]>([]);
+const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
 
-  const [generatedIssue, setGeneratedIssue] = useState<{
-    claim: string;
-    premises: string[];
-    reasons: string[];
-  } | null>(null);
+const [generatedIssue, setGeneratedIssue] = useState<{
+  mode: "expand" | "split";
+  claim: string;
+  premises: string[];
+  reasons: string[];
+} | null>(null);
+
 
   useEffect(() => {
     (async () => {
@@ -70,18 +74,32 @@ export default function ForumPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          content: trimmed,
-        }),
-      });
+body: JSON.stringify({
+  content: trimmed,
+  type: "auto",
+}),
+});
 
-      const { claim, premises, reasons } = await res.json();
+const { mode, claim, premises, reasons } = await res.json();
 
-      setGeneratedIssue({
-        claim,
-        premises,
-        reasons,
-      });
+setGeneratedIssue({
+  mode,
+  claim,
+  premises,
+  reasons,
+});
+
+
+const relatedRes = await fetch("/api/forum/search-related", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ claim }),
+});
+
+const related = await relatedRes.json();
+setRelatedThreads(related);
+
+
     } catch (e) {
       console.error(e);
     } finally {
@@ -281,54 +299,148 @@ export default function ForumPage() {
           </div>
         </div>
 
-        {generatedIssue && (
-          <div
-            style={{
-              background: "#1a1a1a",
-              border: "1px solid #333",
-              color: "#fff",
-              padding: 12,
-              borderRadius: 8,
-              marginBottom: 12,
-            }}
-          >
-            <div style={{ fontWeight: 800, marginBottom: 8 }}>AI整理結果</div>
 
-            <div style={{ fontWeight: 700 }}>主張</div>
-            <div style={{ marginTop: 4 }}>{generatedIssue.claim}</div>
+{generatedIssue && (
+  <div
+    style={{
+      background: "#1a1a1a",
+      border: "1px solid #333",
+      color: "#fff",
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 12,
+    }}
+  >
+    <div style={{ fontWeight: 800, marginBottom: 8 }}>
+      {generatedIssue.mode === "expand"
+        ? "AI展開結果"
+        : "AI整理結果"}
+    </div>
 
-            <div style={{ marginTop: 10, fontWeight: 700 }}>前提</div>
-            {generatedIssue.premises.length === 0 ? (
-              <div style={{ marginTop: 4, color: "#888" }}>
-                （前提はまだ入力されていません）
-              </div>
-            ) : (
-              <ul style={{ marginTop: 4, paddingLeft: 20 }}>
-                {generatedIssue.premises.map((p, i) => (
-                  <li key={i}>{p}</li>
-                ))}
-              </ul>
-            )}
+    {generatedIssue.mode === "expand" ? (
+      <>
+        <div style={{ fontWeight: 700 }}>問い</div>
+        <div style={{ marginTop: 4 }}>{generatedIssue.claim}</div>
 
-            <div style={{ marginTop: 10, fontWeight: 700 }}>根拠</div>
-            {generatedIssue.reasons.length === 0 ? (
-              <div style={{ marginTop: 4, color: "#888" }}>
-                （根拠はまだ入力されていません）
-              </div>
-            ) : (
-              <ul style={{ marginTop: 4, paddingLeft: 20 }}>
-                {generatedIssue.reasons.map((r, i) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
+        <div style={{ marginTop: 10, fontWeight: 700 }}>
+          考えられる前提
+        </div>
+        <ul style={{ marginTop: 4, paddingLeft: 20 }}>
+          {generatedIssue.premises.map((p, i) => (
+            <li key={i}>{p}</li>
+          ))}
+        </ul>
+
+        <div style={{ marginTop: 10, fontWeight: 700 }}>
+          考えられる根拠
+        </div>
+        <ul style={{ marginTop: 4, paddingLeft: 20 }}>
+          {generatedIssue.reasons.map((r, i) => (
+            <li key={i}>{r}</li>
+          ))}
+        </ul>
+      </>
+    ) : (
+      <>
+        <div style={{ fontWeight: 700 }}>主張</div>
+        <div style={{ marginTop: 4 }}>{generatedIssue.claim}</div>
+
+        <div style={{ marginTop: 10, fontWeight: 700 }}>前提</div>
+        <ul style={{ marginTop: 4, paddingLeft: 20 }}>
+          {generatedIssue.premises.map((p, i) => (
+            <li key={i}>{p}</li>
+          ))}
+        </ul>
+
+        <div style={{ marginTop: 10, fontWeight: 700 }}>根拠</div>
+        <ul style={{ marginTop: 4, paddingLeft: 20 }}>
+          {generatedIssue.reasons.map((r, i) => (
+            <li key={i}>{r}</li>
+          ))}
+        </ul>
+      </>
+    )}
+
+
+{relatedThreads.length > 0 && (
+  <div
+    style={{
+      background: "#111",
+      border: "1px solid #333",
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 12,
+      color: "#fff",
+    }}
+  >
+    <div style={{ fontWeight: 800, marginBottom: 6 }}>
+      この論点に近い議論
+    </div>
+
+{relatedThreads.map((t) => (
+  <div
+    key={t.id}
+    style={{ marginBottom: 6, cursor: "pointer" }}
+    onClick={() => setSelectedThreadId(t.id)}
+  >
+    {t.title}
+
+    {selectedThreadId === t.id && (
+      <div style={{ color: "#2a7", fontSize: 12 }}>
+        選択中
+      </div>
+    )}
+  </div>
+))}
+  </div>
+)}
+
+<div style={{ marginTop: 10 }}>
+<button
+  disabled={!selectedThreadId}
+  onClick={() => {
+    if (!selectedThreadId) return;
+    window.location.href = `/${tenant}/forum/thread/${selectedThreadId}`;
+  }}
+>
+  このスレに参加する
+</button>
+<button
+  style={{ marginLeft: 8 }}
+  onClick={async () => {
+    if (!generatedIssue) return;
+
+    const res = await fetch("/api/forum/create-thread-from-draft", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: generatedIssue.claim,
+        claim: generatedIssue.claim,
+        premises: generatedIssue.premises,
+        reasons: generatedIssue.reasons,
+        postType: "auto",
+      }),
+    });
+
+    const result = await res.json();
+
+    if (result?.threadId) {
+      window.location.href = `/${tenant}/forum/thread/${result.threadId}`;
+    }
+  }}
+>
+  新しいスレを作る
+</button>
+</div>
+
+  </div>
+)}
 
         <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
           あなたの考え
         </h3>
-
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}

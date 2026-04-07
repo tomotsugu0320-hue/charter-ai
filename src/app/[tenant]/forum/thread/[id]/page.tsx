@@ -28,6 +28,7 @@ type PostRow = {
   prediction_flag?: boolean;
   prediction_target?: string | null;
   prediction_deadline?: string | null;
+parent_opinion_id?: string | null;
   prediction_result?: string | null;
   feedback_counts?: {
     term_unknown?: number;
@@ -121,6 +122,34 @@ function formatDate(value?: string) {
   return d.toLocaleString("ja-JP");
 }
 
+
+function roleColor(role: string) {
+  switch (role) {
+    case "issue_raise":
+      return "#6a1b9a";
+    case "opinion":
+      return "#111";
+    case "rebuttal":
+      return "#b71c1c";
+    case "supplement":
+      return "#0d47a1";
+    case "explanation":
+      return "#2e7d32";
+    default:
+      return "#555";
+  }
+}
+
+
+function scoreColor(score?: number) {
+  if (!score) return "#777";
+  if (score >= 80) return "#2e7d32"; // 緑（強い）
+  if (score >= 60) return "#1565c0"; // 青（普通）
+  if (score >= 40) return "#ef6c00"; // オレンジ（弱い）
+  return "#b71c1c"; // 赤（危険）
+}
+
+
 function roleLabel(role: string) {
   switch (role) {
     case "issue_raise":
@@ -168,9 +197,16 @@ const [explanations, setExplanations] = useState<Record<string, string>>({});
   const [posts, setPosts] = useState<PostRow[]>([]);
 
   const [text, setText] = useState("");
+
+const [rebuttalClaim, setRebuttalClaim] = useState("");
+const [rebuttalPremise, setRebuttalPremise] = useState("");
+const [rebuttalReason, setRebuttalReason] = useState("");
+
   const [summary, setSummary] = useState<ThreadSummary | null>(null);
   const [feedbackSummary, setFeedbackSummary] =
     useState<FeedbackSummary | null>(null);
+
+const [replyToOpinionId, setReplyToOpinionId] = useState<string | null>(null);
 
   const [postRole, setPostRole] =
     useState<PostRoleOption["value"]>("opinion");
@@ -466,7 +502,6 @@ const [explanations, setExplanations] = useState<Record<string, string>>({});
 
       const result = await res.json();
 
-
       if (!res.ok) {
         throw new Error(result?.error || "読込失敗");
       }
@@ -500,12 +535,30 @@ const [explanations, setExplanations] = useState<Record<string, string>>({});
   }
 
   async function handlePost() {
-    const trimmed = text.trim();
 
-    if (!trimmed) {
-      alert("投稿内容を入れて。");
-      return;
-    }
+let contentToPost = "";
+
+if (postRole === "rebuttal") {
+  const claim = rebuttalClaim.trim();
+  const premise = rebuttalPremise.trim();
+  const reason = rebuttalReason.trim();
+
+  if (!claim || !premise || !reason) {
+    alert("反論は『主張・前提・根拠』を全部入れて。");
+    return;
+  }
+
+  contentToPost = `主張: ${claim}\n前提: ${premise}\n根拠: ${reason}`;
+} else {
+  const trimmed = text.trim();
+
+  if (!trimmed) {
+    alert("投稿内容を入れて。");
+    return;
+  }
+
+  contentToPost = trimmed;
+}
 
     if (!threadId) {
       alert("threadIdがない。");
@@ -522,10 +575,11 @@ const [explanations, setExplanations] = useState<Record<string, string>>({});
           "Content-Type": "application/json",
         },
 
-        body: JSON.stringify({
-          threadId,
-          content: trimmed,
-          postRole,
+body: JSON.stringify({
+  threadId,
+  content: contentToPost,
+  postRole,
+  parentOpinionId: replyToOpinionId,
           prediction_flag: predictionFlag,
           prediction_target: predictionFlag ? predictionTarget : null,
           prediction_deadline:
@@ -534,11 +588,15 @@ const [explanations, setExplanations] = useState<Record<string, string>>({});
         }),
       });
 
-      const result = await res.json();
+
+const result = await res.json();
+
 
       if (!res.ok) {
         throw new Error(result?.error || "投稿失敗");
       }
+
+setReplyToOpinionId(null);
 
       console.log("[add-post result]", result);
 
@@ -547,6 +605,7 @@ const [explanations, setExplanations] = useState<Record<string, string>>({});
       setPredictionFlag(false);
       setPredictionTarget("");
       setPredictionDeadline("");
+      await loadThread();
     } catch (e: any) {
       console.error(e);
       setError(e?.message || "投稿失敗");
@@ -943,10 +1002,49 @@ if (result.explanation) {
                           cursor: "pointer",
                         }}
                       >
-                        {group.issue ? `論点: ${group.issue.content}` : "（論点なし）"}
+ {group.issue
+  ? `問い: ${group.issue.content}`
+  : `問い: ${thread?.title ?? thread?.original_post ?? "このスレのテーマ"}`}
                       </summary>
 
                       <div style={{ marginTop: 12 }}>
+{bestOpinionsByIssue[groupIndex]?.best && (
+  <div
+    style={{
+      marginBottom: 16,
+      padding: 12,
+      borderRadius: 12,
+      border: "2px solid #2e7d32",
+      background: "#f1f8f4",
+    }}
+  >
+    <div
+      style={{
+        fontSize: 13,
+        fontWeight: 800,
+        color: "#2e7d32",
+        marginBottom: 6,
+      }}
+    >
+      🏆 ベスト意見
+    </div>
+
+    <div style={{ marginBottom: 6 }}>
+      {bestOpinionsByIssue[groupIndex].best.opinion.content}
+    </div>
+
+    <div
+      style={{
+        fontSize: 12,
+        color: "#555",
+      }}
+    >
+      スコア：
+      {bestOpinionsByIssue[groupIndex].best.effectiveScore}
+    </div>
+  </div>
+)}
+
                         {group.opinions.length === 0 ? (
                           <div style={{ color: "#777", fontSize: 14 }}>
                             まだ意見がない。
@@ -981,27 +1079,68 @@ opacity: (() => {
 })(),
 }}
                               >
-                                <div style={{ fontWeight: 700, marginBottom: 6 }}>
-                                  💬 意見
-                                  <span
-                                    style={{
-                                      marginLeft: 8,
-                                      fontSize: 12,
-                                      color: "#2e7d32",
-                                    }}
-                                  >
-{op.opinion.logic_score ?? "未評価"}
 
-<span style={{ marginLeft: 6 }}>
+<div
+  style={{
+    fontWeight: 700,
+    marginBottom: 6,
+    color: roleColor(op.opinion.post_role),
+  }}
+>
+  💬 {roleLabel(op.opinion.post_role)}
+
+<span
+  style={{
+    marginLeft: 8,
+    fontSize: 12,
+    color: scoreColor(op.opinion.logic_score),
+  }}
+>
+  {op.opinion.logic_score ?? "未評価"}｜
   {(op.opinion.logic_score ?? 0) >= 80
     ? "🔥 強い"
     : (op.opinion.logic_score ?? 0) >= 60
     ? "👍 普通"
     : "⚠️ 弱い"}
 </span>
-                                  </span>
                                 </div>
+<div style={{ display: "flex", gap: 8, marginTop: 8, marginBottom: 8 }}>
+  <button
+    onClick={() => {
+      setPostRole("rebuttal");
+      setReplyToOpinionId(op.opinion.id);
+      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+    }}
+    style={{
+      padding: "6px 10px",
+      borderRadius: 6,
+      border: "1px solid #ccc",
+      background: "#fff",
+      fontSize: 12,
+      cursor: "pointer",
+    }}
+  >
+    この意見に反論する
+  </button>
 
+  <button
+    onClick={() => {
+      setPostRole("supplement");
+      setReplyToOpinionId(op.opinion.id);
+      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+    }}
+    style={{
+      padding: "6px 10px",
+      borderRadius: 6,
+      border: "1px solid #ccc",
+      background: "#fff",
+      fontSize: 12,
+      cursor: "pointer",
+    }}
+  >
+    この意見を補足する
+  </button>
+</div>
                                 <div style={{ marginBottom: 8 }}>
                                  {(() => {
   const { claim, premises, reasons } = splitContent(op.opinion.content);
@@ -1185,59 +1324,239 @@ opacity: (() => {
                                         gap: 8,
                                       }}
                                     >
-                                      {op.children.map((child) => {
-                                        const childScore = child.logic_score ?? 0;
-                                        const childLowScore =
-                                          hideLowScore &&
-                                          childScore > 0 &&
-                                          childScore < 60;
 
-                                        return (
-                                          <div
-                                            key={child.id}
-                                            style={{
+{op.children
+  .filter((child) => child.parent_opinion_id === op.opinion.id)
+  .map((child) => {
+  return (
+    <div
+      key={child.id}
+      style={{
+        opacity: (() => {
+          const score = child.logic_score ?? 0;
 
-opacity: (() => {
-  const score = child.logic_score ?? 0;
+          if (hideLowScore && score > 0 && score < 60) {
+            return 0.3;
+          }
 
-  if (hideLowScore && score > 0 && score < 60) {
-    return 0.3;
-  }
+          if (score >= 80) return 1;
+          if (score >= 60) return 0.8;
+          if (score >= 40) return 0.6;
+          return 0.4;
+        })(),
+      }}
+    >
+      {child.post_role === "rebuttal" ? (
+        <div
+          style={{
+            display: "grid",
+gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            gap: 12,
+            alignItems: "start",
+          }}
+        >
+          {/* 左：元の意見 */}
+          <div
+            style={{
+              border: "1px solid #ddd",
+              borderRadius: 10,
+              padding: 10,
+              background: "#f5f5f5",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: roleColor(op.opinion.post_role),
+                marginBottom: 8,
+              }}
+            >
+              意見
+            </div>
 
-  if (score >= 80) return 1;
-  if (score >= 60) return 0.8;
-  if (score >= 40) return 0.6;
-  return 0.4;
-})(),
-                                            }}
-                                          >
-                                            <div
-                                              style={{
-                                                fontSize: 12,
-                                                fontWeight: 700,
-                                                color:
-                                                  child.post_role === "rebuttal"
-                                                    ? "#b71c1c"
-                                                    : "#555",
-                                              }}
-                                            >
+            {(() => {
+              const { claim, premises, reasons } = splitContent(op.opinion.content);
 
-{roleLabel(child.post_role)}（
-  {child.logic_score ?? "未評価"}
-）
+              return (
+                <div>
+                  <div style={{ marginBottom: 6 }}>
+                    <div style={{ fontWeight: 800 }}>主張</div>
+                    <div>{claim}</div>
+                  </div>
 
-<span style={{ marginLeft: 6 }}>
-  {(child.logic_score ?? 0) >= 80
-    ? "🔥 強い"
-    : (child.logic_score ?? 0) >= 60
-    ? "👍 普通"
-    : "⚠️ 弱い"}
-</span>
-                                            </div>
-                                            <div>{child.content}</div>
-                                          </div>
-                                        );
-                                      })}
+                  {premises.length > 0 && (
+                    <div style={{ marginBottom: 6 }}>
+                      <div style={{ fontWeight: 800 }}>前提</div>
+                      <ul style={{ paddingLeft: 20 }}>
+                        {premises.map((p, i) => (
+                          <li key={i}>{p}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {reasons.length > 0 && (
+                    <div>
+                      <div style={{ fontWeight: 800 }}>根拠</div>
+                      <ul style={{ paddingLeft: 20 }}>
+                        {reasons.map((r, i) => (
+                          <li key={i}>{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* 右：反論 */}
+
+<div
+  style={{
+    border: "1px solid #ddd",
+    borderRadius: 10,
+    padding: 10,
+    background:
+      (child.logic_score ?? 0) >= 80
+        ? "#e8f5e9"   // 強い（緑）
+        : (child.logic_score ?? 0) >= 60
+        ? "#e3f2fd"   // 普通（青）
+        : "#ffebee",  // 弱い（赤）
+  }}
+>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: roleColor(child.post_role),
+                marginBottom: 8,
+              }}
+            >
+              反論（
+              <span
+                style={{
+                  marginLeft: 4,
+                  color: scoreColor(child.logic_score),
+                }}
+              >
+                {child.logic_score ?? "未評価"}
+              </span>
+              ）
+              <span style={{ marginLeft: 6 }}>
+                {(child.logic_score ?? 0) >= 80
+                  ? "🔥 強い"
+                  : (child.logic_score ?? 0) >= 60
+                  ? "👍 普通"
+                  : "⚠️ 弱い"}
+              </span>
+            </div>
+
+            {(() => {
+              const { claim, premises, reasons } = splitContent(child.content);
+
+              return (
+                <div>
+                  <div style={{ marginBottom: 6 }}>
+                    <div style={{ fontWeight: 800 }}>主張</div>
+                    <div>{claim}</div>
+                  </div>
+
+                  {premises.length > 0 && (
+                    <div style={{ marginBottom: 6 }}>
+                      <div style={{ fontWeight: 800 }}>前提</div>
+                      <ul style={{ paddingLeft: 20 }}>
+                        {premises.map((p, i) => (
+                          <li key={i}>{p}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {reasons.length > 0 && (
+                    <div>
+                      <div style={{ fontWeight: 800 }}>根拠</div>
+                      <ul style={{ paddingLeft: 20 }}>
+                        {reasons.map((r, i) => (
+                          <li key={i}>{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: roleColor(child.post_role),
+            }}
+          >
+            {roleLabel(child.post_role)}（
+            <span
+              style={{
+                marginLeft: 6,
+                color: scoreColor(child.logic_score),
+              }}
+            >
+              {child.logic_score ?? "未評価"}
+            </span>
+            ）
+            <span style={{ marginLeft: 6 }}>
+              {(child.logic_score ?? 0) >= 80
+                ? "🔥 強い"
+                : (child.logic_score ?? 0) >= 60
+                ? "👍 普通"
+                : "⚠️ 弱い"}
+            </span>
+          </div>
+
+          {(() => {
+            const { claim, premises, reasons } = splitContent(child.content);
+
+            return (
+              <div>
+                <div style={{ marginBottom: 6 }}>
+                  <div style={{ fontWeight: 800 }}>主張</div>
+                  <div>{claim}</div>
+                </div>
+
+                {premises.length > 0 && (
+                  <div style={{ marginBottom: 6 }}>
+                    <div style={{ fontWeight: 800 }}>前提</div>
+                    <ul style={{ paddingLeft: 20 }}>
+                      {premises.map((p, i) => (
+                        <li key={i}>{p}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {reasons.length > 0 && (
+                  <div>
+                    <div style={{ fontWeight: 800 }}>根拠</div>
+                    <ul style={{ paddingLeft: 20 }}>
+                      {reasons.map((r, i) => (
+                        <li key={i}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+    </div>
+  );
+})}
+
                                     </div>
                                   </details>
                                 )}
@@ -1262,25 +1581,35 @@ opacity: (() => {
               background: "#fff",
             }}
           >
-            <h2
-              style={{
-                margin: 0,
-                marginBottom: 12,
-                fontSize: 24,
-                fontWeight: 800,
-              }}
-            >
-              追加入力
-            </h2>
+<h2
+  style={{
+    margin: 0,
+    marginBottom: 12,
+    fontSize: 24,
+    fontWeight: 800,
+  }}
+>
+  {replyToOpinionId
+    ? `この意見への${
+        postRole === "rebuttal"
+          ? "反論"
+          : postRole === "supplement"
+          ? "補足"
+          : "投稿"
+      }`
+    : "新しい投稿"}
+</h2>
 
-            <p
-              style={{
-                marginTop: 0,
-                color: "#666",
-              }}
-            >
-              投稿の種類を選んでから書き込めるようにした。
-            </p>
+<p
+  style={{
+    marginTop: 0,
+    color: "#666",
+  }}
+>
+  {replyToOpinionId
+    ? "選択した意見に対する投稿です。"
+    : "このスレの問いに対して投稿します。"}
+</p>
 
             <div style={{ marginBottom: 14 }}>
               <label
@@ -1320,21 +1649,72 @@ opacity: (() => {
               </select>
             </div>
 
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="追記したい内容を書く"
-              rows={5}
-              style={{
-                width: "100%",
-                border: "1px solid #ccc",
-                borderRadius: 10,
-                padding: 12,
-                fontSize: 16,
-                resize: "vertical",
-                outline: "none",
-              }}
-            />
+{postRole === "rebuttal" ? (
+  <div style={{ display: "grid", gap: 10 }}>
+
+<textarea
+  value={rebuttalClaim}
+  onChange={(e) => setRebuttalClaim(e.target.value)}
+  placeholder="反論の主張（何が間違っているか・どう考えるべきか）"
+  rows={3}
+  style={{
+    width: "100%",
+    border: "1px solid #ccc",
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 16,
+    resize: "vertical",
+    outline: "none",
+  }}
+/>
+
+    <input
+      value={rebuttalPremise}
+      onChange={(e) => setRebuttalPremise(e.target.value)}
+      placeholder="反論の前提"
+      style={{
+        width: "100%",
+        border: "1px solid #ccc",
+        borderRadius: 10,
+        padding: 12,
+        fontSize: 16,
+        outline: "none",
+      }}
+    />
+
+    <textarea
+      value={rebuttalReason}
+      onChange={(e) => setRebuttalReason(e.target.value)}
+      placeholder="反論の根拠"
+      rows={4}
+      style={{
+        width: "100%",
+        border: "1px solid #ccc",
+        borderRadius: 10,
+        padding: 12,
+        fontSize: 16,
+        resize: "vertical",
+        outline: "none",
+      }}
+    />
+  </div>
+) : (
+  <textarea
+    value={text}
+    onChange={(e) => setText(e.target.value)}
+    placeholder="追記したい内容を書く"
+    rows={5}
+    style={{
+      width: "100%",
+      border: "1px solid #ccc",
+      borderRadius: 10,
+      padding: 12,
+      fontSize: 16,
+      resize: "vertical",
+      outline: "none",
+    }}
+  />
+)}
 
             <div style={{ marginTop: 12, display: "flex", gap: 12 }}>
               <button
@@ -1354,13 +1734,18 @@ opacity: (() => {
               </button>
 
               <button
-                onClick={() => {
-                  setText("");
-                  setPostRole("opinion");
-                  setPredictionFlag(false);
-                  setPredictionTarget("");
-                  setPredictionDeadline("");
-                }}
+onClick={() => {
+  setText("");
+  setPostRole("opinion");
+  setPredictionFlag(false);
+  setPredictionTarget("");
+  setPredictionDeadline("");
+  setRebuttalClaim("");
+  setRebuttalPremise("");
+  setRebuttalReason("");
+  setReplyToOpinionId(null);
+}}
+
                 disabled={posting}
                 style={{
                   border: "1px solid #ccc",
