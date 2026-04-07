@@ -1,7 +1,6 @@
 // src/app/api/forum/create-thread-from-draft/route.ts
 
 
-
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -12,16 +11,25 @@ const supabase = createClient(
 
 export async function POST(req: Request) {
   try {
-    const { draftId, tenantSlug } = await req.json();
+    const body = await req.json();
 
-    if (!draftId || !tenantSlug) {
+    const {
+      tenantSlug,
+      title,
+      claim,
+      premises,
+      reasons,
+    } = body;
+
+    if (!tenantSlug || !title || !claim) {
       return NextResponse.json(
-        { error: "draftId and tenantSlug are required" },
+        { error: "tenantSlug, title and claim are required" },
         { status: 400 }
       );
     }
 
-    // tenant取得
+    // tenant自体は今のforum_threadsには紐付けていないが、
+    // 存在チェックだけしておく
     const { data: tenant, error: tenantError } = await supabase
       .from("tenants")
       .select("id")
@@ -36,76 +44,62 @@ export async function POST(req: Request) {
       );
     }
 
-    // draft取得
-    const { data: draft, error: draftError } = await supabase
-      .from("forum_issue_drafts")
-      .select("*")
-      .eq("id", draftId)
+    const { data: thread, error: threadError } = await supabase
+      .from("forum_threads")
+      .insert({
+        title,
+        slug: `${title}-${Date.now()}`,
+        original_post: claim,
+        visibility: "public",
+      })
+      .select("id")
       .single();
-
-    if (draftError || !draft) {
-      console.error("draft error:", draftError);
-      return NextResponse.json(
-        { error: "draft not found" },
-        { status: 404 }
-      );
-    }
-
-    // すでにスレ化されてる場合
-    if (draft.thread_id) {
-      return NextResponse.json({
-        success: true,
-        threadId: draft.thread_id,
-        alreadyCreated: true,
-      });
-    }
-
-
-    // スレ作成
-const { data: thread, error: threadError } = await supabase
-  .from("forum_threads")
-  .insert({
-    tenant_id: tenant.id,
-    title: draft.claim,
-  })
-  .select("id")
-  .single();
-
 
     if (threadError || !thread) {
       console.error("thread create error:", threadError);
       return NextResponse.json(
-        { error: "failed to create thread" },
+        {
+          error:
+            threadError?.message ||
+            threadError?.details ||
+            JSON.stringify(threadError) ||
+            "failed to create thread",
+        },
         { status: 500 }
       );
     }
 
-    // 初期投稿
+    const content =
+      Array.isArray(premises) && Array.isArray(reasons)
+        ? [
+            `主張: ${claim}`,
+            ...premises.map((p: string) => `前提: ${p}`),
+            ...reasons.map((r: string) => `根拠: ${r}`),
+          ].join("\n")
+        : claim;
+
     const { error: postError } = await supabase
       .from("forum_posts")
       .insert({
         thread_id: thread.id,
         source_type: "human",
         post_role: "issue_raise",
-        content: draft.raw_content,
+        content,
       });
 
     if (postError) {
       console.error("post create error:", postError);
       return NextResponse.json(
-        { error: "failed to create post" },
+        {
+          error:
+            postError?.message ||
+            postError?.details ||
+            JSON.stringify(postError) ||
+            "failed to create post",
+        },
         { status: 500 }
       );
     }
-
-    // draft更新
-    await supabase
-      .from("forum_issue_drafts")
-      .update({
-        thread_id: thread.id,
-        published_at: new Date().toISOString(),
-      })
-      .eq("id", draft.id);
 
     return NextResponse.json({
       success: true,

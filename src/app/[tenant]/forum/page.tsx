@@ -415,20 +415,33 @@ setRelatedThreads(related);
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        title: generatedIssue.claim,
-        claim: generatedIssue.claim,
-        premises: generatedIssue.premises,
-        reasons: generatedIssue.reasons,
-        postType: "auto",
-      }),
+body: JSON.stringify({
+  tenantSlug: tenant,
+  title: generatedIssue.claim,
+  claim: generatedIssue.claim,
+  premises: generatedIssue.premises,
+  reasons: generatedIssue.reasons,
+  postType: "auto",
+}),
     });
 
-    const result = await res.json();
+const result = await res.json();
 
-    if (result?.threadId) {
-      window.location.href = `/${tenant}/forum/thread/${result.threadId}`;
-    }
+console.log("create-thread result:", result);
+
+if (!res.ok) {
+  alert(result?.error || "スレッド作成失敗");
+  return;
+}
+
+if (!result?.threadId) {
+  alert("threadId が返ってきてない");
+  console.error(result);
+  return;
+}
+
+window.location.href = `/${tenant}/forum/thread/${result.threadId}`;
+
   }}
 >
   新しいスレを作る
