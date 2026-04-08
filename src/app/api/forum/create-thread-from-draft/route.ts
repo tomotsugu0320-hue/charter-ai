@@ -112,23 +112,22 @@ export async function POST(req: Request) {
     // 🔥 ここが今回の追加（超重要）
     // ===============================
 
-    const { error: structureError } = await supabase
-      .from("thread_ai_structures")
-      .upsert({
-        thread_id: thread.id,
-        summary_text: summaryText ?? null,
+const { error: structureError } = await supabase
+  .from("thread_ai_structures")
+  .upsert({
+    thread_id: thread.id,
+    summary_text: summaryText ?? null,
 
-        issues: Array.isArray(issues) ? issues : [],
-        conflicts: Array.isArray(conflicts) ? conflicts : [],
+    issues: Array.isArray(issues) ? issues : [],
 
-        // 使わないが将来用に空で入れておく
-        opinions: [],
-        rebuttals: [],
-        supplements: [],
-        explanations: [],
+    opinions: [],
+    rebuttals: [],
+    supplements: [],
+    explanations: [],
 
-        full_structure_json: fullStructure ?? null,
-      });
+    full_structure_json: fullStructure ?? null,
+  });
+
 
     if (structureError) {
       console.error("structure save error:", structureError);
