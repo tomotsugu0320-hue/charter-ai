@@ -161,11 +161,12 @@ setRelatedThreads(related);
     value={categoryFilter}
     onChange={(e) => setCategoryFilter(e.target.value)}
     style={{
-      border: "1px solid #ccc",
       borderRadius: 10,
       padding: "10px 12px",
       fontSize: 14,
-      background: "#fff",
+background: "#222",
+color: "#fff",
+border: "1px solid #555",
       minWidth: 180,
     }}
   >
