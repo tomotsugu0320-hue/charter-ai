@@ -53,6 +53,19 @@ export async function POST(req: NextRequest) {
 
 const rawText = suggestion.proposed_text;
 
+let category = "政治・経済";
+
+if (rawText.includes("売上") || rawText.includes("経営") || rawText.includes("集客")) {
+  category = "ビジネス";
+} else if (rawText.includes("恋愛") || rawText.includes("彼女") || rawText.includes("彼氏")) {
+  category = "恋愛";
+} else if (rawText.includes("健康") || rawText.includes("筋トレ") || rawText.includes("ダイエット")) {
+  category = "健康";
+} else if (rawText.includes("雑談")) {
+  category = "雑談";
+}
+
+
 // ② 仮タイトル（今はそのまま）
 let title = rawText;
 
@@ -120,11 +133,12 @@ if (matched) {
 // ③ forum_threads 作成
 const { data: thread, error: threadError } = await supabase
   .from("forum_threads")
-  .insert({
-    title: title,
-    slug: slug,
-    original_post: rawText,
-  })
+.insert({
+  title: title,
+  slug: slug,
+  original_post: rawText,
+  category: category,
+})
   .select("id")
   .single();
 

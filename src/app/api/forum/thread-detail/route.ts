@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
 const { data: thread, error: threadError } = await supabase
   .from("forum_threads")
-  .select("id, title, slug, original_post, created_at")
+.select("id, title, slug, original_post, category, created_at")
   .eq("id", threadId)
   .maybeSingle();
 

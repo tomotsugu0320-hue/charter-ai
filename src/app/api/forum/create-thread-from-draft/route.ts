@@ -41,14 +41,30 @@ export async function POST(req: Request) {
       );
     }
 
+
+let category = "政治・経済";
+
+if (title.includes("売上") || title.includes("経営") || title.includes("集客")) {
+  category = "ビジネス";
+} else if (title.includes("恋愛") || title.includes("彼女") || title.includes("彼氏")) {
+  category = "恋愛";
+} else if (title.includes("健康") || title.includes("筋トレ") || title.includes("ダイエット")) {
+  category = "健康";
+} else if (title.includes("雑談")) {
+  category = "雑談";
+}
+
     const content =
-      Array.isArray(premises) && Array.isArray(reasons)
+     Array.isArray(premises) && Array.isArray(reasons)
         ? [
             `主張: ${claim}`,
             ...premises.map((p: string) => `前提: ${p}`),
             ...reasons.map((r: string) => `根拠: ${r}`),
           ].join("\n")
         : claim;
+
+
+
 
     const { data: thread, error: threadError } = await supabase
       .from("forum_threads")
@@ -57,6 +73,7 @@ export async function POST(req: Request) {
         slug: `${title}-${Date.now()}`,
         original_post: content,
         visibility: "public",
+        category: category,
       })
       .select("id")
       .single();

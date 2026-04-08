@@ -1,8 +1,5 @@
 // src/app/api/forum/top-summary/route.ts
 
-
-// src/app/api/forum/top-summary/route.ts
-
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -16,7 +13,7 @@ export async function GET() {
     // スレッド取得
     const { data: threads, error: threadError } = await supabase
       .from("forum_threads")
-      .select("id, title, created_at");
+      .select("id, title, category, created_at")
 
     if (threadError) {
       throw threadError;
@@ -50,13 +47,14 @@ export async function GET() {
         const avg =
           stat.count > 0 ? Math.round(stat.totalScore / stat.count) : 0;
 
-        return {
-          id: t.id,
-          title: t.title,
-          created_at: t.created_at,
-          post_count: stat.count,
-          avg_logic_score: avg,
-        };
+return {
+  id: t.id,
+  title: t.title,
+  category: t.category,
+  created_at: t.created_at,
+  post_count: stat.count,
+  avg_logic_score: avg,
+};
       }) ?? [];
 
     // 人気スレ

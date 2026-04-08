@@ -16,10 +16,16 @@ export default function ForumPage() {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const [popularThreads, setPopularThreads] = useState<any[]>([]);
-  const [activeThreads, setActiveThreads] = useState<any[]>([]);
+
+
+
+
+
+const [popularThreads, setPopularThreads] = useState<any[]>([]);
+const [activeThreads, setActiveThreads] = useState<any[]>([]);
 const [relatedThreads, setRelatedThreads] = useState<any[]>([]);
 const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+const [categoryFilter, setCategoryFilter] = useState("すべて");
 
 const [generatedIssue, setGeneratedIssue] = useState<{
   mode: "expand" | "split";
@@ -36,6 +42,9 @@ const [generatedIssue, setGeneratedIssue] = useState<{
         const result = await res.json();
 
         console.log("top-summary result:", result);
+
+console.log("popularThreads:", result.popularThreads);
+
         console.log("popularThreads sample:", result.popularThreads?.[0]);
 
         setPopularThreads(result.popularThreads ?? []);
@@ -46,21 +55,34 @@ const [generatedIssue, setGeneratedIssue] = useState<{
     })();
   }, []);
 
-  const filteredPopularThreads = keyword
-    ? popularThreads.filter(
-        (t) =>
-          String(t.title || "").includes(keyword) ||
-          String(t.summary || "").includes(keyword)
-      )
-    : popularThreads;
 
-  const filteredActiveThreads = keyword
-    ? activeThreads.filter(
-        (t) =>
-          String(t.title || "").includes(keyword) ||
-          String(t.summary || "").includes(keyword)
-      )
-    : activeThreads;
+const filteredPopularThreads = popularThreads.filter((t) => {
+  const matchKeyword = keyword
+    ? String(t.title || "").includes(keyword) ||
+      String(t.summary || "").includes(keyword)
+    : true;
+
+  const matchCategory =
+    categoryFilter === "すべて"
+      ? true
+      : String(t.category || "") === categoryFilter;
+
+  return matchKeyword && matchCategory;
+});
+
+const filteredActiveThreads = activeThreads.filter((t) => {
+  const matchKeyword = keyword
+    ? String(t.title || "").includes(keyword) ||
+      String(t.summary || "").includes(keyword)
+    : true;
+
+  const matchCategory =
+    categoryFilter === "すべて"
+      ? true
+      : String(t.category || "") === categoryFilter;
+
+  return matchKeyword && matchCategory;
+});
 
   const handleSubmit = async () => {
     const trimmed = text.trim();
@@ -111,6 +133,7 @@ setRelatedThreads(related);
     <main style={{ maxWidth: 760, margin: "0 auto", padding: 24 }}>
       <h1 style={{ fontSize: 28, fontWeight: 800 }}>AI掲示板</h1>
 
+
       <div
         style={{
           marginTop: 16,
@@ -131,6 +154,33 @@ setRelatedThreads(related);
           議論が噛み合わない原因は「前提のズレ」にあります。
         </div>
       </div>
+
+
+<div style={{ marginTop: 16, marginBottom: 16 }}>
+  <select
+    value={categoryFilter}
+    onChange={(e) => setCategoryFilter(e.target.value)}
+    style={{
+      border: "1px solid #ccc",
+      borderRadius: 10,
+      padding: "10px 12px",
+      fontSize: 14,
+      background: "#fff",
+      minWidth: 180,
+    }}
+  >
+    <option value="すべて">すべて</option>
+    <option value="政治・経済">政治・経済</option>
+    <option value="ビジネス">ビジネス</option>
+    <option value="恋愛">恋愛</option>
+    <option value="健康">健康</option>
+    <option value="雑談">雑談</option>
+  </select>
+</div>
+
+
+
+
 
       {goal && (
         <div
@@ -161,9 +211,14 @@ setRelatedThreads(related);
             color: "#fff",
           }}
         >
+
+
+
           <div style={{ fontSize: 12, color: "#aaa" }}>
             注目している論点
           </div>
+
+
           <div style={{ fontWeight: 700 }}>{keyword}</div>
         </div>
       )}
@@ -189,16 +244,21 @@ setRelatedThreads(related);
               color: "#fff",
             }}
           >
-            <Link
-              href={`/${tenant}/forum/thread/${t.id}`}
-              style={{
-                textDecoration: "underline",
-                color: "inherit",
-                display: "block",
-              }}
-            >
-              <div style={{ fontWeight: 800, fontSize: 18 }}>{t.title}</div>
-            </Link>
+
+
+<Link
+  href={`/${tenant}/forum/thread/${t.id}`}
+  style={{
+    textDecoration: "underline",
+    color: "inherit",
+    display: "block",
+  }}
+>
+  <div style={{ fontSize: 12, color: "#aaa", marginBottom: 6 }}>
+    {t.category ?? "未設定"}
+  </div>
+  <div style={{ fontWeight: 800, fontSize: 18 }}>{t.title}</div>
+</Link>
 
             {t.assumption && (
               <div style={{ fontSize: 12, color: "#bbb", marginTop: 4 }}>
@@ -248,6 +308,10 @@ setRelatedThreads(related);
                 display: "block",
               }}
             >
+<div style={{ fontSize: 12, color: "#aaa", marginBottom: 6 }}>
+  {t.category ?? "未設定"}
+</div>
+
               <div style={{ fontWeight: 800, fontSize: 18 }}>{t.title}</div>
             </Link>
 

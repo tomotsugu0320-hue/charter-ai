@@ -4,13 +4,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+
 type ThreadRow = {
   id: string;
   title: string;
   slug: string;
   original_post: string;
+  category?: string;
   created_at?: string;
 };
+
 
 type PostRow = {
   id: string;
@@ -198,6 +201,21 @@ const [explanations, setExplanations] = useState<Record<string, string>>({});
 
   const [text, setText] = useState("");
 
+
+const [searchText, setSearchText] = useState("");
+<input
+  value={searchText}
+  onChange={(e) => setSearchText(e.target.value)}
+  placeholder="投稿を検索"
+  style={{
+    width: "100%",
+    border: "1px solid #ccc",
+    borderRadius: 10,
+    padding: "10px 12px",
+    marginBottom: 12,
+  }}
+/>
+
 const [selectedGuide, setSelectedGuide] = useState<{
   type: "論点" | "前提" | "根拠";
   text: string;
@@ -248,17 +266,24 @@ const [replyToOpinionId, setReplyToOpinionId] = useState<string | null>(null);
     loadThread();
   }, [threadId]);
 
-  const visiblePosts = useMemo(() => {
-    return posts.filter((post) => {
-      return (
-        post.post_role === "issue_raise" ||
-        post.post_role === "opinion" ||
-        post.post_role === "rebuttal" ||
-        post.post_role === "supplement" ||
-        post.post_role === "explanation"
-      );
-    });
-  }, [posts]);
+
+const visiblePosts = useMemo(() => {
+  return posts.filter((post) => {
+    const matchRole =
+      post.post_role === "issue_raise" ||
+      post.post_role === "opinion" ||
+      post.post_role === "rebuttal" ||
+      post.post_role === "supplement" ||
+      post.post_role === "explanation";
+
+    const matchSearch = searchText
+      ? post.content.includes(searchText)
+      : true;
+
+    return matchRole && matchSearch;
+  });
+}, [posts, searchText]);
+
 
   const sortedVisiblePosts = useMemo(() => {
     const arr = [...visiblePosts];
@@ -806,6 +831,16 @@ if (result.explanation) {
             >
               作成日時: {formatDate(thread.created_at)}
             </div>
+
+<div
+  style={{
+    marginTop: 6,
+    fontSize: 13,
+    color: "#666",
+  }}
+>
+  カテゴリ：{thread.category ?? "未設定"}
+</div>
 
             <div
               style={{
@@ -1877,6 +1912,37 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
               background: "#fff",
             }}
           >
+
+<div style={{ marginTop: 16, marginBottom: 16 }}>
+  <button
+    onClick={() => {
+      setSelectedGuide(null);
+      setPostRole("opinion");
+      setReplyToOpinionId(null);
+
+      setTimeout(() => {
+        window.scrollTo({
+          top: document.body.scrollHeight,
+          behavior: "smooth",
+        });
+      }, 100);
+    }}
+    style={{
+      width: "100%",
+      border: "none",
+      borderRadius: 12,
+      padding: "14px 16px",
+      background: "#111",
+      color: "#fff",
+      fontSize: 16,
+      fontWeight: 800,
+      cursor: "pointer",
+    }}
+  >
+    このテーマについて最初の意見を書く
+  </button>
+</div>
+
 <h2
   style={{
     margin: 0,
