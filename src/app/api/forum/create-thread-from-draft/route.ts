@@ -1,6 +1,5 @@
 // src/app/api/forum/create-thread-from-draft/route.ts
 
-
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -19,6 +18,12 @@ export async function POST(req: Request) {
       claim,
       premises,
       reasons,
+
+      // 👇 追加（AI構造）
+      summaryText,
+      issues,
+      conflicts,
+      fullStructure,
     } = body;
 
     if (!tenantSlug || !title || !claim) {
@@ -28,8 +33,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // tenant自体は今のforum_threadsには紐付けていないが、
-    // 存在チェックだけしておく
+    // tenant確認
     const { data: tenant, error: tenantError } = await supabase
       .from("tenants")
       .select("id")
@@ -44,6 +48,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // スレ作成
     const { data: thread, error: threadError } = await supabase
       .from("forum_threads")
       .insert({
@@ -69,6 +74,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // 👇 投稿内容生成
     const content =
       Array.isArray(premises) && Array.isArray(reasons)
         ? [
@@ -78,6 +84,7 @@ export async function POST(req: Request) {
           ].join("\n")
         : claim;
 
+    // 👇 初期投稿（論点）
     const { error: postError } = await supabase
       .from("forum_posts")
       .insert({
@@ -101,10 +108,47 @@ export async function POST(req: Request) {
       );
     }
 
+    // ===============================
+    // 🔥 ここが今回の追加（超重要）
+    // ===============================
+
+    const { error: structureError } = await supabase
+      .from("thread_ai_structures")
+      .upsert({
+        thread_id: thread.id,
+        summary_text: summaryText ?? null,
+
+        issues: Array.isArray(issues) ? issues : [],
+        conflicts: Array.isArray(conflicts) ? conflicts : [],
+
+        // 使わないが将来用に空で入れておく
+        opinions: [],
+        rebuttals: [],
+        supplements: [],
+        explanations: [],
+
+        full_structure_json: fullStructure ?? null,
+      });
+
+    if (structureError) {
+      console.error("structure save error:", structureError);
+      return NextResponse.json(
+        {
+          error:
+            structureError?.message ||
+            structureError?.details ||
+            JSON.stringify(structureError) ||
+            "failed to save structure",
+        },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
       threadId: thread.id,
     });
+
   } catch (error) {
     console.error("create-thread-from-draft error:", error);
     return NextResponse.json(
