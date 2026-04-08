@@ -197,7 +197,24 @@ const [explanations, setExplanations] = useState<Record<string, string>>({});
   const [posts, setPosts] = useState<PostRow[]>([]);
 
   const [text, setText] = useState("");
-const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
+
+const [selectedGuide, setSelectedGuide] = useState<{
+  type: "論点" | "前提" | "根拠";
+  text: string;
+} | null>(null);
+
+const [relatedPosts, setRelatedPosts] = useState<
+  {
+    id: string;
+    content: string;
+    post_role: string;
+    created_at?: string;
+    thread_id: string;
+  }[]
+>([]);
+const [relatedSummary, setRelatedSummary] = useState<string | null>(null);
+const [loadingRelated, setLoadingRelated] = useState(false);
+
 
 const [rebuttalClaim, setRebuttalClaim] = useState("");
 const [rebuttalPremise, setRebuttalPremise] = useState("");
@@ -486,11 +503,68 @@ const [replyToOpinionId, setReplyToOpinionId] = useState<string | null>(null);
     return Math.round(total / scoredPosts.length);
   }, [visiblePosts]);
 
+
   const maxLogicScore = useMemo(() => {
     const scoredPosts = visiblePosts.filter((post) => (post.logic_score ?? 0) > 0);
     if (scoredPosts.length === 0) return null;
     return Math.max(...scoredPosts.map((post) => post.logic_score ?? 0));
   }, [visiblePosts]);
+
+
+const originalStructure = useMemo(() => {
+  return splitContent(thread?.original_post ?? "");
+}, [thread?.original_post]);
+
+
+async function handleNodeClick(type: "論点" | "前提" | "根拠", text: string) {
+  setSelectedGuide({
+    type,
+    text,
+  });
+  setPostRole("opinion");
+  setReplyToOpinionId(null);
+
+  setLoadingRelated(true);
+  setRelatedPosts([]);
+  setRelatedSummary(null);
+
+  try {
+    const res = await fetch("/api/forum/search-related", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        text,
+        threadId,
+      }),
+    });
+
+    const result = await res.json();
+
+    console.log("clicked:", text);
+    console.log("threadId:", threadId);
+    console.log("result:", result);
+
+    if (!res.ok) {
+      throw new Error(result?.error || "関連検索失敗");
+    }
+
+    setRelatedPosts(result.posts || []);
+    setRelatedSummary(result.summary || null);
+
+    setTimeout(() => {
+      const el = document.getElementById("related-section");
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  } catch (e: any) {
+    console.error(e);
+    setError(e?.message || "関連検索失敗");
+  } finally {
+    setLoadingRelated(false);
+  }
+}
+
 
   async function loadThread() {
     setLoading(true);
@@ -558,9 +632,9 @@ if (postRole === "rebuttal") {
     return;
   }
 
-  contentToPost = selectedIssue
-    ? `論点: ${selectedIssue}\n${trimmed}`
-    : trimmed;
+contentToPost = selectedGuide
+  ? `${selectedGuide.type}: ${selectedGuide.text}\n${trimmed}`
+  : trimmed;
 }
 
     if (!threadId) {
@@ -608,7 +682,7 @@ setReplyToOpinionId(null);
       setPredictionFlag(false);
       setPredictionTarget("");
       setPredictionDeadline("");
-      setSelectedIssue(null);
+      setSelectedGuide(null);
       await loadThread();
     } catch (e: any) {
       console.error(e);
@@ -849,20 +923,25 @@ if (result.explanation) {
     主な論点
   </h2>
 
+<p
+  style={{
+    marginTop: 0,
+    marginBottom: 12,
+    fontSize: 13,
+    color: "#666",
+  }}
+>
+  気になる項目を押すと、関連する議論を下で確認できます。
+</p>
+
 <div style={{ display: "grid", gap: 10 }}>
   {summary?.key_points?.issues?.length ? (
     summary.key_points.issues.map((item, index) => (
       <button
         key={`${item}-${index}`}
-        onClick={() => {
-          setSelectedIssue(item);
-          setPostRole("opinion");
-          setReplyToOpinionId(null);
-          window.scrollTo({
-            top: document.body.scrollHeight,
-            behavior: "smooth",
-          });
-        }}
+
+onClick={() => handleNodeClick("論点", item)}
+
         style={{
           width: "100%",
           textAlign: "left",
@@ -885,6 +964,125 @@ if (result.explanation) {
 
 </section>
 
+<section
+  style={{
+    marginTop: 24,
+    border: "1px solid #ddd",
+    borderRadius: 16,
+    padding: 20,
+    background: "#fff",
+  }}
+>
+  <h2
+    style={{
+      margin: 0,
+      marginBottom: 12,
+      fontSize: 24,
+      fontWeight: 800,
+    }}
+  >
+    主な前提
+  </h2>
+
+<p
+  style={{
+    marginTop: 0,
+    marginBottom: 12,
+    fontSize: 13,
+    color: "#666",
+  }}
+>
+  気になる項目を押すと、関連する議論を下で確認できます
+</p>
+
+  <div style={{ display: "grid", gap: 10 }}>
+    {originalStructure.premises.length > 0 ? (
+      originalStructure.premises.map((item, index) => (
+        <button
+          key={`${item}-${index}`}
+
+onClick={() => handleNodeClick("前提", item)}
+
+          style={{
+            width: "100%",
+            textAlign: "left",
+            border: "1px solid #ddd",
+            borderRadius: 10,
+            padding: "12px 14px",
+            background: "#fff",
+            fontSize: 15,
+            lineHeight: 1.6,
+            cursor: "pointer",
+          }}
+        >
+          {item}
+        </button>
+      ))
+    ) : (
+      <div style={{ color: "#666" }}>まだ前提は整理されていない。</div>
+    )}
+  </div>
+</section>
+
+<section
+  style={{
+    marginTop: 24,
+    border: "1px solid #ddd",
+    borderRadius: 16,
+    padding: 20,
+    background: "#fff",
+  }}
+>
+  <h2
+    style={{
+      margin: 0,
+      marginBottom: 12,
+      fontSize: 24,
+      fontWeight: 800,
+    }}
+  >
+    主な根拠
+  </h2>
+
+<p
+  style={{
+    marginTop: 0,
+    marginBottom: 12,
+    fontSize: 13,
+    color: "#666",
+  }}
+>
+  気になる項目を押すと、関連する議論を下で確認できます。
+</p>
+
+  <div style={{ display: "grid", gap: 10 }}>
+    {originalStructure.reasons.length > 0 ? (
+      originalStructure.reasons.map((item, index) => (
+        <button
+          key={`${item}-${index}`}
+
+onClick={() => handleNodeClick("根拠", item)}
+
+          style={{
+            width: "100%",
+            textAlign: "left",
+            border: "1px solid #ddd",
+            borderRadius: 10,
+            padding: "12px 14px",
+            background: "#fff",
+            fontSize: 15,
+            lineHeight: 1.6,
+            cursor: "pointer",
+          }}
+        >
+          {item}
+        </button>
+      ))
+    ) : (
+      <div style={{ color: "#666" }}>まだ根拠は整理されていない。</div>
+    )}
+  </div>
+</section>
 
 <section
   style={{
@@ -906,31 +1104,100 @@ if (result.explanation) {
     主な対立
   </h2>
 
+  <p
+    style={{
+      marginTop: 0,
+      marginBottom: 12,
+      fontSize: 13,
+      color: "#666",
+    }}
+  >
+    気になる項目を押すと、関連する議論を下で確認できます。
+  </p>
+
   {conflicts && conflicts.length > 0 ? (
     <div style={{ display: "grid", gap: 10 }}>
-      {conflicts.map((c, i) => (
-        <div
-          key={i}
-          style={{
-            padding: 10,
-            borderRadius: 8,
-            background: "#fafafa",
-            border: "1px solid #eee",
-          }}
-        >
-          <div style={{ color: "#b71c1c", fontWeight: 700 }}>
-            A：{c.opinion}
-          </div>
-          <div style={{ color: "#0d47a1", fontWeight: 700 }}>
-            B：{c.rebuttal}
-          </div>
-        </div>
-      ))}
+{conflicts.map((c, i) => (
+  <div
+    key={i}
+    style={{
+      padding: 10,
+      borderRadius: 8,
+      background: "#fafafa",
+      border: "1px solid #eee",
+      display: "grid",
+      gap: 8,
+    }}
+  >
+    <button
+      onClick={() => handleNodeClick("論点", c.opinion)}
+      style={{
+        textAlign: "left",
+        border: "1px solid #f44336",
+        borderRadius: 10,
+        padding: "10px 12px",
+        background: "#fff5f5",
+        cursor: "pointer",
+        fontWeight: 700,
+      }}
+    >
+      🔴 A：{c.opinion}
+    </button>
+
+    <button
+      onClick={() => handleNodeClick("論点", c.opinion)}
+      style={{
+        width: "fit-content",
+        border: "none",
+        background: "transparent",
+        color: "#b71c1c",
+        textDecoration: "underline",
+        cursor: "pointer",
+        fontSize: 13,
+        padding: 0,
+      }}
+    >
+      この意見に関する過去の投稿を見る
+    </button>
+
+    <button
+      onClick={() => handleNodeClick("論点", c.rebuttal)}
+      style={{
+        textAlign: "left",
+        border: "1px solid #2196f3",
+        borderRadius: 10,
+        padding: "10px 12px",
+        background: "#f0f6ff",
+        cursor: "pointer",
+        fontWeight: 700,
+      }}
+    >
+      🔵 B：{c.rebuttal}
+    </button>
+
+    <button
+      onClick={() => handleNodeClick("論点", c.rebuttal)}
+      style={{
+        width: "fit-content",
+        border: "none",
+        background: "transparent",
+        color: "#0d47a1",
+        textDecoration: "underline",
+        cursor: "pointer",
+        fontSize: 13,
+        padding: 0,
+      }}
+    >
+      この意見に関する過去の投稿を見る
+    </button>
+  </div>
+))}
     </div>
   ) : (
     <div style={{ color: "#666" }}>対立はまだ抽出されていない。</div>
   )}
 </section>
+
 
           <section
             style={{
@@ -1133,7 +1400,7 @@ opacity: (() => {
 
 <button
   onClick={() => {
-    setSelectedIssue(null);
+    setSelectedGuide(null);
     setPostRole("rebuttal");
     setReplyToOpinionId(op.opinion.id);
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
@@ -1152,7 +1419,7 @@ opacity: (() => {
 
 <button
   onClick={() => {
-    setSelectedIssue(null);
+    setSelectedGuide(null);
     setPostRole("supplement");
     setReplyToOpinionId(op.opinion.id);
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
@@ -1639,8 +1906,7 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
     ? "選択した意見に対する投稿です。"
     : "このスレの問いに対して投稿します。"}
 </p>
-
-{selectedIssue && (
+{selectedGuide && (
   <div
     style={{
       marginBottom: 12,
@@ -1653,7 +1919,85 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
       fontSize: 14,
     }}
   >
-    選択中の論点: {selectedIssue}
+    選択中の{selectedGuide.type}: {selectedGuide.text}
+  </div>
+)}
+
+{selectedGuide && (
+  <div
+    id="related-section"
+    style={{
+      marginBottom: 12,
+      padding: "12px 14px",
+      borderRadius: 10,
+      background: "#fafafa",
+      border: "1px solid #e5e5e5",
+    }}
+  >
+    <div
+      style={{
+        fontSize: 13,
+        fontWeight: 800,
+        marginBottom: 8,
+        color: "#444",
+      }}
+    >
+      過去に投稿された関連内容
+    </div>
+
+    {loadingRelated ? (
+      <div style={{ color: "#666", fontSize: 14 }}>検索中...</div>
+    ) : relatedPosts.length > 0 ? (
+
+      <div style={{ display: "grid", gap: 8 }}>
+        {relatedPosts.map((post) => (
+          <div
+            key={post.id}
+            style={{
+              border: "1px solid #ddd",
+              borderRadius: 8,
+              padding: "10px 12px",
+              background: "#fff",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#666",
+                marginBottom: 4,
+              }}
+            >
+              {roleLabel(post.post_role)} / {formatDate(post.created_at)}
+            </div>
+            <div style={{ fontSize: 14, lineHeight: 1.6 }}>
+              {post.content}
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div style={{ color: "#666", fontSize: 14 }}>
+        まだ投稿はありません。この内容について最初の意見を書けます。
+      </div>
+    )}
+
+    {relatedSummary && (
+      <div
+        style={{
+          marginTop: 10,
+          padding: "10px 12px",
+          borderRadius: 8,
+          background: "#f0f4ff",
+          border: "1px solid #ccd",
+          fontSize: 13,
+          lineHeight: 1.6,
+        }}
+      >
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>関連要約</div>
+        <div>{relatedSummary}</div>
+      </div>
+    )}
   </div>
 )}
 
@@ -1776,13 +2120,13 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
                   fontWeight: 700,
                 }}
               >
-                {posting ? "投稿中..." : "投稿する"}
+                {posting ? "投稿中..." : "この内容について意見を書く"}
               </button>
 
               <button
 onClick={() => {
   setText("");
-  setSelectedIssue(null);
+  setSelectedGuide(null);
   setPostRole("opinion");
   setPredictionFlag(false);
   setPredictionTarget("");
@@ -1791,6 +2135,9 @@ onClick={() => {
   setRebuttalPremise("");
   setRebuttalReason("");
   setReplyToOpinionId(null);
+setRelatedPosts([]);
+setRelatedSummary(null);
+setLoadingRelated(false);
 }}
 
 

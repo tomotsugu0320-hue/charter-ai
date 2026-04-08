@@ -1,6 +1,5 @@
 // api/forum/search-related
 
-
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -11,26 +10,41 @@ const supabase = createClient(
 
 export async function POST(req: Request) {
   try {
-    const { claim } = await req.json();
+    const { text, threadId } = await req.json();
 
-    if (!claim) {
-      return NextResponse.json([], { status: 200 });
+const keyword = String(text ?? "")
+  .replace(/[。？?！!]/g, "")
+  .slice(0, 15)
+  .trim();
+
+    if (!keyword) {
+      return NextResponse.json({ posts: [], summary: null });
     }
 
-    const { data, error } = await supabase
-      .from("forum_threads")
-      .select("id, title")
-      .ilike("title", `%${claim}%`)
-      .limit(5);
+    let query = supabase
+      .from("forum_posts")
+      .select("id, content, post_role, created_at, thread_id")
+      .ilike("content", `%${keyword}%`)
+      .order("created_at", { ascending: false })
+      .limit(8);
+
+    if (threadId) {
+      query = query.eq("thread_id", threadId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error(error);
-      return NextResponse.json([], { status: 200 });
+      return NextResponse.json({ posts: [], summary: null });
     }
 
-    return NextResponse.json(data ?? []);
+    return NextResponse.json({
+      posts: data ?? [],
+      summary: null,
+    });
   } catch (e) {
     console.error(e);
-    return NextResponse.json([], { status: 200 });
+    return NextResponse.json({ posts: [], summary: null });
   }
 }
