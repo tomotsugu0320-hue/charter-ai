@@ -127,7 +127,11 @@ setGeneratedIssue({
 const relatedRes = await fetch("/api/forum/search-related", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ claim }),
+body: JSON.stringify({
+  claim,
+  premises,
+  reasons,
+}),
 });
 
 const related = await relatedRes.json();
@@ -170,6 +174,7 @@ setRelatedThreads(related);
 
 <div style={{ marginTop: 16, marginBottom: 16 }}>
 
+
 <div style={{ marginBottom: 12 }}>
   <input
     value={searchQuery}
@@ -185,6 +190,25 @@ color: "#fff",
       border: "1px solid #555",
     }}
   />
+{hasSearch && (
+  <button
+    onClick={() => setSearchQuery("")}
+    style={{
+      marginTop: 8,
+      border: "1px solid #555",
+      borderRadius: 8,
+      padding: "8px 12px",
+      background: "#222",
+      color: "#fff",
+      cursor: "pointer",
+    }}
+  >
+    検索をクリア
+  </button>
+)}
+
+
+
 </div>
 
   <select
@@ -210,7 +234,12 @@ border: "1px solid #555",
 </div>
 
 
-
+{hasSearch && (
+  <div style={{ marginTop: 8, color: "#ddd", fontSize: 13 }}>
+    検索結果：
+    人気スレ {filteredPopularThreads.length}件 / 活発スレ {filteredActiveThreads.length}件
+  </div>
+)}
 
 
       {goal && (
@@ -255,7 +284,11 @@ border: "1px solid #555",
       )}
 
       <section style={{ marginTop: 24 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800 }}>🔥 人気スレ</h2>
+
+<h2 style={{ fontSize: 20, fontWeight: 800 }}>
+  🔥 人気スレ {hasSearch ? "（検索結果）" : ""}
+</h2>
+
 
 {hasSearch && filteredPopularThreads.length === 0 && (
   <p style={{ color: "#666" }}>
@@ -311,7 +344,9 @@ color: "#fff",
       </section>
 
       <section style={{ marginTop: 24 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800 }}>📈 活発スレ</h2>
+<h2 style={{ fontSize: 20, fontWeight: 800 }}>
+  📈 活発スレ {hasSearch ? "（検索結果）" : ""}
+</h2>
 
         {hasSearch && filteredActiveThreads.length === 0 && (
           <p style={{ color: "#666" }}>
