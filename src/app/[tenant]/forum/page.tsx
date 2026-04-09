@@ -13,19 +13,17 @@ export default function ForumPage() {
   const keyword = searchParams.get("keyword") || "";
   const goal = searchParams.get("goal") || "";
 
-  const [text, setText] = useState("");
-  const [loading, setLoading] = useState(false);
-
-
-
-
-
+const [text, setText] = useState("");
+const [loading, setLoading] = useState(false);
 
 const [popularThreads, setPopularThreads] = useState<any[]>([]);
 const [activeThreads, setActiveThreads] = useState<any[]>([]);
 const [relatedThreads, setRelatedThreads] = useState<any[]>([]);
 const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
 const [categoryFilter, setCategoryFilter] = useState("すべて");
+const [searchQuery, setSearchQuery] = useState("");
+
+const hasSearch = searchQuery.trim() !== "";
 
 const [generatedIssue, setGeneratedIssue] = useState<{
   mode: "expand" | "split";
@@ -57,31 +55,39 @@ console.log("popularThreads:", result.popularThreads);
 
 
 const filteredPopularThreads = popularThreads.filter((t) => {
-  const matchKeyword = keyword
-    ? String(t.title || "").includes(keyword) ||
-      String(t.summary || "").includes(keyword)
-    : true;
+  const q = searchQuery.trim().toLowerCase();
+
+  const matchSearch =
+    q === ""
+      ? true
+      : String(t.title || "").toLowerCase().includes(q) ||
+        String(t.summary || "").toLowerCase().includes(q);
 
   const matchCategory =
     categoryFilter === "すべて"
       ? true
       : String(t.category || "") === categoryFilter;
 
-  return matchKeyword && matchCategory;
+  return matchSearch && matchCategory;
+
 });
 
+
 const filteredActiveThreads = activeThreads.filter((t) => {
-  const matchKeyword = keyword
-    ? String(t.title || "").includes(keyword) ||
-      String(t.summary || "").includes(keyword)
-    : true;
+  const q = searchQuery.trim().toLowerCase();
+
+  const matchSearch =
+    q === ""
+      ? true
+      : String(t.title || "").toLowerCase().includes(q) ||
+        String(t.summary || "").toLowerCase().includes(q);
 
   const matchCategory =
     categoryFilter === "すべて"
       ? true
       : String(t.category || "") === categoryFilter;
 
-  return matchKeyword && matchCategory;
+  return matchSearch && matchCategory;
 });
 
   const handleSubmit = async () => {
@@ -157,6 +163,24 @@ setRelatedThreads(related);
 
 
 <div style={{ marginTop: 16, marginBottom: 16 }}>
+
+<div style={{ marginBottom: 12 }}>
+  <input
+    value={searchQuery}
+    onChange={(e) => setSearchQuery(e.target.value)}
+    placeholder="タイトルや内容で検索"
+    style={{
+      width: "100%",
+      borderRadius: 10,
+      padding: "12px 14px",
+      fontSize: 16,
+background: "#1a1a1a",
+color: "#fff",
+      border: "1px solid #555",
+    }}
+  />
+</div>
+
   <select
     value={categoryFilter}
     onChange={(e) => setCategoryFilter(e.target.value)}
@@ -194,7 +218,7 @@ border: "1px solid #555",
             color: "#fff",
           }}
         >
-          <div style={{ fontSize: 12, color: "#aaa" }}>
+          <div style={{ fontSize: 12, color: "#ddd" }}>
             マクロから渡されたゴール
           </div>
           <div style={{ fontWeight: 700 }}>{goal}</div>
@@ -215,7 +239,7 @@ border: "1px solid #555",
 
 
 
-          <div style={{ fontSize: 12, color: "#aaa" }}>
+          <div style={{ fontSize: 12, color: "#ddd" }}>
             注目している論点
           </div>
 
@@ -227,22 +251,22 @@ border: "1px solid #555",
       <section style={{ marginTop: 24 }}>
         <h2 style={{ fontSize: 20, fontWeight: 800 }}>🔥 人気スレ</h2>
 
-        {keyword && filteredPopularThreads.length === 0 && (
-          <p style={{ color: "#666" }}>
-            「{keyword}」に一致する人気スレはまだありません。
-          </p>
-        )}
+{hasSearch && filteredPopularThreads.length === 0 && (
+  <p style={{ color: "#666" }}>
+    「{searchQuery}」に一致する人気スレはまだありません。
+  </p>
+)}
 
         {filteredPopularThreads.map((t) => (
           <div
             key={t.id}
             style={{
               border: "1px solid #333",
-              background: "#111",
               borderRadius: 10,
               padding: 12,
               marginBottom: 8,
-              color: "#fff",
+background: "#1a1a1a",
+color: "#fff",
             }}
           >
 
@@ -255,7 +279,7 @@ border: "1px solid #555",
     display: "block",
   }}
 >
-  <div style={{ fontSize: 12, color: "#aaa", marginBottom: 6 }}>
+  <div style={{ fontSize: 12, color: "#ddd", marginBottom: 6 }}>
     {t.category ?? "未設定"}
   </div>
   <div style={{ fontWeight: 800, fontSize: 18 }}>{t.title}</div>
@@ -273,7 +297,7 @@ border: "1px solid #555",
               </div>
             )}
 
-            <div style={{ fontSize: 12, color: "#aaa" }}>
+            <div style={{ fontSize: 12, color: "#ddd" }}>
               平均スコア: {t.avg_logic_score} / 投稿数: {t.post_count}
             </div>
           </div>
@@ -283,9 +307,9 @@ border: "1px solid #555",
       <section style={{ marginTop: 24 }}>
         <h2 style={{ fontSize: 20, fontWeight: 800 }}>📈 活発スレ</h2>
 
-        {keyword && filteredActiveThreads.length === 0 && (
+        {hasSearch && filteredActiveThreads.length === 0 && (
           <p style={{ color: "#666" }}>
-            「{keyword}」に一致する活発スレはまだありません。
+            「{searchQuery}」に一致する活発スレはまだありません。
           </p>
         )}
 
@@ -294,11 +318,11 @@ border: "1px solid #555",
             key={t.id}
             style={{
               border: "1px solid #333",
-              background: "#111",
               borderRadius: 10,
               padding: 12,
               marginBottom: 8,
-              color: "#fff",
+background: "#1a1a1a",
+color: "#fff",
             }}
           >
             <Link
@@ -309,7 +333,7 @@ border: "1px solid #555",
                 display: "block",
               }}
             >
-<div style={{ fontSize: 12, color: "#aaa", marginBottom: 6 }}>
+<div style={{ fontSize: 12, color: "#ddd", marginBottom: 6 }}>
   {t.category ?? "未設定"}
 </div>
 
@@ -328,7 +352,7 @@ border: "1px solid #555",
               </div>
             )}
 
-            <div style={{ fontSize: 12, color: "#aaa" }}>
+            <div style={{ fontSize: 12, color: "#ddd" }}>
               投稿数: {t.post_count} / 平均スコア: {t.avg_logic_score}
             </div>
           </div>
@@ -359,7 +383,7 @@ border: "1px solid #555",
             議論が噛み合わない原因は「前提のズレ」です。
           </div>
 
-          <div style={{ color: "#aaa", fontSize: 13, marginTop: 4 }}>
+          <div style={{ color: "#ddd", fontSize: 13, marginTop: 4 }}>
             あなたの考えを書くと、それを分解して見える化します。
           </div>
         </div>
@@ -430,12 +454,12 @@ border: "1px solid #555",
 {relatedThreads.length > 0 && (
   <div
     style={{
-      background: "#111",
       border: "1px solid #333",
       padding: 12,
       borderRadius: 8,
       marginBottom: 12,
-      color: "#fff",
+background: "#1a1a1a",
+color: "#fff"
     }}
   >
     <div style={{ fontWeight: 800, marginBottom: 6 }}>
@@ -542,8 +566,8 @@ window.location.href = `/${tenant}/forum/thread/${result.threadId}`;
             marginTop: 12,
             padding: "10px 16px",
             borderRadius: 8,
-            background: "#111",
-            color: "#fff",
+background: "#1a1a1a",
+color: "#fff",
             fontWeight: 700,
             border: "none",
             cursor: "pointer",
@@ -552,7 +576,7 @@ window.location.href = `/${tenant}/forum/thread/${result.threadId}`;
           {loading ? "処理中..." : "構造化して投稿する"}
         </button>
 
-        <p style={{ fontSize: 12, color: "#aaa", marginTop: 6 }}>
+        <p style={{ fontSize: 12, color: "#ddd", marginTop: 6 }}>
           投稿すると、主張・前提・根拠に分解されます
         </p>
       </section>

@@ -186,6 +186,7 @@ export default function ForumThreadPage({ params }: PageProps) {
     { opinion: string; rebuttal: string }[]
   >([]);
 const [explanations, setExplanations] = useState<Record<string, string>>({});
+const [fontSize, setFontSize] = useState<"small" | "medium" | "large">("medium");
 
   const [tenant, setTenant] = useState("");
   const [threadId, setThreadId] = useState("");
@@ -200,21 +201,7 @@ const [explanations, setExplanations] = useState<Record<string, string>>({});
   const [posts, setPosts] = useState<PostRow[]>([]);
 
   const [text, setText] = useState("");
-
-
 const [searchText, setSearchText] = useState("");
-<input
-  value={searchText}
-  onChange={(e) => setSearchText(e.target.value)}
-  placeholder="投稿を検索"
-  style={{
-    width: "100%",
-    border: "1px solid #ccc",
-    borderRadius: 10,
-    padding: "10px 12px",
-    marginBottom: 12,
-  }}
-/>
 
 const [selectedGuide, setSelectedGuide] = useState<{
   type: "論点" | "前提" | "根拠";
@@ -267,6 +254,24 @@ const [replyToOpinionId, setReplyToOpinionId] = useState<string | null>(null);
   }, [threadId]);
 
 
+
+const fontSizeMap = {
+  small: {
+    base: 14,
+    title: 24,
+  },
+  medium: {
+    base: 16,
+    title: 28,
+  },
+  large: {
+    base: 20,
+    title: 32,
+  },
+};
+const currentFont = fontSizeMap[fontSize];
+
+
 const visiblePosts = useMemo(() => {
   return posts.filter((post) => {
     const matchRole =
@@ -277,7 +282,7 @@ const visiblePosts = useMemo(() => {
       post.post_role === "explanation";
 
     const matchSearch = searchText
-      ? post.content.includes(searchText)
+      ? post.content.toLowerCase().includes(searchText.toLowerCase())
       : true;
 
     return matchRole && matchSearch;
@@ -784,7 +789,7 @@ if (result.explanation) {
         <a
           href={`/${tenant}/forum`}
           style={{
-            color: "#111",
+            color: "#0d47a1",
             textDecoration: "none",
             fontWeight: 700,
           }}
@@ -792,6 +797,16 @@ if (result.explanation) {
           ← 掲示板トップに戻る
         </a>
       </div>
+
+
+<div style={{ marginBottom: 12 }}>
+  <span style={{ marginRight: 8 }}>文字サイズ：</span>
+
+  <button onClick={() => setFontSize("small")}>小</button>
+  <button onClick={() => setFontSize("medium")} style={{ marginLeft: 6 }}>中</button>
+  <button onClick={() => setFontSize("large")} style={{ marginLeft: 6 }}>大</button>
+</div>
+
 
       {loading ? (
         <div>読み込み中...</div>
@@ -814,7 +829,7 @@ if (result.explanation) {
             <h1
               style={{
                 margin: 0,
-                fontSize: 32,
+                fontSize: currentFont.title,
                 fontWeight: 800,
                 lineHeight: 1.4,
               }}
@@ -825,7 +840,7 @@ if (result.explanation) {
             <div
               style={{
                 marginTop: 10,
-                fontSize: 14,
+                fontSize: currentFont.base,
                 color: "#666",
               }}
             >
@@ -835,7 +850,7 @@ if (result.explanation) {
 <div
   style={{
     marginTop: 6,
-    fontSize: 13,
+    fontSize: currentFont.base,
     color: "#666",
   }}
 >
@@ -845,9 +860,9 @@ if (result.explanation) {
             <div
               style={{
                 marginTop: 8,
-                fontSize: 14,
+                fontSize: currentFont.base,
                 fontWeight: 700,
-                color: "#111",
+                color: "#0d47a1",
               }}
             >
               {averageLogicScore > 0 ? (
@@ -856,7 +871,7 @@ if (result.explanation) {
                   <span
                     style={{
                       marginLeft: 8,
-                      fontSize: 12,
+                      fontSize: currentFont.base,
                       fontWeight: 500,
                       color: "#666",
                     }}
@@ -876,7 +891,7 @@ if (result.explanation) {
             <div
               style={{
                 marginTop: 4,
-                fontSize: 13,
+                fontSize: currentFont.base,
                 color: maxLogicScore && maxLogicScore >= 80 ? "#2e7d32" : "#555",
                 fontWeight: maxLogicScore && maxLogicScore >= 80 ? 700 : 500,
               }}
@@ -895,7 +910,7 @@ if (result.explanation) {
             >
               <div
                 style={{
-                  fontSize: 13,
+                  fontSize: currentFont.base,
                   fontWeight: 700,
                   color: "#555",
                   marginBottom: 8,
@@ -903,9 +918,15 @@ if (result.explanation) {
               >
                 元投稿
               </div>
-              <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}>
-                {thread.original_post}
-              </div>
+<div
+  style={{
+    whiteSpace: "pre-wrap",
+    lineHeight: 1.8,
+    fontSize: currentFont.base,
+  }}
+>
+  {thread.original_post}
+</div>
             </div>
           </section>
 
@@ -922,7 +943,7 @@ if (result.explanation) {
               style={{
                 margin: 0,
                 marginBottom: 16,
-                fontSize: 24,
+                fontSize: currentFont.title,
                 fontWeight: 800,
               }}
             >
@@ -932,7 +953,13 @@ if (result.explanation) {
             {!summary ? (
               <p style={{ margin: 0, color: "#666" }}>要約を読み込み中...</p>
             ) : (
-              <div style={{ color: "#444", lineHeight: 1.8 }}>
+<div
+  style={{
+    color: "#444",
+    lineHeight: 1.8,
+    fontSize: currentFont.base,
+  }}
+>
                 {summary.summary_text}
               </div>
             )}
@@ -951,7 +978,7 @@ if (result.explanation) {
     style={{
       margin: 0,
       marginBottom: 12,
-      fontSize: 24,
+      fontSize: currentFont.title,
       fontWeight: 800,
     }}
   >
@@ -962,7 +989,7 @@ if (result.explanation) {
   style={{
     marginTop: 0,
     marginBottom: 12,
-    fontSize: 13,
+    fontSize: currentFont.base,
     color: "#666",
   }}
 >
@@ -976,21 +1003,32 @@ if (result.explanation) {
         key={`${item}-${index}`}
 
 onClick={() => handleNodeClick("論点", item)}
+  style={{
+    width: "100%",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    border: "1px solid #ddd",
+    borderRadius: 10,
+    padding: "12px 14px",
+    background: "#fff",
+    fontSize: currentFont.base,
+    cursor: "pointer",
+  }}
+>
+  <span>{item}</span>
 
-        style={{
-          width: "100%",
-          textAlign: "left",
-          border: "1px solid #ddd",
-          borderRadius: 10,
-          padding: "12px 14px",
-          background: "#fff",
-          fontSize: 15,
-          lineHeight: 1.6,
-          cursor: "pointer",
-        }}
-      >
-        {item}
-      </button>
+  <span
+    style={{
+      fontSize: currentFont.base,
+      color: "#0d47a1",
+      fontWeight: 700,
+      whiteSpace: "nowrap",
+    }}
+  >
+    議論を見る・ここから意見を書く →
+  </span>
+</button>
     ))
   ) : (
     <div style={{ color: "#666" }}>まだ論点は整理されていない。</div>
@@ -1012,7 +1050,7 @@ onClick={() => handleNodeClick("論点", item)}
     style={{
       margin: 0,
       marginBottom: 12,
-      fontSize: 24,
+      fontSize: currentFont.title,
       fontWeight: 800,
     }}
   >
@@ -1023,7 +1061,7 @@ onClick={() => handleNodeClick("論点", item)}
   style={{
     marginTop: 0,
     marginBottom: 12,
-    fontSize: 13,
+    fontSize: currentFont.base,
     color: "#666",
   }}
 >
@@ -1038,21 +1076,32 @@ onClick={() => handleNodeClick("論点", item)}
 
 onClick={() => handleNodeClick("前提", item)}
 
-          style={{
-            width: "100%",
-            textAlign: "left",
-            border: "1px solid #ddd",
-            borderRadius: 10,
-            padding: "12px 14px",
-            background: "#fff",
-            fontSize: 15,
-            lineHeight: 1.6,
-            cursor: "pointer",
-          }}
-        >
-          {item}
-        </button>
-      ))
+  style={{
+    width: "100%",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    border: "1px solid #ddd",
+    borderRadius: 10,
+    padding: "12px 14px",
+    background: "#fff",
+    fontSize: currentFont.base,
+    cursor: "pointer",
+  }}
+>
+  <span>{item}</span>
+
+  <span
+    style={{
+      fontSize: currentFont.base,
+      color: "#0d47a1",
+      fontWeight: 700,
+      whiteSpace: "nowrap",
+    }}
+  >
+   議論を見る・ここから意見を書く →
+  </span>
+</button>      ))
     ) : (
       <div style={{ color: "#666" }}>まだ前提は整理されていない。</div>
     )}
@@ -1072,7 +1121,7 @@ onClick={() => handleNodeClick("前提", item)}
     style={{
       margin: 0,
       marginBottom: 12,
-      fontSize: 24,
+      fontSize: currentFont.title,
       fontWeight: 800,
     }}
   >
@@ -1083,7 +1132,7 @@ onClick={() => handleNodeClick("前提", item)}
   style={{
     marginTop: 0,
     marginBottom: 12,
-    fontSize: 13,
+    fontSize: currentFont.base,
     color: "#666",
   }}
 >
@@ -1098,20 +1147,32 @@ onClick={() => handleNodeClick("前提", item)}
 
 onClick={() => handleNodeClick("根拠", item)}
 
-          style={{
-            width: "100%",
-            textAlign: "left",
-            border: "1px solid #ddd",
-            borderRadius: 10,
-            padding: "12px 14px",
-            background: "#fff",
-            fontSize: 15,
-            lineHeight: 1.6,
-            cursor: "pointer",
-          }}
-        >
-          {item}
-        </button>
+  style={{
+    width: "100%",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    border: "1px solid #ddd",
+    borderRadius: 10,
+    padding: "12px 14px",
+    background: "#fff",
+    fontSize: currentFont.base,
+    cursor: "pointer",
+  }}
+>
+  <span>{item}</span>
+
+  <span
+    style={{
+      fontSize: currentFont.base,
+      color: "#0d47a1",
+      fontWeight: 700,
+      whiteSpace: "nowrap",
+    }}
+  >
+    議論を見る・ここから意見を書く →
+  </span>
+</button>
       ))
     ) : (
       <div style={{ color: "#666" }}>まだ根拠は整理されていない。</div>
@@ -1132,7 +1193,7 @@ onClick={() => handleNodeClick("根拠", item)}
     style={{
       margin: 0,
       marginBottom: 12,
-      fontSize: 24,
+      fontSize: currentFont.title,
       fontWeight: 800,
     }}
   >
@@ -1143,7 +1204,7 @@ onClick={() => handleNodeClick("根拠", item)}
     style={{
       marginTop: 0,
       marginBottom: 12,
-      fontSize: 13,
+      fontSize: currentFont.base,
       color: "#666",
     }}
   >
@@ -1164,67 +1225,65 @@ onClick={() => handleNodeClick("根拠", item)}
       gap: 8,
     }}
   >
-    <button
-      onClick={() => handleNodeClick("論点", c.opinion)}
-      style={{
-        textAlign: "left",
-        border: "1px solid #f44336",
-        borderRadius: 10,
-        padding: "10px 12px",
-        background: "#fff5f5",
-        cursor: "pointer",
-        fontWeight: 700,
-      }}
-    >
-      🔴 A：{c.opinion}
-    </button>
+<button
+  onClick={() => handleNodeClick("論点", c.opinion)}
+  style={{
+    width: "100%",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    border: "1px solid #f44336",
+    borderRadius: 10,
+    padding: "10px 12px",
+    background: "#fff5f5",
+    cursor: "pointer",
+    fontWeight: 700,
+  }}
+>
+  <span>🔴 A：{c.opinion}</span>
 
-    <button
-      onClick={() => handleNodeClick("論点", c.opinion)}
-      style={{
-        width: "fit-content",
-        border: "none",
-        background: "transparent",
-        color: "#b71c1c",
-        textDecoration: "underline",
-        cursor: "pointer",
-        fontSize: 13,
-        padding: 0,
-      }}
-    >
-      この意見に関する過去の投稿を見る
-    </button>
+  <span
+    style={{
+      fontSize: currentFont.base,
+      color: "#b71c1c",
+      fontWeight: 700,
+      whiteSpace: "nowrap",
+    }}
+  >
+    議論を見る・ここから意見を書く →
+  </span>
+</button>
 
-    <button
-      onClick={() => handleNodeClick("論点", c.rebuttal)}
-      style={{
-        textAlign: "left",
-        border: "1px solid #2196f3",
-        borderRadius: 10,
-        padding: "10px 12px",
-        background: "#f0f6ff",
-        cursor: "pointer",
-        fontWeight: 700,
-      }}
-    >
-      🔵 B：{c.rebuttal}
-    </button>
 
-    <button
-      onClick={() => handleNodeClick("論点", c.rebuttal)}
-      style={{
-        width: "fit-content",
-        border: "none",
-        background: "transparent",
-        color: "#0d47a1",
-        textDecoration: "underline",
-        cursor: "pointer",
-        fontSize: 13,
-        padding: 0,
-      }}
-    >
-      この意見に関する過去の投稿を見る
-    </button>
+<button
+  onClick={() => handleNodeClick("論点", c.rebuttal)}
+  style={{
+    width: "100%",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    border: "1px solid #2196f3",
+    borderRadius: 10,
+    padding: "10px 12px",
+    background: "#f0f6ff",
+    cursor: "pointer",
+    fontWeight: 700,
+  }}
+>
+  <span>🔵 B：{c.rebuttal}</span>
+
+  <span
+    style={{
+      fontSize: currentFont.base,
+      color: "#0d47a1",
+      fontWeight: 700,
+      whiteSpace: "nowrap",
+    }}
+  >
+    議論を見る・ここから意見を書く →
+  </span>
+</button>
+
   </div>
 ))}
     </div>
@@ -1247,12 +1306,29 @@ onClick={() => handleNodeClick("根拠", item)}
               style={{
                 margin: 0,
                 marginBottom: 16,
-                fontSize: 24,
+                fontSize: currentFont.title,
                 fontWeight: 800,
               }}
             >
               投稿一覧
             </h2>
+
+<div style={{ marginBottom: 12 }}>
+  <input
+    value={searchText}
+    onChange={(e) => setSearchText(e.target.value)}
+    placeholder="投稿を検索"
+    style={{
+      width: "100%",
+      border: "1px solid #ccc",
+      borderRadius: 10,
+      padding: "12px 14px",
+      fontSize: currentFont.base,
+      background: "#fff",
+      color: "#000",
+    }}
+  />
+</div>
 
             <label
               style={{
@@ -1260,7 +1336,7 @@ onClick={() => handleNodeClick("根拠", item)}
                 alignItems: "center",
                 gap: 8,
                 marginBottom: 12,
-                fontSize: 14,
+                fontSize: currentFont.base,
                 color: "#444",
                 cursor: "pointer",
               }}
@@ -1323,7 +1399,7 @@ onClick={() => handleNodeClick("根拠", item)}
                     <details open style={{ marginBottom: 12 }}>
                       <summary
                         style={{
-                          fontSize: 14,
+                          fontSize: currentFont.base,
                           fontWeight: 800,
                           color: "#0d47a1",
                           cursor: "pointer",
@@ -1347,7 +1423,7 @@ onClick={() => handleNodeClick("根拠", item)}
   >
     <div
       style={{
-        fontSize: 13,
+        fontSize: currentFont.base,
         fontWeight: 800,
         color: "#2e7d32",
         marginBottom: 6,
@@ -1362,7 +1438,7 @@ onClick={() => handleNodeClick("根拠", item)}
 
     <div
       style={{
-        fontSize: 12,
+        fontSize: currentFont.base,
         color: "#555",
       }}
     >
@@ -1373,7 +1449,7 @@ onClick={() => handleNodeClick("根拠", item)}
 )}
 
                         {group.opinions.length === 0 ? (
-                          <div style={{ color: "#777", fontSize: 14 }}>
+                          <div style={{ color: "#777", fontSize: currentFont.base }}>
                             まだ意見がない。
                           </div>
                         ) : (
@@ -1395,14 +1471,14 @@ onClick={() => handleNodeClick("根拠", item)}
 opacity: (() => {
   const score = op.opinion.logic_score ?? 0;
 
-  if (hideLowScore && score > 0 && score < 60) {
-    return 0.3;
-  }
+if (hideLowScore && score > 0 && score < 60) {
+  return 0.65;
+}
 
-  if (score >= 80) return 1;
-  if (score >= 60) return 0.8;
-  if (score >= 40) return 0.6;
-  return 0.4;
+if (score >= 80) return 1;
+if (score >= 60) return 0.95;
+if (score >= 40) return 0.85;
+return 0.75;
 })(),
 }}
                               >
@@ -1419,7 +1495,7 @@ opacity: (() => {
 <span
   style={{
     marginLeft: 8,
-    fontSize: 12,
+    fontSize: currentFont.base,
     color: scoreColor(op.opinion.logic_score),
   }}
 >
@@ -1445,7 +1521,7 @@ opacity: (() => {
     borderRadius: 6,
     border: "1px solid #ccc",
     background: "#fff",
-    fontSize: 12,
+    fontSize: currentFont.base,
     cursor: "pointer",
   }}
 >
@@ -1464,7 +1540,7 @@ opacity: (() => {
     borderRadius: 6,
     border: "1px solid #ccc",
     background: "#fff",
-    fontSize: 12,
+    fontSize: currentFont.base,
     cursor: "pointer",
   }}
 >
@@ -1528,7 +1604,7 @@ opacity: (() => {
       borderRadius: 999,
       padding: "6px 10px",
       background: "#fff",
-      fontSize: 12,
+      fontSize: currentFont.base,
       cursor:
         feedbackLoadingPostId === op.opinion.id ? "default" : "pointer",
     }}
@@ -1544,7 +1620,7 @@ opacity: (() => {
       borderRadius: 999,
       padding: "6px 10px",
       background: "#fff",
-      fontSize: 12,
+      fontSize: currentFont.base,
       cursor:
         feedbackLoadingPostId === op.opinion.id ? "default" : "pointer",
     }}
@@ -1560,7 +1636,7 @@ opacity: (() => {
       borderRadius: 999,
       padding: "6px 10px",
       background: "#fff",
-      fontSize: 12,
+      fontSize: currentFont.base,
       cursor:
         feedbackLoadingPostId === op.opinion.id ? "default" : "pointer",
     }}
@@ -1576,7 +1652,7 @@ opacity: (() => {
       borderRadius: 999,
       padding: "6px 10px",
       background: "#fff",
-      fontSize: 12,
+      fontSize: currentFont.base,
       cursor:
         feedbackLoadingPostId === op.opinion.id ? "default" : "pointer",
     }}
@@ -1592,7 +1668,7 @@ opacity: (() => {
       borderRadius: 999,
       padding: "6px 10px",
       background: "#fff",
-      fontSize: 12,
+      fontSize: currentFont.base,
       cursor:
         feedbackLoadingPostId === op.opinion.id ? "default" : "pointer",
     }}
@@ -1605,7 +1681,7 @@ opacity: (() => {
   <div
     style={{
       marginTop: 8,
-      fontSize: 12,
+      fontSize: currentFont.base,
       color: "#666",
     }}
   >
@@ -1621,7 +1697,7 @@ opacity: (() => {
       borderRadius: 8,
       background: "#f0f4ff",
       border: "1px solid #ccd",
-      fontSize: 13,
+      fontSize: currentFont.base,
       lineHeight: 1.6,
     }}
   >
@@ -1638,7 +1714,7 @@ opacity: (() => {
                                     <summary
                                       style={{
                                         cursor: "pointer",
-                                        fontSize: 13,
+                                        fontSize: currentFont.base,
                                         fontWeight: 700,
                                         color: "#555",
                                       }}
@@ -1666,14 +1742,14 @@ opacity: (() => {
         opacity: (() => {
           const score = child.logic_score ?? 0;
 
-          if (hideLowScore && score > 0 && score < 60) {
-            return 0.3;
-          }
+if (hideLowScore && score > 0 && score < 60) {
+  return 0.65;
+}
 
-          if (score >= 80) return 1;
-          if (score >= 60) return 0.8;
-          if (score >= 40) return 0.6;
-          return 0.4;
+if (score >= 80) return 1;
+if (score >= 60) return 0.95;
+if (score >= 40) return 0.85;
+return 0.75;
         })(),
       }}
     >
@@ -1697,7 +1773,7 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
           >
             <div
               style={{
-                fontSize: 12,
+                fontSize: currentFont.base,
                 fontWeight: 700,
                 color: roleColor(op.opinion.post_role),
                 marginBottom: 8,
@@ -1759,7 +1835,7 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
 >
             <div
               style={{
-                fontSize: 12,
+                fontSize: currentFont.base,
                 fontWeight: 700,
                 color: roleColor(child.post_role),
                 marginBottom: 8,
@@ -1824,7 +1900,7 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
         <div>
           <div
             style={{
-              fontSize: 12,
+              fontSize: currentFont.base,
               fontWeight: 700,
               color: roleColor(child.post_role),
             }}
@@ -1934,12 +2010,12 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
       padding: "14px 16px",
       background: "#111",
       color: "#fff",
-      fontSize: 16,
+      fontSize: currentFont.base,
       fontWeight: 800,
       cursor: "pointer",
     }}
   >
-    このテーマについて最初の意見を書く
+    まだ誰も書いていない。このテーマの最初の意見を書く
   </button>
 </div>
 
@@ -1947,7 +2023,7 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
   style={{
     margin: 0,
     marginBottom: 12,
-    fontSize: 24,
+    fontSize: currentFont.title,
     fontWeight: 800,
   }}
 >
@@ -1961,33 +2037,47 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
       }`
     : "新しい投稿"}
 </h2>
-
 <p
   style={{
     marginTop: 0,
     color: "#666",
+    fontSize: currentFont.base,
   }}
 >
   {replyToOpinionId
     ? "選択した意見に対する投稿です。"
     : "このスレの問いに対して投稿します。"}
 </p>
+
+
 {selectedGuide && (
   <div
     style={{
       marginBottom: 12,
-      padding: "10px 12px",
+      padding: "12px 14px",
       borderRadius: 10,
       background: "#eef4ff",
       border: "1px solid #c9d8ff",
       color: "#0d47a1",
-      fontWeight: 700,
-      fontSize: 14,
+      fontSize: currentFont.base,
+      lineHeight: 1.7,
     }}
   >
-    選択中の{selectedGuide.type}: {selectedGuide.text}
+    <div
+      style={{
+        fontWeight: 800,
+        marginBottom: 6,
+      }}
+    >
+      この{selectedGuide.type}について意見できます
+    </div>
+
+    <div style={{ fontWeight: 700 }}>
+      {selectedGuide.text}
+    </div>
   </div>
 )}
+
 
 {selectedGuide && (
   <div
@@ -2002,7 +2092,7 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
   >
     <div
       style={{
-        fontSize: 13,
+        fontSize: currentFont.base,
         fontWeight: 800,
         marginBottom: 8,
         color: "#444",
@@ -2012,7 +2102,7 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
     </div>
 
     {loadingRelated ? (
-      <div style={{ color: "#666", fontSize: 14 }}>検索中...</div>
+      <div style={{ color: "#666", fontSize: currentFont.base }}>検索中...</div>
     ) : relatedPosts.length > 0 ? (
 
       <div style={{ display: "grid", gap: 8 }}>
@@ -2028,7 +2118,7 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
           >
             <div
               style={{
-                fontSize: 12,
+                fontSize: currentFont.base,
                 fontWeight: 700,
                 color: "#666",
                 marginBottom: 4,
@@ -2036,14 +2126,14 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
             >
               {roleLabel(post.post_role)} / {formatDate(post.created_at)}
             </div>
-            <div style={{ fontSize: 14, lineHeight: 1.6 }}>
+            <div style={{ fontSize: currentFont.base, lineHeight: 1.6 }}>
               {post.content}
             </div>
           </div>
         ))}
       </div>
     ) : (
-      <div style={{ color: "#666", fontSize: 14 }}>
+      <div style={{ color: "#666", fontSize: currentFont.base }}>
         まだ投稿はありません。この内容について最初の意見を書けます。
       </div>
     )}
@@ -2056,7 +2146,7 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
           borderRadius: 8,
           background: "#f0f4ff",
           border: "1px solid #ccd",
-          fontSize: 13,
+          fontSize: currentFont.base,
           lineHeight: 1.6,
         }}
       >
@@ -2073,7 +2163,7 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
                 style={{
                   display: "block",
                   marginBottom: 8,
-                  fontSize: 14,
+                  fontSize: currentFont.base,
                   fontWeight: 700,
                 }}
               >
@@ -2093,7 +2183,7 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
                   border: "1px solid #ccc",
                   borderRadius: 10,
                   padding: "10px 12px",
-                  fontSize: 15,
+                  fontSize: currentFont.base,
                   background: "#fff",
                 }}
               >
@@ -2118,7 +2208,7 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
     border: "1px solid #ccc",
     borderRadius: 10,
     padding: 12,
-    fontSize: 16,
+    fontSize: currentFont.base,
     resize: "vertical",
     outline: "none",
   }}
@@ -2133,7 +2223,7 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
         border: "1px solid #ccc",
         borderRadius: 10,
         padding: 12,
-        fontSize: 16,
+        fontSize: currentFont.base,
         outline: "none",
       }}
     />
@@ -2148,7 +2238,7 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
         border: "1px solid #ccc",
         borderRadius: 10,
         padding: 12,
-        fontSize: 16,
+        fontSize: currentFont.base,
         resize: "vertical",
         outline: "none",
       }}
@@ -2158,14 +2248,14 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
   <textarea
     value={text}
     onChange={(e) => setText(e.target.value)}
-    placeholder="追記したい内容を書く"
+    placeholder="あなたの考えを書く（主張・前提・根拠でもOK）"
     rows={5}
     style={{
       width: "100%",
       border: "1px solid #ccc",
       borderRadius: 10,
       padding: 12,
-      fontSize: 16,
+      fontSize: currentFont.base,
       resize: "vertical",
       outline: "none",
     }}
