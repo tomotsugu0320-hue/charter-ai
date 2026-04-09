@@ -1003,11 +1003,12 @@ if (result.explanation) {
         key={`${item}-${index}`}
 
 onClick={() => handleNodeClick("論点", item)}
+
   style={{
     width: "100%",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
+    display: "grid",
+    gap: 8,
+    textAlign: "left",
     border: "1px solid #ddd",
     borderRadius: 10,
     padding: "12px 14px",
@@ -1016,14 +1017,14 @@ onClick={() => handleNodeClick("論点", item)}
     cursor: "pointer",
   }}
 >
-  <span>{item}</span>
+  <span style={{ lineHeight: 1.6 }}>{item}</span>
 
   <span
     style={{
       fontSize: currentFont.base,
       color: "#0d47a1",
       fontWeight: 700,
-      whiteSpace: "nowrap",
+      lineHeight: 1.4,
     }}
   >
     議論を見る・ここから意見を書く →
@@ -1149,9 +1150,9 @@ onClick={() => handleNodeClick("根拠", item)}
 
   style={{
     width: "100%",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
+    display: "grid",
+    gap: 8,
+    textAlign: "left",
     border: "1px solid #ddd",
     borderRadius: 10,
     padding: "12px 14px",
@@ -1160,20 +1161,19 @@ onClick={() => handleNodeClick("根拠", item)}
     cursor: "pointer",
   }}
 >
-  <span>{item}</span>
+  <span style={{ lineHeight: 1.6 }}>{item}</span>
 
   <span
     style={{
       fontSize: currentFont.base,
       color: "#0d47a1",
       fontWeight: 700,
-      whiteSpace: "nowrap",
+      lineHeight: 1.4,
     }}
   >
     議論を見る・ここから意見を書く →
   </span>
-</button>
-      ))
+</button>      ))
     ) : (
       <div style={{ color: "#666" }}>まだ根拠は整理されていない。</div>
     )}
@@ -1229,9 +1229,9 @@ onClick={() => handleNodeClick("根拠", item)}
   onClick={() => handleNodeClick("論点", c.opinion)}
   style={{
     width: "100%",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
+    display: "grid",
+    gap: 8,
+    textAlign: "left",
     border: "1px solid #f44336",
     borderRadius: 10,
     padding: "10px 12px",
@@ -1240,26 +1240,27 @@ onClick={() => handleNodeClick("根拠", item)}
     fontWeight: 700,
   }}
 >
-  <span>🔴 A：{c.opinion}</span>
+  <span style={{ lineHeight: 1.6 }}>🔴 A：{c.opinion}</span>
 
   <span
     style={{
       fontSize: currentFont.base,
       color: "#b71c1c",
       fontWeight: 700,
-      whiteSpace: "nowrap",
+      lineHeight: 1.4,
     }}
   >
     議論を見る・ここから意見を書く →
   </span>
 </button>
 
-
 <button
-  onClick={() => handleNodeClick("論点", c.rebuttal)}
+  onClick={() => handleNodeClick("論点", c.opinion)}
   style={{
     width: "100%",
-    display: "flex",
+    display: "grid",
+    gap: 8,
+    textAlign: "left",
     justifyContent: "space-between",
     alignItems: "center",
     border: "1px solid #2196f3",
@@ -1283,6 +1284,11 @@ onClick={() => handleNodeClick("根拠", item)}
     議論を見る・ここから意見を書く →
   </span>
 </button>
+
+
+
+
+
 
   </div>
 ))}
