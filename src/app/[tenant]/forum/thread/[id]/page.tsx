@@ -215,6 +215,7 @@ const [relatedPosts, setRelatedPosts] = useState<
     post_role: string;
     created_at?: string;
     thread_id: string;
+    thread_title?: string;
   }[]
 >([]);
 const [relatedSummary, setRelatedSummary] = useState<string | null>(null);
@@ -2086,6 +2087,10 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
 
 
 {selectedGuide && (
+
+
+
+
   <div
     id="related-section"
     style={{
@@ -2133,6 +2138,17 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
               {roleLabel(post.post_role)} / {formatDate(post.created_at)}
             </div>
             <div style={{ fontSize: currentFont.base, lineHeight: 1.6 }}>
+
+<div
+  style={{
+    fontSize: currentFont.base,
+    fontWeight: 800,
+    color: "#111",
+    marginBottom: 4,
+  }}
+>
+{post.thread_title || "関連スレ"}
+</div>
               {post.content}
             </div>
           </div>
@@ -2160,6 +2176,95 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
         <div>{relatedSummary}</div>
       </div>
     )}
+
+<div
+  style={{
+    marginTop: 16,
+    paddingTop: 10,
+    borderTop: "1px solid #ddd",
+  }}
+>
+  <div
+    style={{
+      fontSize: currentFont.base,
+      fontWeight: 800,
+      marginBottom: 6,
+      color: "#444",
+    }}
+  >
+    この論点を深める
+  </div>
+
+  <div style={{ display: "grid", gap: 8 }}>
+{Array.from(
+  new Map(
+    relatedPosts
+      .filter((post) => String(post.thread_id) !== String(threadId))
+      .map((post) => [post.thread_id, post])
+  ).values()
+)
+  .slice(0, 3)
+  .map((post) => (
+    <a
+      key={`jump-${post.thread_id}`}
+      href={`/${tenant}/forum/thread/${post.thread_id}`}
+      style={{
+        display: "block",
+        border: "1px solid #ddd",
+        borderRadius: 8,
+        padding: "10px 12px",
+        background: "#fff",
+        textDecoration: "none",
+      }}
+    >
+      <div
+        style={{
+          fontSize: currentFont.base,
+          color: "#999",
+          marginBottom: 4,
+        }}
+      >
+        他スレの関連投稿
+      </div>
+
+      <div
+        style={{
+          fontSize: currentFont.base,
+          color: "#0d47a1",
+          fontWeight: 800,
+          lineHeight: 1.6,
+          marginBottom: 4,
+        }}
+      >
+        👉 {post.content.length > 40
+          ? `${post.content.slice(0, 40)}...`
+          : post.content}
+      </div>
+
+      <div
+        style={{
+          fontSize: currentFont.base,
+          color: "#666",
+          marginBottom: 4,
+          fontWeight: 700,
+        }}
+      >
+        {roleLabel(post.post_role)}
+      </div>
+
+      <div
+        style={{
+          marginTop: 4,
+          fontSize: currentFont.base,
+          color: "#666",
+        }}
+      >
+        → この話題の別スレを見る
+      </div>
+    </a>
+  ))}
+  </div>
+</div>
   </div>
 )}
 

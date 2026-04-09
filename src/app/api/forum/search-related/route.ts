@@ -29,7 +29,16 @@ export async function POST(req: Request) {
 
     let query = supabase
       .from("forum_posts")
-      .select("id, content, post_role, created_at, thread_id")
+.select(`
+  id,
+  content,
+  post_role,
+  created_at,
+  thread_id,
+  forum_threads (
+    title
+  )
+`)
       .order("created_at", { ascending: false })
       .limit(12);
 
@@ -47,13 +56,23 @@ export async function POST(req: Request) {
 
     if (error) {
       console.error(error);
+
       return NextResponse.json({ posts: [], summary: null });
     }
 
-    return NextResponse.json({
-      posts: data ?? [],
-      summary: null,
-    });
+const posts = (data ?? []).map((row: any) => ({
+  id: row.id,
+  content: row.content,
+  post_role: row.post_role,
+  created_at: row.created_at,
+  thread_id: row.thread_id,
+  thread_title: row.forum_threads?.title ?? "",
+}));
+
+return NextResponse.json({
+  posts,
+  summary: null,
+});
   } catch (e) {
     console.error(e);
     return NextResponse.json({ posts: [], summary: null });
