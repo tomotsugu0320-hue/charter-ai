@@ -202,6 +202,7 @@ const [fontSize, setFontSize] = useState<"small" | "medium" | "large">("medium")
 
   const [text, setText] = useState("");
 const [searchText, setSearchText] = useState("");
+const [copied, setCopied] = useState(false);
 
 const [selectedGuide, setSelectedGuide] = useState<{
   type: "論点" | "前提" | "根拠";
@@ -271,6 +272,9 @@ const fontSizeMap = {
   },
 };
 const currentFont = fontSizeMap[fontSize];
+
+const currentUrl =
+  typeof window !== "undefined" ? window.location.href : "";
 
 
 const visiblePosts = useMemo(() => {
@@ -545,6 +549,28 @@ const visiblePosts = useMemo(() => {
 const originalStructure = useMemo(() => {
   return splitContent(thread?.original_post ?? "");
 }, [thread?.original_post]);
+
+
+async function handleShare() {
+  const url = window.location.href;
+
+  try {
+    if (navigator.share) {
+      await navigator.share({
+        title: thread?.title,
+        text: thread?.original_post?.slice(0, 80),
+        url,
+      });
+      return;
+    }
+
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  } catch (e) {
+    console.error(e);
+  }
+}
 
 
 async function handleNodeClick(type: "論点" | "前提" | "根拠", text: string) {
@@ -837,6 +863,42 @@ if (result.explanation) {
             >
               {thread.title}
             </h1>
+
+<div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+  <button
+    onClick={handleShare}
+    style={{
+      padding: "8px 12px",
+      borderRadius: 8,
+      border: "none",
+      background: "#111",
+      color: "#fff",
+      cursor: "pointer",
+      fontWeight: 700,
+    }}
+  >
+    この議論を共有
+  </button>
+
+<a
+  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
+    `${thread.title} ${currentUrl}`
+  )}`}
+  target="_blank"
+  rel="noopener noreferrer"
+  style={{
+    padding: "8px 12px",
+    borderRadius: 8,
+    border: "1px solid #ccc",
+    textDecoration: "none",
+    fontWeight: 700,
+  }}
+>
+  Xで共有
+</a>
+
+  {copied && <span style={{ color: "#2e7d32" }}>コピーした</span>}
+</div>
 
             <div
               style={{
