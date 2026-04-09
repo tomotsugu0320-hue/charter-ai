@@ -1072,16 +1072,15 @@ onClick={() => handleNodeClick("論点", item)}
   <div style={{ display: "grid", gap: 10 }}>
     {originalStructure.premises.length > 0 ? (
       originalStructure.premises.map((item, index) => (
-        <button
-          key={`${item}-${index}`}
 
-onClick={() => handleNodeClick("前提", item)}
-
+<button
+  key={`${item}-${index}`}
+  onClick={() => handleNodeClick("前提", item)}
   style={{
     width: "100%",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
+    display: "grid",
+    gap: 8,
+    textAlign: "left",
     border: "1px solid #ddd",
     borderRadius: 10,
     padding: "12px 14px",
@@ -1090,19 +1089,20 @@ onClick={() => handleNodeClick("前提", item)}
     cursor: "pointer",
   }}
 >
-  <span>{item}</span>
+  <span style={{ lineHeight: 1.6 }}>{item}</span>
 
   <span
     style={{
       fontSize: currentFont.base,
       color: "#0d47a1",
       fontWeight: 700,
-      whiteSpace: "nowrap",
+      lineHeight: 1.4,
     }}
   >
-   議論を見る・ここから意見を書く →
+    議論を見る・ここから意見を書く →
   </span>
-</button>      ))
+</button>
+      ))
     ) : (
       <div style={{ color: "#666" }}>まだ前提は整理されていない。</div>
     )}
@@ -1255,7 +1255,7 @@ onClick={() => handleNodeClick("根拠", item)}
 </button>
 
 <button
-  onClick={() => handleNodeClick("論点", c.opinion)}
+  onClick={() => handleNodeClick("論点", c.rebuttal)}
   style={{
     width: "100%",
     display: "grid",

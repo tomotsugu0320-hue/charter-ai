@@ -57,11 +57,14 @@ console.log("popularThreads:", result.popularThreads);
 const filteredPopularThreads = popularThreads.filter((t) => {
   const q = searchQuery.trim().toLowerCase();
 
-  const matchSearch =
-    q === ""
-      ? true
-      : String(t.title || "").toLowerCase().includes(q) ||
-        String(t.summary || "").toLowerCase().includes(q);
+
+const matchSearch =
+  q === ""
+    ? true
+    : String(t.title || "").toLowerCase().includes(q) ||
+      String(t.summary || "").toLowerCase().includes(q) ||
+      String(t.original_post || "").toLowerCase().includes(q);
+
 
   const matchCategory =
     categoryFilter === "すべて"
@@ -76,11 +79,14 @@ const filteredPopularThreads = popularThreads.filter((t) => {
 const filteredActiveThreads = activeThreads.filter((t) => {
   const q = searchQuery.trim().toLowerCase();
 
-  const matchSearch =
-    q === ""
-      ? true
-      : String(t.title || "").toLowerCase().includes(q) ||
-        String(t.summary || "").toLowerCase().includes(q);
+
+const matchSearch =
+  q === ""
+    ? true
+    : String(t.title || "").toLowerCase().includes(q) ||
+      String(t.summary || "").toLowerCase().includes(q) ||
+      String(t.original_post || "").toLowerCase().includes(q);
+
 
   const matchCategory =
     categoryFilter === "すべて"
