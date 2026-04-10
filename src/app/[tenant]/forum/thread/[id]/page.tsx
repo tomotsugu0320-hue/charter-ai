@@ -1,9 +1,9 @@
 // src/app/[tenant]/forum/thread/[id]/page.tsx
 
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-
 
 type ThreadRow = {
   id: string;
@@ -13,7 +13,6 @@ type ThreadRow = {
   category?: string;
   created_at?: string;
 };
-
 
 type PostRow = {
   id: string;
@@ -31,7 +30,7 @@ type PostRow = {
   prediction_flag?: boolean;
   prediction_target?: string | null;
   prediction_deadline?: string | null;
-parent_opinion_id?: string | null;
+  parent_opinion_id?: string | null;
   prediction_result?: string | null;
   feedback_counts?: {
     term_unknown?: number;
@@ -89,24 +88,21 @@ const POST_ROLE_OPTIONS: PostRoleOption[] = [
   { value: "explanation", label: "解説" },
 ];
 
-
 function splitContent(content: string) {
   if (!content) {
     return {
       claim: "",
-      premises: [],
-      reasons: [],
+      premises: [] as string[],
+      reasons: [] as string[],
     };
   }
 
-  // 超シンプル分解（あとでAIに置換）
   const sentences = content
     .split(/[。！？\n]/)
     .map((s) => s.trim())
     .filter(Boolean);
 
   const claim = sentences[0] ?? "";
-
   const premises = sentences.slice(1, 3);
   const reasons = sentences.slice(3);
 
@@ -117,14 +113,12 @@ function splitContent(content: string) {
   };
 }
 
-
 function formatDate(value?: string) {
   if (!value) return "";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value;
   return d.toLocaleString("ja-JP");
 }
-
 
 function roleColor(role: string) {
   switch (role) {
@@ -143,15 +137,13 @@ function roleColor(role: string) {
   }
 }
 
-
 function scoreColor(score?: number) {
   if (!score) return "#777";
-  if (score >= 80) return "#2e7d32"; // 緑（強い）
-  if (score >= 60) return "#1565c0"; // 青（普通）
-  if (score >= 40) return "#ef6c00"; // オレンジ（弱い）
-  return "#b71c1c"; // 赤（危険）
+  if (score >= 80) return "#2e7d32";
+  if (score >= 60) return "#1565c0";
+  if (score >= 40) return "#ef6c00";
+  return "#b71c1c";
 }
-
 
 function roleLabel(role: string) {
   switch (role) {
@@ -185,8 +177,10 @@ export default function ForumThreadPage({ params }: PageProps) {
   const [conflicts, setConflicts] = useState<
     { opinion: string; rebuttal: string }[]
   >([]);
-const [explanations, setExplanations] = useState<Record<string, string>>({});
-const [fontSize, setFontSize] = useState<"small" | "medium" | "large">("medium");
+  const [explanations, setExplanations] = useState<Record<string, string>>({});
+  const [fontSize, setFontSize] = useState<"small" | "medium" | "large">(
+    "medium"
+  );
 
   const [tenant, setTenant] = useState("");
   const [threadId, setThreadId] = useState("");
@@ -201,37 +195,36 @@ const [fontSize, setFontSize] = useState<"small" | "medium" | "large">("medium")
   const [posts, setPosts] = useState<PostRow[]>([]);
 
   const [text, setText] = useState("");
-const [searchText, setSearchText] = useState("");
-const [copied, setCopied] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [copied, setCopied] = useState(false);
 
-const [selectedGuide, setSelectedGuide] = useState<{
-  type: "論点" | "前提" | "根拠";
-  text: string;
-} | null>(null);
+  const [selectedGuide, setSelectedGuide] = useState<{
+    type: "論点" | "前提" | "根拠";
+    text: string;
+  } | null>(null);
 
-const [relatedPosts, setRelatedPosts] = useState<
-  {
-    id: string;
-    content: string;
-    post_role: string;
-    created_at?: string;
-    thread_id: string;
-    thread_title?: string;
-  }[]
->([]);
-const [relatedSummary, setRelatedSummary] = useState<string | null>(null);
-const [loadingRelated, setLoadingRelated] = useState(false);
+  const [relatedPosts, setRelatedPosts] = useState<
+    {
+      id: string;
+      content: string;
+      post_role: string;
+      created_at?: string;
+      thread_id: string;
+      thread_title?: string;
+    }[]
+  >([]);
+  const [relatedSummary, setRelatedSummary] = useState<string | null>(null);
+  const [loadingRelated, setLoadingRelated] = useState(false);
 
-
-const [rebuttalClaim, setRebuttalClaim] = useState("");
-const [rebuttalPremise, setRebuttalPremise] = useState("");
-const [rebuttalReason, setRebuttalReason] = useState("");
+  const [rebuttalClaim, setRebuttalClaim] = useState("");
+  const [rebuttalPremise, setRebuttalPremise] = useState("");
+  const [rebuttalReason, setRebuttalReason] = useState("");
 
   const [summary, setSummary] = useState<ThreadSummary | null>(null);
   const [feedbackSummary, setFeedbackSummary] =
     useState<FeedbackSummary | null>(null);
 
-const [replyToOpinionId, setReplyToOpinionId] = useState<string | null>(null);
+  const [replyToOpinionId, setReplyToOpinionId] = useState<string | null>(null);
 
   const [postRole, setPostRole] =
     useState<PostRoleOption["value"]>("opinion");
@@ -255,45 +248,73 @@ const [replyToOpinionId, setReplyToOpinionId] = useState<string | null>(null);
     loadThread();
   }, [threadId]);
 
+  const fontSizeMap = {
+    small: {
+      base: 14,
+      title: 24,
+    },
+    medium: {
+      base: 16,
+      title: 28,
+    },
+    large: {
+      base: 20,
+      title: 32,
+    },
+  };
 
+  const currentFont = fontSizeMap[fontSize];
+  const currentUrl =
+    typeof window !== "undefined" ? window.location.href : "";
 
-const fontSizeMap = {
-  small: {
-    base: 14,
-    title: 24,
-  },
-  medium: {
-    base: 16,
-    title: 28,
-  },
-  large: {
-    base: 20,
-    title: 32,
-  },
-};
-const currentFont = fontSizeMap[fontSize];
+  const whiteCardStyle: React.CSSProperties = {
+    marginTop: 24,
+    border: "1px solid #ddd",
+    borderRadius: 16,
+    padding: 20,
+    background: "#fff",
+    color: "#111",
+  };
 
-const currentUrl =
-  typeof window !== "undefined" ? window.location.href : "";
+  const whiteButtonCardStyle: React.CSSProperties = {
+    width: "100%",
+    display: "grid",
+    gap: 8,
+    textAlign: "left",
+    border: "1px solid #ddd",
+    borderRadius: 10,
+    padding: "12px 14px",
+    background: "#fff",
+    color: "#111",
+    fontSize: currentFont.base,
+    cursor: "pointer",
+  };
 
+  const postCardBaseStyle: React.CSSProperties = {
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 10,
+    border: "1px solid #ddd",
+    background: "#fff",
+    color: "#111",
+  };
 
-const visiblePosts = useMemo(() => {
-  return posts.filter((post) => {
-    const matchRole =
-      post.post_role === "issue_raise" ||
-      post.post_role === "opinion" ||
-      post.post_role === "rebuttal" ||
-      post.post_role === "supplement" ||
-      post.post_role === "explanation";
+  const visiblePosts = useMemo(() => {
+    return posts.filter((post) => {
+      const matchRole =
+        post.post_role === "issue_raise" ||
+        post.post_role === "opinion" ||
+        post.post_role === "rebuttal" ||
+        post.post_role === "supplement" ||
+        post.post_role === "explanation";
 
-    const matchSearch = searchText
-      ? post.content.toLowerCase().includes(searchText.toLowerCase())
-      : true;
+      const matchSearch = searchText
+        ? post.content.toLowerCase().includes(searchText.toLowerCase())
+        : true;
 
-    return matchRole && matchSearch;
-  });
-}, [posts, searchText]);
-
+      return matchRole && matchSearch;
+    });
+  }, [posts, searchText]);
 
   const sortedVisiblePosts = useMemo(() => {
     const arr = [...visiblePosts];
@@ -449,9 +470,7 @@ const visiblePosts = useMemo(() => {
         ).length;
 
         const trustLabel = authorTrustMap[op.opinion.author_key ?? ""]?.label;
-
         const bonus = trustBonus(trustLabel);
-
         const effectiveScore = base - rebuttalCount * 5 + bonus;
 
         return {
@@ -473,59 +492,6 @@ const visiblePosts = useMemo(() => {
     });
   }, [groupedByOpinion, authorTrustMap]);
 
-  const unresolvedIssues = useMemo(() => {
-    return groupedByOpinion
-      .map((group) => {
-        const ranked = [...group.opinions]
-          .map((op) => {
-            const base = op.opinion.logic_score ?? 0;
-            const rebuttalCount = op.children.filter(
-              (c) => c.post_role === "rebuttal"
-            ).length;
-
-            const trustLabel = authorTrustMap[op.opinion.author_key ?? ""]?.label;
-
-            const bonus = trustBonus(trustLabel);
-
-            const score = base - rebuttalCount * 5 + bonus;
-
-            return {
-              content: op.opinion.content,
-              score,
-              trustLabel: trustLabel ?? "-",
-            };
-          })
-          .sort((a, b) => b.score - a.score);
-
-        if (ranked.length < 2) return null;
-
-        const first = ranked[0];
-        const second = ranked[1];
-        const diff = first.score - second.score;
-
-        if (diff < 10) {
-          return {
-            issue: group.issue?.content ?? "（論点なし）",
-            first,
-            second,
-            diff,
-          };
-        }
-
-        return null;
-      })
-      .filter(
-        (
-          item
-        ): item is {
-          issue: string;
-          first: { content: string; score: number; trustLabel: string };
-          second: { content: string; score: number; trustLabel: string };
-          diff: number;
-        } => item !== null
-      );
-  }, [groupedByOpinion, authorTrustMap]);
-
   const averageLogicScore = useMemo(() => {
     const scoredPosts = visiblePosts.filter((post) => (post.logic_score ?? 0) > 0);
 
@@ -538,90 +504,81 @@ const visiblePosts = useMemo(() => {
     return Math.round(total / scoredPosts.length);
   }, [visiblePosts]);
 
-
   const maxLogicScore = useMemo(() => {
     const scoredPosts = visiblePosts.filter((post) => (post.logic_score ?? 0) > 0);
     if (scoredPosts.length === 0) return null;
     return Math.max(...scoredPosts.map((post) => post.logic_score ?? 0));
   }, [visiblePosts]);
 
+  const originalStructure = useMemo(() => {
+    return splitContent(thread?.original_post ?? "");
+  }, [thread?.original_post]);
 
-const originalStructure = useMemo(() => {
-  return splitContent(thread?.original_post ?? "");
-}, [thread?.original_post]);
+  async function handleShare() {
+    const url = window.location.href;
 
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: thread?.title,
+          text: thread?.original_post?.slice(0, 80),
+          url,
+        });
+        return;
+      }
 
-async function handleShare() {
-  const url = window.location.href;
-
-  try {
-    if (navigator.share) {
-      await navigator.share({
-        title: thread?.title,
-        text: thread?.original_post?.slice(0, 80),
-        url,
-      });
-      return;
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      console.error(e);
     }
-
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  } catch (e) {
-    console.error(e);
   }
-}
 
-
-async function handleNodeClick(type: "論点" | "前提" | "根拠", text: string) {
-  setSelectedGuide({
-    type,
-    text,
-  });
-  setPostRole("opinion");
-  setReplyToOpinionId(null);
-
-  setLoadingRelated(true);
-  setRelatedPosts([]);
-  setRelatedSummary(null);
-
-  try {
-    const res = await fetch("/api/forum/search-related", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        text,
-        threadId,
-      }),
+  async function handleNodeClick(type: "論点" | "前提" | "根拠", text: string) {
+    setSelectedGuide({
+      type,
+      text,
     });
+    setPostRole("opinion");
+    setReplyToOpinionId(null);
 
-    const result = await res.json();
+    setLoadingRelated(true);
+    setRelatedPosts([]);
+    setRelatedSummary(null);
 
-    console.log("clicked:", text);
-    console.log("threadId:", threadId);
-    console.log("result:", result);
+    try {
+      const res = await fetch("/api/forum/search-related", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text,
+          threadId,
+        }),
+      });
 
-    if (!res.ok) {
-      throw new Error(result?.error || "関連検索失敗");
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result?.error || "関連検索失敗");
+      }
+
+      setRelatedPosts(result.posts || []);
+      setRelatedSummary(result.summary || null);
+
+      setTimeout(() => {
+        const el = document.getElementById("related-section");
+        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    } catch (e: any) {
+      console.error(e);
+      setError(e?.message || "関連検索失敗");
+    } finally {
+      setLoadingRelated(false);
     }
-
-    setRelatedPosts(result.posts || []);
-    setRelatedSummary(result.summary || null);
-
-    setTimeout(() => {
-      const el = document.getElementById("related-section");
-      el?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
-  } catch (e: any) {
-    console.error(e);
-    setError(e?.message || "関連検索失敗");
-  } finally {
-    setLoadingRelated(false);
   }
-}
-
 
   async function loadThread() {
     setLoading(true);
@@ -667,32 +624,31 @@ async function handleNodeClick(type: "論点" | "前提" | "根拠", text: strin
   }
 
   async function handlePost() {
+    let contentToPost = "";
 
-let contentToPost = "";
+    if (postRole === "rebuttal") {
+      const claim = rebuttalClaim.trim();
+      const premise = rebuttalPremise.trim();
+      const reason = rebuttalReason.trim();
 
-if (postRole === "rebuttal") {
-  const claim = rebuttalClaim.trim();
-  const premise = rebuttalPremise.trim();
-  const reason = rebuttalReason.trim();
+      if (!claim || !premise || !reason) {
+        alert("反論は『主張・前提・根拠』を全部入れて。");
+        return;
+      }
 
-  if (!claim || !premise || !reason) {
-    alert("反論は『主張・前提・根拠』を全部入れて。");
-    return;
-  }
+      contentToPost = `主張: ${claim}\n前提: ${premise}\n根拠: ${reason}`;
+    } else {
+      const trimmed = text.trim();
 
-  contentToPost = `主張: ${claim}\n前提: ${premise}\n根拠: ${reason}`;
-} else {
-  const trimmed = text.trim();
+      if (!trimmed) {
+        alert("投稿内容を入れて。");
+        return;
+      }
 
-  if (!trimmed) {
-    alert("投稿内容を入れて。");
-    return;
-  }
-
-contentToPost = selectedGuide
-  ? `${selectedGuide.type}: ${selectedGuide.text}\n${trimmed}`
-  : trimmed;
-}
+      contentToPost = selectedGuide
+        ? `${selectedGuide.type}: ${selectedGuide.text}\n${trimmed}`
+        : trimmed;
+    }
 
     if (!threadId) {
       alert("threadIdがない。");
@@ -708,12 +664,11 @@ contentToPost = selectedGuide
         headers: {
           "Content-Type": "application/json",
         },
-
-body: JSON.stringify({
-  threadId,
-  content: contentToPost,
-  postRole,
-  parentOpinionId: replyToOpinionId,
+        body: JSON.stringify({
+          threadId,
+          content: contentToPost,
+          postRole,
+          parentOpinionId: replyToOpinionId,
           prediction_flag: predictionFlag,
           prediction_target: predictionFlag ? predictionTarget : null,
           prediction_deadline:
@@ -722,18 +677,13 @@ body: JSON.stringify({
         }),
       });
 
-
-const result = await res.json();
-
+      const result = await res.json();
 
       if (!res.ok) {
         throw new Error(result?.error || "投稿失敗");
       }
 
-setReplyToOpinionId(null);
-
-      console.log("[add-post result]", result);
-
+      setReplyToOpinionId(null);
       setText("");
       setPostRole("opinion");
       setPredictionFlag(false);
@@ -751,9 +701,6 @@ setReplyToOpinionId(null);
   }
 
   async function handleFeedback(postId: string, feedbackType: string) {
-
-console.log("clicked", postId, feedbackType);
-
     if (!threadId) {
       alert("threadIdがない。");
       return;
@@ -763,38 +710,28 @@ console.log("clicked", postId, feedbackType);
     setError(null);
 
     try {
-const res = await fetch("/api/forum/feedback", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    threadId,
-    postId,
-    feedbackType,
-  }),
-});
+      const res = await fetch("/api/forum/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threadId,
+          postId,
+          feedbackType,
+        }),
+      });
 
-const result = await res.json();
+      const result = await res.json();
 
+      if (!res.ok) {
+        throw new Error(result?.error || "feedback保存失敗");
+      }
 
-console.log("explanation:", result.explanation);
-
-
-if (!res.ok) {
-  throw new Error(result?.error || "feedback保存失敗");
-}
-
-
-if (result.explanation) {
-  setExplanations((prev) => ({
-    ...prev,
-    [String(postId)]: result.explanation,
-  }));
-}
-
-
-// await loadThread(); ← 消す
-
-
+      if (result.explanation) {
+        setExplanations((prev) => ({
+          ...prev,
+          [String(postId)]: result.explanation,
+        }));
+      }
     } catch (e: any) {
       console.error(e);
       setError(e?.message || "feedback保存失敗");
@@ -825,15 +762,16 @@ if (result.explanation) {
         </a>
       </div>
 
-
-<div style={{ marginBottom: 12 }}>
-  <span style={{ marginRight: 8 }}>文字サイズ：</span>
-
-  <button onClick={() => setFontSize("small")}>小</button>
-  <button onClick={() => setFontSize("medium")} style={{ marginLeft: 6 }}>中</button>
-  <button onClick={() => setFontSize("large")} style={{ marginLeft: 6 }}>大</button>
-</div>
-
+      <div style={{ marginBottom: 12 }}>
+        <span style={{ marginRight: 8 }}>文字サイズ：</span>
+        <button onClick={() => setFontSize("small")}>小</button>
+        <button onClick={() => setFontSize("medium")} style={{ marginLeft: 6 }}>
+          中
+        </button>
+        <button onClick={() => setFontSize("large")} style={{ marginLeft: 6 }}>
+          大
+        </button>
+      </div>
 
       {loading ? (
         <div>読み込み中...</div>
@@ -845,60 +783,55 @@ if (result.explanation) {
         </div>
       ) : (
         <>
-          <section
-            style={{
-              border: "1px solid #ddd",
-              borderRadius: 16,
-              padding: 20,
-              background: "#fff",
-            }}
-          >
+          <section style={whiteCardStyle}>
             <h1
               style={{
                 margin: 0,
                 fontSize: currentFont.title,
                 fontWeight: 800,
                 lineHeight: 1.4,
+                color: "#111",
               }}
             >
               {thread.title}
             </h1>
 
-<div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-  <button
-    onClick={handleShare}
-    style={{
-      padding: "8px 12px",
-      borderRadius: 8,
-      border: "none",
-      background: "#111",
-      color: "#fff",
-      cursor: "pointer",
-      fontWeight: 700,
-    }}
-  >
-    この議論を共有
-  </button>
+            <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+              <button
+                onClick={handleShare}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "#111",
+                  color: "#fff",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                }}
+              >
+                この議論を共有
+              </button>
 
-<a
-  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
-    `${thread.title} ${currentUrl}`
-  )}`}
-  target="_blank"
-  rel="noopener noreferrer"
-  style={{
-    padding: "8px 12px",
-    borderRadius: 8,
-    border: "1px solid #ccc",
-    textDecoration: "none",
-    fontWeight: 700,
-  }}
->
-  Xで共有
-</a>
+              <a
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
+                  `${thread.title} ${currentUrl}`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: "1px solid #ccc",
+                  textDecoration: "none",
+                  fontWeight: 700,
+                  color: "#111",
+                }}
+              >
+                Xで共有
+              </a>
 
-  {copied && <span style={{ color: "#2e7d32" }}>コピーした</span>}
-</div>
+              {copied && <span style={{ color: "#2e7d32" }}>コピーした</span>}
+            </div>
 
             <div
               style={{
@@ -910,15 +843,15 @@ if (result.explanation) {
               作成日時: {formatDate(thread.created_at)}
             </div>
 
-<div
-  style={{
-    marginTop: 6,
-    fontSize: currentFont.base,
-    color: "#666",
-  }}
->
-  カテゴリ：{thread.category ?? "未設定"}
-</div>
+            <div
+              style={{
+                marginTop: 6,
+                fontSize: currentFont.base,
+                color: "#666",
+              }}
+            >
+              カテゴリ：{thread.category ?? "未設定"}
+            </div>
 
             <div
               style={{
@@ -969,6 +902,7 @@ if (result.explanation) {
                 borderRadius: 12,
                 background: "#f6f6f6",
                 border: "1px solid #e5e5e5",
+                color: "#111",
               }}
             >
               <div
@@ -981,33 +915,27 @@ if (result.explanation) {
               >
                 元投稿
               </div>
-<div
-  style={{
-    whiteSpace: "pre-wrap",
-    lineHeight: 1.8,
-    fontSize: currentFont.base,
-  }}
->
-  {thread.original_post}
-</div>
+              <div
+                style={{
+                  whiteSpace: "pre-wrap",
+                  lineHeight: 1.8,
+                  fontSize: currentFont.base,
+                  color: "#111",
+                }}
+              >
+                {thread.original_post}
+              </div>
             </div>
           </section>
 
-          <section
-            style={{
-              marginTop: 24,
-              border: "1px solid #ddd",
-              borderRadius: 16,
-              padding: 20,
-              background: "#fff",
-            }}
-          >
+          <section style={whiteCardStyle}>
             <h2
               style={{
                 margin: 0,
                 marginBottom: 16,
                 fontSize: currentFont.title,
                 fontWeight: 800,
+                color: "#111",
               }}
             >
               やさしい要約
@@ -1016,388 +944,306 @@ if (result.explanation) {
             {!summary ? (
               <p style={{ margin: 0, color: "#666" }}>要約を読み込み中...</p>
             ) : (
-<div
-  style={{
-    color: "#444",
-    lineHeight: 1.8,
-    fontSize: currentFont.base,
-  }}
->
+              <div
+                style={{
+                  color: "#444",
+                  lineHeight: 1.8,
+                  fontSize: currentFont.base,
+                }}
+              >
                 {summary.summary_text}
               </div>
             )}
           </section>
 
-<section
-  style={{
-    marginTop: 24,
-    border: "1px solid #ddd",
-    borderRadius: 16,
-    padding: 20,
-    background: "#fff",
-  }}
->
-  <h2
-    style={{
-      margin: 0,
-      marginBottom: 12,
-      fontSize: currentFont.title,
-      fontWeight: 800,
-    }}
-  >
-    主な論点
-  </h2>
+          <section style={whiteCardStyle}>
+            <h2
+              style={{
+                margin: 0,
+                marginBottom: 12,
+                fontSize: currentFont.title,
+                fontWeight: 800,
+                color: "#111",
+              }}
+            >
+              主な論点
+            </h2>
 
-<p
-  style={{
-    marginTop: 0,
-    marginBottom: 12,
-    fontSize: currentFont.base,
-    color: "#666",
-  }}
->
-  気になる項目を押すと、関連する議論を下で確認できます。
-</p>
+            <p
+              style={{
+                marginTop: 0,
+                marginBottom: 12,
+                fontSize: currentFont.base,
+                color: "#666",
+              }}
+            >
+              気になる項目を押すと、関連する議論を下で確認できます。
+            </p>
 
-<div style={{ display: "grid", gap: 10 }}>
-  {summary?.key_points?.issues?.length ? (
-    summary.key_points.issues.map((item, index) => (
-      <button
-        key={`${item}-${index}`}
+            <div style={{ display: "grid", gap: 10 }}>
+              {summary?.key_points?.issues?.length ? (
+                summary.key_points.issues.map((item, index) => (
+                  <button
+                    key={`${item}-${index}`}
+                    onClick={() => handleNodeClick("論点", item)}
+                    style={whiteButtonCardStyle}
+                  >
+                    <span style={{ lineHeight: 1.6 }}>{item}</span>
+                    <span
+                      style={{
+                        fontSize: currentFont.base,
+                        color: "#0d47a1",
+                        fontWeight: 700,
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      議論を見る・ここから意見を書く →
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <div style={{ color: "#666" }}>まだ論点は整理されていない。</div>
+              )}
+            </div>
+          </section>
 
-onClick={() => handleNodeClick("論点", item)}
+          <section style={whiteCardStyle}>
+            <h2
+              style={{
+                margin: 0,
+                marginBottom: 12,
+                fontSize: currentFont.title,
+                fontWeight: 800,
+                color: "#111",
+              }}
+            >
+              主な前提
+            </h2>
 
-  style={{
-    width: "100%",
-    display: "grid",
-    gap: 8,
-    textAlign: "left",
-    border: "1px solid #ddd",
-    borderRadius: 10,
-    padding: "12px 14px",
-    background: "#fff",
-    fontSize: currentFont.base,
-    cursor: "pointer",
-  }}
->
-  <span style={{ lineHeight: 1.6 }}>{item}</span>
+            <p
+              style={{
+                marginTop: 0,
+                marginBottom: 12,
+                fontSize: currentFont.base,
+                color: "#666",
+              }}
+            >
+              気になる項目を押すと、関連する議論を下で確認できます
+            </p>
 
-  <span
-    style={{
-      fontSize: currentFont.base,
-      color: "#0d47a1",
-      fontWeight: 700,
-      lineHeight: 1.4,
-    }}
-  >
-    議論を見る・ここから意見を書く →
-  </span>
-</button>
-    ))
-  ) : (
-    <div style={{ color: "#666" }}>まだ論点は整理されていない。</div>
-  )}
-</div>
+            <div style={{ display: "grid", gap: 10 }}>
+              {originalStructure.premises.length > 0 ? (
+                originalStructure.premises.map((item, index) => (
+                  <button
+                    key={`${item}-${index}`}
+                    onClick={() => handleNodeClick("前提", item)}
+                    style={whiteButtonCardStyle}
+                  >
+                    <span style={{ lineHeight: 1.6 }}>{item}</span>
+                    <span
+                      style={{
+                        fontSize: currentFont.base,
+                        color: "#0d47a1",
+                        fontWeight: 700,
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      議論を見る・ここから意見を書く →
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <div style={{ color: "#666" }}>まだ前提は整理されていない。</div>
+              )}
+            </div>
+          </section>
 
-</section>
+          <section style={whiteCardStyle}>
+            <h2
+              style={{
+                margin: 0,
+                marginBottom: 12,
+                fontSize: currentFont.title,
+                fontWeight: 800,
+                color: "#111",
+              }}
+            >
+              主な根拠
+            </h2>
 
-<section
-  style={{
-    marginTop: 24,
-    border: "1px solid #ddd",
-    borderRadius: 16,
-    padding: 20,
-    background: "#fff",
-  }}
->
-  <h2
-    style={{
-      margin: 0,
-      marginBottom: 12,
-      fontSize: currentFont.title,
-      fontWeight: 800,
-    }}
-  >
-    主な前提
-  </h2>
+            <p
+              style={{
+                marginTop: 0,
+                marginBottom: 12,
+                fontSize: currentFont.base,
+                color: "#666",
+              }}
+            >
+              気になる項目を押すと、関連する議論を下で確認できます。
+            </p>
 
-<p
-  style={{
-    marginTop: 0,
-    marginBottom: 12,
-    fontSize: currentFont.base,
-    color: "#666",
-  }}
->
-  気になる項目を押すと、関連する議論を下で確認できます
-</p>
+            <div style={{ display: "grid", gap: 10 }}>
+              {originalStructure.reasons.length > 0 ? (
+                originalStructure.reasons.map((item, index) => (
+                  <button
+                    key={`${item}-${index}`}
+                    onClick={() => handleNodeClick("根拠", item)}
+                    style={whiteButtonCardStyle}
+                  >
+                    <span style={{ lineHeight: 1.6 }}>{item}</span>
+                    <span
+                      style={{
+                        fontSize: currentFont.base,
+                        color: "#0d47a1",
+                        fontWeight: 700,
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      議論を見る・ここから意見を書く →
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <div style={{ color: "#666" }}>まだ根拠は整理されていない。</div>
+              )}
+            </div>
+          </section>
 
-  <div style={{ display: "grid", gap: 10 }}>
-    {originalStructure.premises.length > 0 ? (
-      originalStructure.premises.map((item, index) => (
+          <section style={whiteCardStyle}>
+            <h2
+              style={{
+                margin: 0,
+                marginBottom: 12,
+                fontSize: currentFont.title,
+                fontWeight: 800,
+                color: "#111",
+              }}
+            >
+              主な対立
+            </h2>
 
-<button
-  key={`${item}-${index}`}
-  onClick={() => handleNodeClick("前提", item)}
-  style={{
-    width: "100%",
-    display: "grid",
-    gap: 8,
-    textAlign: "left",
-    border: "1px solid #ddd",
-    borderRadius: 10,
-    padding: "12px 14px",
-    background: "#fff",
-    fontSize: currentFont.base,
-    cursor: "pointer",
-  }}
->
-  <span style={{ lineHeight: 1.6 }}>{item}</span>
+            <p
+              style={{
+                marginTop: 0,
+                marginBottom: 12,
+                fontSize: currentFont.base,
+                color: "#666",
+              }}
+            >
+              気になる項目を押すと、関連する議論を下で確認できます。
+            </p>
 
-  <span
-    style={{
-      fontSize: currentFont.base,
-      color: "#0d47a1",
-      fontWeight: 700,
-      lineHeight: 1.4,
-    }}
-  >
-    議論を見る・ここから意見を書く →
-  </span>
-</button>
-      ))
-    ) : (
-      <div style={{ color: "#666" }}>まだ前提は整理されていない。</div>
-    )}
-  </div>
-</section>
+            {conflicts && conflicts.length > 0 ? (
+              <div style={{ display: "grid", gap: 10 }}>
+                {conflicts.map((c, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      padding: 10,
+                      borderRadius: 8,
+                      background: "#fafafa",
+                      border: "1px solid #eee",
+                      display: "grid",
+                      gap: 8,
+                      color: "#111",
+                    }}
+                  >
+                    <button
+                      onClick={() => handleNodeClick("論点", c.opinion)}
+                      style={{
+                        width: "100%",
+                        display: "grid",
+                        gap: 8,
+                        textAlign: "left",
+                        border: "1px solid #f44336",
+                        borderRadius: 10,
+                        padding: "10px 12px",
+                        background: "#fff5f5",
+                        cursor: "pointer",
+                        fontWeight: 700,
+                        color: "#111",
+                      }}
+                    >
+                      <span style={{ lineHeight: 1.6 }}>🔴 A：{c.opinion}</span>
+                      <span
+                        style={{
+                          fontSize: currentFont.base,
+                          color: "#b71c1c",
+                          fontWeight: 700,
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        議論を見る・ここから意見を書く →
+                      </span>
+                    </button>
 
-<section
-  style={{
-    marginTop: 24,
-    border: "1px solid #ddd",
-    borderRadius: 16,
-    padding: 20,
-    background: "#fff",
-  }}
->
-  <h2
-    style={{
-      margin: 0,
-      marginBottom: 12,
-      fontSize: currentFont.title,
-      fontWeight: 800,
-    }}
-  >
-    主な根拠
-  </h2>
+                    <button
+                      onClick={() => handleNodeClick("論点", c.rebuttal)}
+                      style={{
+                        width: "100%",
+                        display: "grid",
+                        gap: 8,
+                        textAlign: "left",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        border: "1px solid #2196f3",
+                        borderRadius: 10,
+                        padding: "10px 12px",
+                        background: "#f0f6ff",
+                        cursor: "pointer",
+                        fontWeight: 700,
+                        color: "#111",
+                      }}
+                    >
+                      <span>🔵 B：{c.rebuttal}</span>
+                      <span
+                        style={{
+                          fontSize: currentFont.base,
+                          color: "#0d47a1",
+                          fontWeight: 700,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        議論を見る・ここから意見を書く →
+                      </span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ color: "#666" }}>対立はまだ抽出されていない。</div>
+            )}
+          </section>
 
-<p
-  style={{
-    marginTop: 0,
-    marginBottom: 12,
-    fontSize: currentFont.base,
-    color: "#666",
-  }}
->
-  気になる項目を押すと、関連する議論を下で確認できます。
-</p>
-
-  <div style={{ display: "grid", gap: 10 }}>
-    {originalStructure.reasons.length > 0 ? (
-      originalStructure.reasons.map((item, index) => (
-        <button
-          key={`${item}-${index}`}
-
-onClick={() => handleNodeClick("根拠", item)}
-
-  style={{
-    width: "100%",
-    display: "grid",
-    gap: 8,
-    textAlign: "left",
-    border: "1px solid #ddd",
-    borderRadius: 10,
-    padding: "12px 14px",
-    background: "#fff",
-    fontSize: currentFont.base,
-    cursor: "pointer",
-  }}
->
-  <span style={{ lineHeight: 1.6 }}>{item}</span>
-
-  <span
-    style={{
-      fontSize: currentFont.base,
-      color: "#0d47a1",
-      fontWeight: 700,
-      lineHeight: 1.4,
-    }}
-  >
-    議論を見る・ここから意見を書く →
-  </span>
-</button>      ))
-    ) : (
-      <div style={{ color: "#666" }}>まだ根拠は整理されていない。</div>
-    )}
-  </div>
-</section>
-
-<section
-  style={{
-    marginTop: 24,
-    border: "1px solid #ddd",
-    borderRadius: 16,
-    padding: 20,
-    background: "#fff",
-  }}
->
-  <h2
-    style={{
-      margin: 0,
-      marginBottom: 12,
-      fontSize: currentFont.title,
-      fontWeight: 800,
-    }}
-  >
-    主な対立
-  </h2>
-
-  <p
-    style={{
-      marginTop: 0,
-      marginBottom: 12,
-      fontSize: currentFont.base,
-      color: "#666",
-    }}
-  >
-    気になる項目を押すと、関連する議論を下で確認できます。
-  </p>
-
-  {conflicts && conflicts.length > 0 ? (
-    <div style={{ display: "grid", gap: 10 }}>
-{conflicts.map((c, i) => (
-  <div
-    key={i}
-    style={{
-      padding: 10,
-      borderRadius: 8,
-      background: "#fafafa",
-      border: "1px solid #eee",
-      display: "grid",
-      gap: 8,
-    }}
-  >
-<button
-  onClick={() => handleNodeClick("論点", c.opinion)}
-  style={{
-    width: "100%",
-    display: "grid",
-    gap: 8,
-    textAlign: "left",
-    border: "1px solid #f44336",
-    borderRadius: 10,
-    padding: "10px 12px",
-    background: "#fff5f5",
-    cursor: "pointer",
-    fontWeight: 700,
-  }}
->
-  <span style={{ lineHeight: 1.6 }}>🔴 A：{c.opinion}</span>
-
-  <span
-    style={{
-      fontSize: currentFont.base,
-      color: "#b71c1c",
-      fontWeight: 700,
-      lineHeight: 1.4,
-    }}
-  >
-    議論を見る・ここから意見を書く →
-  </span>
-</button>
-
-<button
-  onClick={() => handleNodeClick("論点", c.rebuttal)}
-  style={{
-    width: "100%",
-    display: "grid",
-    gap: 8,
-    textAlign: "left",
-    justifyContent: "space-between",
-    alignItems: "center",
-    border: "1px solid #2196f3",
-    borderRadius: 10,
-    padding: "10px 12px",
-    background: "#f0f6ff",
-    cursor: "pointer",
-    fontWeight: 700,
-  }}
->
-  <span>🔵 B：{c.rebuttal}</span>
-
-  <span
-    style={{
-      fontSize: currentFont.base,
-      color: "#0d47a1",
-      fontWeight: 700,
-      whiteSpace: "nowrap",
-    }}
-  >
-    議論を見る・ここから意見を書く →
-  </span>
-</button>
-
-
-
-
-
-
-  </div>
-))}
-    </div>
-  ) : (
-    <div style={{ color: "#666" }}>対立はまだ抽出されていない。</div>
-  )}
-</section>
-
-
-          <section
-            style={{
-              marginTop: 24,
-              border: "1px solid #ddd",
-              borderRadius: 16,
-              padding: 20,
-              background: "#fff",
-            }}
-          >
+          <section style={whiteCardStyle}>
             <h2
               style={{
                 margin: 0,
                 marginBottom: 16,
                 fontSize: currentFont.title,
                 fontWeight: 800,
+                color: "#111",
               }}
             >
               投稿一覧
             </h2>
 
-<div style={{ marginBottom: 12 }}>
-  <input
-    value={searchText}
-    onChange={(e) => setSearchText(e.target.value)}
-    placeholder="投稿を検索"
-    style={{
-      width: "100%",
-      border: "1px solid #ccc",
-      borderRadius: 10,
-      padding: "12px 14px",
-      fontSize: currentFont.base,
-      background: "#fff",
-      color: "#000",
-    }}
-  />
-</div>
+            <div style={{ marginBottom: 12 }}>
+              <input
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                placeholder="投稿を検索"
+                style={{
+                  width: "100%",
+                  border: "1px solid #ccc",
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                  fontSize: currentFont.base,
+                  background: "#fff",
+                  color: "#000",
+                }}
+              />
+            </div>
 
             <label
               style={{
@@ -1463,6 +1309,7 @@ onClick={() => handleNodeClick("根拠", item)}
                       borderRadius: 14,
                       padding: 16,
                       background: "#fafafa",
+                      color: "#111",
                     }}
                   >
                     <details open style={{ marginBottom: 12 }}>
@@ -1474,48 +1321,51 @@ onClick={() => handleNodeClick("根拠", item)}
                           cursor: "pointer",
                         }}
                       >
- {group.issue
-  ? `問い: ${group.issue.content}`
-  : `問い: ${thread?.title ?? thread?.original_post ?? "このスレのテーマ"}`}
+                        {group.issue
+                          ? `問い: ${group.issue.content}`
+                          : `問い: ${
+                              thread?.title ?? thread?.original_post ?? "このスレのテーマ"
+                            }`}
                       </summary>
 
                       <div style={{ marginTop: 12 }}>
-{bestOpinionsByIssue[groupIndex]?.best && (
-  <div
-    style={{
-      marginBottom: 16,
-      padding: 12,
-      borderRadius: 12,
-      border: "2px solid #2e7d32",
-      background: "#f1f8f4",
-    }}
-  >
-    <div
-      style={{
-        fontSize: currentFont.base,
-        fontWeight: 800,
-        color: "#2e7d32",
-        marginBottom: 6,
-      }}
-    >
-      🏆 ベスト意見
-    </div>
+                        {bestOpinionsByIssue[groupIndex]?.best && (
+                          <div
+                            style={{
+                              marginBottom: 16,
+                              padding: 12,
+                              borderRadius: 12,
+                              border: "2px solid #2e7d32",
+                              background: "#f1f8f4",
+                              color: "#111",
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: currentFont.base,
+                                fontWeight: 800,
+                                color: "#2e7d32",
+                                marginBottom: 6,
+                              }}
+                            >
+                              🏆 ベスト意見
+                            </div>
 
-    <div style={{ marginBottom: 6 }}>
-      {bestOpinionsByIssue[groupIndex].best.opinion.content}
-    </div>
+                            <div style={{ marginBottom: 6 }}>
+                              {bestOpinionsByIssue[groupIndex].best.opinion.content}
+                            </div>
 
-    <div
-      style={{
-        fontSize: currentFont.base,
-        color: "#555",
-      }}
-    >
-      スコア：
-      {bestOpinionsByIssue[groupIndex].best.effectiveScore}
-    </div>
-  </div>
-)}
+                            <div
+                              style={{
+                                fontSize: currentFont.base,
+                                color: "#555",
+                              }}
+                            >
+                              スコア：
+                              {bestOpinionsByIssue[groupIndex].best.effectiveScore}
+                            </div>
+                          </div>
+                        )}
 
                         {group.opinions.length === 0 ? (
                           <div style={{ color: "#777", fontSize: currentFont.base }}>
@@ -1523,260 +1373,212 @@ onClick={() => handleNodeClick("根拠", item)}
                           </div>
                         ) : (
                           group.opinions.map((op) => {
-                            const opinionScore = op.opinion.logic_score ?? 0;
-                            const isLowScore =
-                              hideLowScore && opinionScore > 0 && opinionScore < 60;
+                            const score = op.opinion.logic_score ?? 0;
 
                             return (
                               <div
                                 key={op.opinion.id}
                                 style={{
-                                  marginBottom: 16,
-                                  padding: 12,
-                                  borderRadius: 10,
-                                  border: "1px solid #ddd",
-                                  background: "#fff",
-
-opacity: (() => {
-  const score = op.opinion.logic_score ?? 0;
-
-if (hideLowScore && score > 0 && score < 60) {
-  return 0.65;
-}
-
-if (score >= 80) return 1;
-if (score >= 60) return 0.95;
-if (score >= 40) return 0.85;
-return 0.75;
-})(),
-}}
+                                  ...postCardBaseStyle,
+                                  opacity:
+                                    hideLowScore && score > 0 && score < 60
+                                      ? 0.65
+                                      : score >= 80
+                                      ? 1
+                                      : score >= 60
+                                      ? 0.95
+                                      : score >= 40
+                                      ? 0.85
+                                      : 0.75,
+                                }}
                               >
-
-<div
-  style={{
-    fontWeight: 700,
-    marginBottom: 6,
-    color: roleColor(op.opinion.post_role),
-  }}
->
-  💬 {roleLabel(op.opinion.post_role)}
-
-<span
-  style={{
-    marginLeft: 8,
-    fontSize: currentFont.base,
-    color: scoreColor(op.opinion.logic_score),
-  }}
->
-  {op.opinion.logic_score ?? "未評価"}｜
-  {(op.opinion.logic_score ?? 0) >= 80
-    ? "🔥 強い"
-    : (op.opinion.logic_score ?? 0) >= 60
-    ? "👍 普通"
-    : "⚠️ 弱い"}
-</span>
+                                <div
+                                  style={{
+                                    fontWeight: 700,
+                                    marginBottom: 6,
+                                    color: roleColor(op.opinion.post_role),
+                                  }}
+                                >
+                                  💬 {roleLabel(op.opinion.post_role)}
+                                  <span
+                                    style={{
+                                      marginLeft: 8,
+                                      fontSize: currentFont.base,
+                                      color: scoreColor(op.opinion.logic_score),
+                                    }}
+                                  >
+                                    {op.opinion.logic_score ?? "未評価"}｜
+                                    {(op.opinion.logic_score ?? 0) >= 80
+                                      ? "🔥 強い"
+                                      : (op.opinion.logic_score ?? 0) >= 60
+                                      ? "👍 普通"
+                                      : "⚠️ 弱い"}
+                                  </span>
                                 </div>
-<div style={{ display: "flex", gap: 8, marginTop: 8, marginBottom: 8 }}>
 
-<button
-  onClick={() => {
-    setSelectedGuide(null);
-    setPostRole("rebuttal");
-    setReplyToOpinionId(op.opinion.id);
-    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-  }}
-  style={{
-    padding: "6px 10px",
-    borderRadius: 6,
-    border: "1px solid #ccc",
-    background: "#fff",
-    fontSize: currentFont.base,
-    cursor: "pointer",
-  }}
->
-  この意見に反論する
-</button>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    gap: 8,
+                                    marginTop: 8,
+                                    marginBottom: 8,
+                                  }}
+                                >
+                                  <button
+                                    onClick={() => {
+                                      setSelectedGuide(null);
+                                      setPostRole("rebuttal");
+                                      setReplyToOpinionId(op.opinion.id);
+                                      window.scrollTo({
+                                        top: document.body.scrollHeight,
+                                        behavior: "smooth",
+                                      });
+                                    }}
+                                    style={{
+                                      padding: "6px 10px",
+                                      borderRadius: 6,
+                                      border: "1px solid #ccc",
+                                      background: "#fff",
+                                      fontSize: currentFont.base,
+                                      cursor: "pointer",
+                                      color: "#111",
+                                    }}
+                                  >
+                                    この意見に反論する
+                                  </button>
 
-<button
-  onClick={() => {
-    setSelectedGuide(null);
-    setPostRole("supplement");
-    setReplyToOpinionId(op.opinion.id);
-    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-  }}
-  style={{
-    padding: "6px 10px",
-    borderRadius: 6,
-    border: "1px solid #ccc",
-    background: "#fff",
-    fontSize: currentFont.base,
-    cursor: "pointer",
-  }}
->
-  この意見を補足する
-</button>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedGuide(null);
+                                      setPostRole("supplement");
+                                      setReplyToOpinionId(op.opinion.id);
+                                      window.scrollTo({
+                                        top: document.body.scrollHeight,
+                                        behavior: "smooth",
+                                      });
+                                    }}
+                                    style={{
+                                      padding: "6px 10px",
+                                      borderRadius: 6,
+                                      border: "1px solid #ccc",
+                                      background: "#fff",
+                                      fontSize: currentFont.base,
+                                      cursor: "pointer",
+                                      color: "#111",
+                                    }}
+                                  >
+                                    この意見を補足する
+                                  </button>
+                                </div>
 
-</div>
                                 <div style={{ marginBottom: 8 }}>
-                                 {(() => {
-  const { claim, premises, reasons } = splitContent(op.opinion.content);
+                                  {(() => {
+                                    const { claim, premises, reasons } = splitContent(
+                                      op.opinion.content
+                                    );
 
-  return (
-    <div>
-      {/* 主張 */}
-      <div style={{ marginBottom: 6 }}>
-        <div style={{ fontWeight: 800 }}>主張</div>
-        <div>{claim}</div>
-      </div>
+                                    return (
+                                      <div>
+                                        <div style={{ marginBottom: 6 }}>
+                                          <div style={{ fontWeight: 800 }}>主張</div>
+                                          <div>{claim}</div>
+                                        </div>
 
-      {/* 前提 */}
-      {premises.length > 0 && (
-        <div style={{ marginBottom: 6 }}>
-          <div style={{ fontWeight: 800 }}>前提</div>
-          <ul style={{ paddingLeft: 20 }}>
-            {premises.map((p, i) => (
-              <li key={i}>{p}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+                                        {premises.length > 0 && (
+                                          <div style={{ marginBottom: 6 }}>
+                                            <div style={{ fontWeight: 800 }}>前提</div>
+                                            <ul style={{ paddingLeft: 20 }}>
+                                              {premises.map((p, i) => (
+                                                <li key={i}>{p}</li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        )}
 
-      {/* 根拠 */}
-      {reasons.length > 0 && (
-        <div>
-          <div style={{ fontWeight: 800 }}>根拠</div>
-          <ul style={{ paddingLeft: 20 }}>
-            {reasons.map((r, i) => (
-              <li key={i}>{r}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-})()}
+                                        {reasons.length > 0 && (
+                                          <div>
+                                            <div style={{ fontWeight: 800 }}>根拠</div>
+                                            <ul style={{ paddingLeft: 20 }}>
+                                              {reasons.map((r, i) => (
+                                                <li key={i}>{r}</li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
 
-<div
-  style={{
-    marginBottom: 10,
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 8,
-  }}
->
-  <button
-    onClick={() => handleFeedback(op.opinion.id, "term_unknown")}
-    disabled={feedbackLoadingPostId === op.opinion.id}
-    style={{
-      border: "1px solid #ccc",
-      borderRadius: 999,
-      padding: "6px 10px",
-      background: "#fff",
-      fontSize: currentFont.base,
-      cursor:
-        feedbackLoadingPostId === op.opinion.id ? "default" : "pointer",
-    }}
-  >
-    ❓ 言葉がわからん ({op.opinion.feedback_counts?.term_unknown ?? 0})
-  </button>
+                                <div
+                                  style={{
+                                    marginBottom: 10,
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    gap: 8,
+                                  }}
+                                >
+                                  {[
+                                    ["term_unknown", "❓ 言葉がわからん", op.opinion.feedback_counts?.term_unknown],
+                                    ["premise_unknown", "❓ 前提がわからん", op.opinion.feedback_counts?.premise_unknown],
+                                    ["conclusion_unknown", "❓ 結論がわからん", op.opinion.feedback_counts?.conclusion_unknown],
+                                    ["evidence_unknown", "❓ 根拠がわからん", op.opinion.feedback_counts?.evidence_unknown],
+                                    ["counterargument_unknown", "❓ 反対意見がわからん", op.opinion.feedback_counts?.counterargument_unknown],
+                                  ].map(([type, label, count]) => (
+                                    <button
+                                      key={type}
+                                      onClick={() => handleFeedback(op.opinion.id, String(type))}
+                                      disabled={feedbackLoadingPostId === op.opinion.id}
+                                      style={{
+                                        border: "1px solid #ccc",
+                                        borderRadius: 999,
+                                        padding: "6px 10px",
+                                        background: "#fff",
+                                        fontSize: currentFont.base,
+                                        cursor:
+                                          feedbackLoadingPostId === op.opinion.id
+                                            ? "default"
+                                            : "pointer",
+                                        color: "#111",
+                                      }}
+                                    >
+                                      {label} ({count ?? 0})
+                                    </button>
+                                  ))}
+                                </div>
 
-  <button
-    onClick={() => handleFeedback(op.opinion.id, "premise_unknown")}
-    disabled={feedbackLoadingPostId === op.opinion.id}
-    style={{
-      border: "1px solid #ccc",
-      borderRadius: 999,
-      padding: "6px 10px",
-      background: "#fff",
-      fontSize: currentFont.base,
-      cursor:
-        feedbackLoadingPostId === op.opinion.id ? "default" : "pointer",
-    }}
-  >
-    ❓ 前提がわからん ({op.opinion.feedback_counts?.premise_unknown ?? 0})
-  </button>
+                                {feedbackLoadingPostId === op.opinion.id &&
+                                  !explanations[op.opinion.id] && (
+                                    <div
+                                      style={{
+                                        marginTop: 8,
+                                        fontSize: currentFont.base,
+                                        color: "#666",
+                                      }}
+                                    >
+                                      説明を生成中...
+                                    </div>
+                                  )}
 
-  <button
-    onClick={() => handleFeedback(op.opinion.id, "conclusion_unknown")}
-    disabled={feedbackLoadingPostId === op.opinion.id}
-    style={{
-      border: "1px solid #ccc",
-      borderRadius: 999,
-      padding: "6px 10px",
-      background: "#fff",
-      fontSize: currentFont.base,
-      cursor:
-        feedbackLoadingPostId === op.opinion.id ? "default" : "pointer",
-    }}
-  >
-    ❓ 結論がわからん ({op.opinion.feedback_counts?.conclusion_unknown ?? 0})
-  </button>
-
-  <button
-    onClick={() => handleFeedback(op.opinion.id, "evidence_unknown")}
-    disabled={feedbackLoadingPostId === op.opinion.id}
-    style={{
-      border: "1px solid #ccc",
-      borderRadius: 999,
-      padding: "6px 10px",
-      background: "#fff",
-      fontSize: currentFont.base,
-      cursor:
-        feedbackLoadingPostId === op.opinion.id ? "default" : "pointer",
-    }}
-  >
-    ❓ 根拠がわからん ({op.opinion.feedback_counts?.evidence_unknown ?? 0})
-  </button>
-
-  <button
-    onClick={() => handleFeedback(op.opinion.id, "counterargument_unknown")}
-    disabled={feedbackLoadingPostId === op.opinion.id}
-    style={{
-      border: "1px solid #ccc",
-      borderRadius: 999,
-      padding: "6px 10px",
-      background: "#fff",
-      fontSize: currentFont.base,
-      cursor:
-        feedbackLoadingPostId === op.opinion.id ? "default" : "pointer",
-    }}
-  >
-    ❓ 反対意見がわからん ({op.opinion.feedback_counts?.counterargument_unknown ?? 0})
-  </button>
-</div>
-
-{feedbackLoadingPostId === op.opinion.id && !explanations[op.opinion.id] && (
-  <div
-    style={{
-      marginTop: 8,
-      fontSize: currentFont.base,
-      color: "#666",
-    }}
-  >
-    説明を生成中...
-  </div>
-)}
-
-{explanations[op.opinion.id] && (
-  <div
-    style={{
-      marginTop: 8,
-      padding: 10,
-      borderRadius: 8,
-      background: "#f0f4ff",
-      border: "1px solid #ccd",
-      fontSize: currentFont.base,
-      lineHeight: 1.6,
-    }}
-  >
-    <div style={{ fontWeight: 700, marginBottom: 4 }}>
-      AI解説
-    </div>
-    <div>{explanations[op.opinion.id]}</div>
-  </div>
-)}
-
+                                {explanations[op.opinion.id] && (
+                                  <div
+                                    style={{
+                                      marginTop: 8,
+                                      padding: 10,
+                                      borderRadius: 8,
+                                      background: "#f0f4ff",
+                                      border: "1px solid #ccd",
+                                      fontSize: currentFont.base,
+                                      lineHeight: 1.6,
+                                      color: "#111",
+                                    }}
+                                  >
+                                    <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                                      AI解説
+                                    </div>
+                                    <div>{explanations[op.opinion.id]}</div>
+                                  </div>
+                                )}
 
                                 {op.children.length > 0 && (
                                   <details style={{ marginTop: 10 }}>
@@ -1800,239 +1602,262 @@ return 0.75;
                                         gap: 8,
                                       }}
                                     >
+                                      {op.children
+                                        .filter(
+                                          (child) =>
+                                            child.parent_opinion_id === op.opinion.id
+                                        )
+                                        .map((child) => {
+                                          const childScore = child.logic_score ?? 0;
+                                          const childOpacity =
+                                            hideLowScore &&
+                                            childScore > 0 &&
+                                            childScore < 60
+                                              ? 0.65
+                                              : childScore >= 80
+                                              ? 1
+                                              : childScore >= 60
+                                              ? 0.95
+                                              : childScore >= 40
+                                              ? 0.85
+                                              : 0.75;
 
-{op.children
-  .filter((child) => child.parent_opinion_id === op.opinion.id)
-  .map((child) => {
-  return (
-    <div
-      key={child.id}
-      style={{
-        opacity: (() => {
-          const score = child.logic_score ?? 0;
+                                          return (
+                                            <div
+                                              key={child.id}
+                                              style={{ opacity: childOpacity, color: "#111" }}
+                                            >
+                                              {child.post_role === "rebuttal" ? (
+                                                <div
+                                                  style={{
+                                                    display: "grid",
+                                                    gridTemplateColumns:
+                                                      "repeat(auto-fit, minmax(260px, 1fr))",
+                                                    gap: 12,
+                                                    alignItems: "start",
+                                                  }}
+                                                >
+                                                  <div
+                                                    style={{
+                                                      border: "1px solid #ddd",
+                                                      borderRadius: 10,
+                                                      padding: 10,
+                                                      background: "#f5f5f5",
+                                                      color: "#111",
+                                                    }}
+                                                  >
+                                                    <div
+                                                      style={{
+                                                        fontSize: currentFont.base,
+                                                        fontWeight: 700,
+                                                        color: roleColor(op.opinion.post_role),
+                                                        marginBottom: 8,
+                                                      }}
+                                                    >
+                                                      意見
+                                                    </div>
 
-if (hideLowScore && score > 0 && score < 60) {
-  return 0.65;
-}
+                                                    {(() => {
+                                                      const { claim, premises, reasons } =
+                                                        splitContent(op.opinion.content);
 
-if (score >= 80) return 1;
-if (score >= 60) return 0.95;
-if (score >= 40) return 0.85;
-return 0.75;
-        })(),
-      }}
-    >
-      {child.post_role === "rebuttal" ? (
-        <div
-          style={{
-            display: "grid",
-gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-            gap: 12,
-            alignItems: "start",
-          }}
-        >
-          {/* 左：元の意見 */}
-          <div
-            style={{
-              border: "1px solid #ddd",
-              borderRadius: 10,
-              padding: 10,
-              background: "#f5f5f5",
-            }}
-          >
-            <div
-              style={{
-                fontSize: currentFont.base,
-                fontWeight: 700,
-                color: roleColor(op.opinion.post_role),
-                marginBottom: 8,
-              }}
-            >
-              意見
-            </div>
+                                                      return (
+                                                        <div>
+                                                          <div style={{ marginBottom: 6 }}>
+                                                            <div style={{ fontWeight: 800 }}>
+                                                              主張
+                                                            </div>
+                                                            <div>{claim}</div>
+                                                          </div>
 
-            {(() => {
-              const { claim, premises, reasons } = splitContent(op.opinion.content);
+                                                          {premises.length > 0 && (
+                                                            <div style={{ marginBottom: 6 }}>
+                                                              <div style={{ fontWeight: 800 }}>
+                                                                前提
+                                                              </div>
+                                                              <ul style={{ paddingLeft: 20 }}>
+                                                                {premises.map((p, i) => (
+                                                                  <li key={i}>{p}</li>
+                                                                ))}
+                                                              </ul>
+                                                            </div>
+                                                          )}
 
-              return (
-                <div>
-                  <div style={{ marginBottom: 6 }}>
-                    <div style={{ fontWeight: 800 }}>主張</div>
-                    <div>{claim}</div>
-                  </div>
+                                                          {reasons.length > 0 && (
+                                                            <div>
+                                                              <div style={{ fontWeight: 800 }}>
+                                                                根拠
+                                                              </div>
+                                                              <ul style={{ paddingLeft: 20 }}>
+                                                                {reasons.map((r, i) => (
+                                                                  <li key={i}>{r}</li>
+                                                                ))}
+                                                              </ul>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      );
+                                                    })()}
+                                                  </div>
 
-                  {premises.length > 0 && (
-                    <div style={{ marginBottom: 6 }}>
-                      <div style={{ fontWeight: 800 }}>前提</div>
-                      <ul style={{ paddingLeft: 20 }}>
-                        {premises.map((p, i) => (
-                          <li key={i}>{p}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                                                  <div
+                                                    style={{
+                                                      border: "1px solid #ddd",
+                                                      borderRadius: 10,
+                                                      padding: 10,
+                                                      background:
+                                                        childScore >= 80
+                                                          ? "#e8f5e9"
+                                                          : childScore >= 60
+                                                          ? "#e3f2fd"
+                                                          : "#ffebee",
+                                                      color: "#111",
+                                                    }}
+                                                  >
+                                                    <div
+                                                      style={{
+                                                        fontSize: currentFont.base,
+                                                        fontWeight: 700,
+                                                        color: roleColor(child.post_role),
+                                                        marginBottom: 8,
+                                                      }}
+                                                    >
+                                                      反論（
+                                                      <span
+                                                        style={{
+                                                          marginLeft: 4,
+                                                          color: scoreColor(child.logic_score),
+                                                        }}
+                                                      >
+                                                        {child.logic_score ?? "未評価"}
+                                                      </span>
+                                                      ）
+                                                      <span style={{ marginLeft: 6 }}>
+                                                        {childScore >= 80
+                                                          ? "🔥 強い"
+                                                          : childScore >= 60
+                                                          ? "👍 普通"
+                                                          : "⚠️ 弱い"}
+                                                      </span>
+                                                    </div>
 
-                  {reasons.length > 0 && (
-                    <div>
-                      <div style={{ fontWeight: 800 }}>根拠</div>
-                      <ul style={{ paddingLeft: 20 }}>
-                        {reasons.map((r, i) => (
-                          <li key={i}>{r}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
+                                                    {(() => {
+                                                      const { claim, premises, reasons } =
+                                                        splitContent(child.content);
 
-          {/* 右：反論 */}
+                                                      return (
+                                                        <div>
+                                                          <div style={{ marginBottom: 6 }}>
+                                                            <div style={{ fontWeight: 800 }}>
+                                                              主張
+                                                            </div>
+                                                            <div>{claim}</div>
+                                                          </div>
 
-<div
-  style={{
-    border: "1px solid #ddd",
-    borderRadius: 10,
-    padding: 10,
-    background:
-      (child.logic_score ?? 0) >= 80
-        ? "#e8f5e9"   // 強い（緑）
-        : (child.logic_score ?? 0) >= 60
-        ? "#e3f2fd"   // 普通（青）
-        : "#ffebee",  // 弱い（赤）
-  }}
->
-            <div
-              style={{
-                fontSize: currentFont.base,
-                fontWeight: 700,
-                color: roleColor(child.post_role),
-                marginBottom: 8,
-              }}
-            >
-              反論（
-              <span
-                style={{
-                  marginLeft: 4,
-                  color: scoreColor(child.logic_score),
-                }}
-              >
-                {child.logic_score ?? "未評価"}
-              </span>
-              ）
-              <span style={{ marginLeft: 6 }}>
-                {(child.logic_score ?? 0) >= 80
-                  ? "🔥 強い"
-                  : (child.logic_score ?? 0) >= 60
-                  ? "👍 普通"
-                  : "⚠️ 弱い"}
-              </span>
-            </div>
+                                                          {premises.length > 0 && (
+                                                            <div style={{ marginBottom: 6 }}>
+                                                              <div style={{ fontWeight: 800 }}>
+                                                                前提
+                                                              </div>
+                                                              <ul style={{ paddingLeft: 20 }}>
+                                                                {premises.map((p, i) => (
+                                                                  <li key={i}>{p}</li>
+                                                                ))}
+                                                              </ul>
+                                                            </div>
+                                                          )}
 
-            {(() => {
-              const { claim, premises, reasons } = splitContent(child.content);
+                                                          {reasons.length > 0 && (
+                                                            <div>
+                                                              <div style={{ fontWeight: 800 }}>
+                                                                根拠
+                                                              </div>
+                                                              <ul style={{ paddingLeft: 20 }}>
+                                                                {reasons.map((r, i) => (
+                                                                  <li key={i}>{r}</li>
+                                                                ))}
+                                                              </ul>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      );
+                                                    })()}
+                                                  </div>
+                                                </div>
+                                              ) : (
+                                                <div style={{ color: "#111" }}>
+                                                  <div
+                                                    style={{
+                                                      fontSize: currentFont.base,
+                                                      fontWeight: 700,
+                                                      color: roleColor(child.post_role),
+                                                    }}
+                                                  >
+                                                    {roleLabel(child.post_role)}（
+                                                    <span
+                                                      style={{
+                                                        marginLeft: 6,
+                                                        color: scoreColor(child.logic_score),
+                                                      }}
+                                                    >
+                                                      {child.logic_score ?? "未評価"}
+                                                    </span>
+                                                    ）
+                                                    <span style={{ marginLeft: 6 }}>
+                                                      {childScore >= 80
+                                                        ? "🔥 強い"
+                                                        : childScore >= 60
+                                                        ? "👍 普通"
+                                                        : "⚠️ 弱い"}
+                                                    </span>
+                                                  </div>
 
-              return (
-                <div>
-                  <div style={{ marginBottom: 6 }}>
-                    <div style={{ fontWeight: 800 }}>主張</div>
-                    <div>{claim}</div>
-                  </div>
+                                                  {(() => {
+                                                    const { claim, premises, reasons } =
+                                                      splitContent(child.content);
 
-                  {premises.length > 0 && (
-                    <div style={{ marginBottom: 6 }}>
-                      <div style={{ fontWeight: 800 }}>前提</div>
-                      <ul style={{ paddingLeft: 20 }}>
-                        {premises.map((p, i) => (
-                          <li key={i}>{p}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                                                    return (
+                                                      <div>
+                                                        <div style={{ marginBottom: 6 }}>
+                                                          <div style={{ fontWeight: 800 }}>
+                                                            主張
+                                                          </div>
+                                                          <div>{claim}</div>
+                                                        </div>
 
-                  {reasons.length > 0 && (
-                    <div>
-                      <div style={{ fontWeight: 800 }}>根拠</div>
-                      <ul style={{ paddingLeft: 20 }}>
-                        {reasons.map((r, i) => (
-                          <li key={i}>{r}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-      ) : (
-        <div>
-          <div
-            style={{
-              fontSize: currentFont.base,
-              fontWeight: 700,
-              color: roleColor(child.post_role),
-            }}
-          >
-            {roleLabel(child.post_role)}（
-            <span
-              style={{
-                marginLeft: 6,
-                color: scoreColor(child.logic_score),
-              }}
-            >
-              {child.logic_score ?? "未評価"}
-            </span>
-            ）
-            <span style={{ marginLeft: 6 }}>
-              {(child.logic_score ?? 0) >= 80
-                ? "🔥 強い"
-                : (child.logic_score ?? 0) >= 60
-                ? "👍 普通"
-                : "⚠️ 弱い"}
-            </span>
-          </div>
+                                                        {premises.length > 0 && (
+                                                          <div style={{ marginBottom: 6 }}>
+                                                            <div style={{ fontWeight: 800 }}>
+                                                              前提
+                                                            </div>
+                                                            <ul style={{ paddingLeft: 20 }}>
+                                                              {premises.map((p, i) => (
+                                                                <li key={i}>{p}</li>
+                                                              ))}
+                                                            </ul>
+                                                          </div>
+                                                        )}
 
-          {(() => {
-            const { claim, premises, reasons } = splitContent(child.content);
-
-            return (
-              <div>
-                <div style={{ marginBottom: 6 }}>
-                  <div style={{ fontWeight: 800 }}>主張</div>
-                  <div>{claim}</div>
-                </div>
-
-                {premises.length > 0 && (
-                  <div style={{ marginBottom: 6 }}>
-                    <div style={{ fontWeight: 800 }}>前提</div>
-                    <ul style={{ paddingLeft: 20 }}>
-                      {premises.map((p, i) => (
-                        <li key={i}>{p}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {reasons.length > 0 && (
-                  <div>
-                    <div style={{ fontWeight: 800 }}>根拠</div>
-                    <ul style={{ paddingLeft: 20 }}>
-                      {reasons.map((r, i) => (
-                        <li key={i}>{r}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-        </div>
-      )}
-    </div>
-  );
-})}
-
+                                                        {reasons.length > 0 && (
+                                                          <div>
+                                                            <div style={{ fontWeight: 800 }}>
+                                                              根拠
+                                                            </div>
+                                                            <ul style={{ paddingLeft: 20 }}>
+                                                              {reasons.map((r, i) => (
+                                                                <li key={i}>{r}</li>
+                                                              ))}
+                                                            </ul>
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    );
+                                                  })()}
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
                                     </div>
                                   </details>
                                 )}
@@ -2048,287 +1873,277 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
             )}
           </section>
 
-          <section
-            style={{
-              marginTop: 24,
-              border: "1px solid #ddd",
-              borderRadius: 16,
-              padding: 20,
-              background: "#fff",
-            }}
-          >
+          <section style={whiteCardStyle}>
+            <div style={{ marginTop: 16, marginBottom: 16 }}>
+              <button
+                onClick={() => {
+                  setSelectedGuide(null);
+                  setPostRole("opinion");
+                  setReplyToOpinionId(null);
 
-<div style={{ marginTop: 16, marginBottom: 16 }}>
-  <button
-    onClick={() => {
-      setSelectedGuide(null);
-      setPostRole("opinion");
-      setReplyToOpinionId(null);
+                  setTimeout(() => {
+                    window.scrollTo({
+                      top: document.body.scrollHeight,
+                      behavior: "smooth",
+                    });
+                  }, 100);
+                }}
+                style={{
+                  width: "100%",
+                  border: "none",
+                  borderRadius: 12,
+                  padding: "14px 16px",
+                  background: "#111",
+                  color: "#fff",
+                  fontSize: currentFont.base,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                まだ誰も書いていない。このテーマの最初の意見を書く
+              </button>
+            </div>
 
-      setTimeout(() => {
-        window.scrollTo({
-          top: document.body.scrollHeight,
-          behavior: "smooth",
-        });
-      }, 100);
-    }}
-    style={{
-      width: "100%",
-      border: "none",
-      borderRadius: 12,
-      padding: "14px 16px",
-      background: "#111",
-      color: "#fff",
-      fontSize: currentFont.base,
-      fontWeight: 800,
-      cursor: "pointer",
-    }}
-  >
-    まだ誰も書いていない。このテーマの最初の意見を書く
-  </button>
-</div>
-
-<h2
-  style={{
-    margin: 0,
-    marginBottom: 12,
-    fontSize: currentFont.title,
-    fontWeight: 800,
-  }}
->
-  {replyToOpinionId
-    ? `この意見への${
-        postRole === "rebuttal"
-          ? "反論"
-          : postRole === "supplement"
-          ? "補足"
-          : "投稿"
-      }`
-    : "新しい投稿"}
-</h2>
-<p
-  style={{
-    marginTop: 0,
-    color: "#666",
-    fontSize: currentFont.base,
-  }}
->
-  {replyToOpinionId
-    ? "選択した意見に対する投稿です。"
-    : "このスレの問いに対して投稿します。"}
-</p>
-
-
-{selectedGuide && (
-  <div
-    style={{
-      marginBottom: 12,
-      padding: "12px 14px",
-      borderRadius: 10,
-      background: "#eef4ff",
-      border: "1px solid #c9d8ff",
-      color: "#0d47a1",
-      fontSize: currentFont.base,
-      lineHeight: 1.7,
-    }}
-  >
-    <div
-      style={{
-        fontWeight: 800,
-        marginBottom: 6,
-      }}
-    >
-      この{selectedGuide.type}について意見できます
-    </div>
-
-    <div style={{ fontWeight: 700 }}>
-      {selectedGuide.text}
-    </div>
-  </div>
-)}
-
-
-{selectedGuide && (
-
-
-
-
-  <div
-    id="related-section"
-    style={{
-      marginBottom: 12,
-      padding: "12px 14px",
-      borderRadius: 10,
-      background: "#fafafa",
-      border: "1px solid #e5e5e5",
-    }}
-  >
-    <div
-      style={{
-        fontSize: currentFont.base,
-        fontWeight: 800,
-        marginBottom: 8,
-        color: "#444",
-      }}
-    >
-      過去に投稿された関連内容
-    </div>
-
-    {loadingRelated ? (
-      <div style={{ color: "#666", fontSize: currentFont.base }}>検索中...</div>
-    ) : relatedPosts.length > 0 ? (
-
-      <div style={{ display: "grid", gap: 8 }}>
-        {relatedPosts.map((post) => (
-          <div
-            key={post.id}
-            style={{
-              border: "1px solid #ddd",
-              borderRadius: 8,
-              padding: "10px 12px",
-              background: "#fff",
-            }}
-          >
-            <div
+            <h2
               style={{
-                fontSize: currentFont.base,
-                fontWeight: 700,
-                color: "#666",
-                marginBottom: 4,
+                margin: 0,
+                marginBottom: 12,
+                fontSize: currentFont.title,
+                fontWeight: 800,
+                color: "#111",
               }}
             >
-              {roleLabel(post.post_role)} / {formatDate(post.created_at)}
-            </div>
-            <div style={{ fontSize: currentFont.base, lineHeight: 1.6 }}>
+              {replyToOpinionId
+                ? `この意見への${
+                    postRole === "rebuttal"
+                      ? "反論"
+                      : postRole === "supplement"
+                      ? "補足"
+                      : "投稿"
+                  }`
+                : "新しい投稿"}
+            </h2>
 
-<div
-  style={{
-    fontSize: currentFont.base,
-    fontWeight: 800,
-    color: "#111",
-    marginBottom: 4,
-  }}
->
-{post.thread_title || "関連スレ"}
-</div>
-              {post.content}
-            </div>
-          </div>
-        ))}
-      </div>
-    ) : (
-      <div style={{ color: "#666", fontSize: currentFont.base }}>
-        まだ投稿はありません。この内容について最初の意見を書けます。
-      </div>
-    )}
+            <p
+              style={{
+                marginTop: 0,
+                color: "#666",
+                fontSize: currentFont.base,
+              }}
+            >
+              {replyToOpinionId
+                ? "選択した意見に対する投稿です。"
+                : "このスレの問いに対して投稿します。"}
+            </p>
 
-    {relatedSummary && (
-      <div
-        style={{
-          marginTop: 10,
-          padding: "10px 12px",
-          borderRadius: 8,
-          background: "#f0f4ff",
-          border: "1px solid #ccd",
-          fontSize: currentFont.base,
-          lineHeight: 1.6,
-        }}
-      >
-        <div style={{ fontWeight: 700, marginBottom: 4 }}>関連要約</div>
-        <div>{relatedSummary}</div>
-      </div>
-    )}
+            {selectedGuide && (
+              <div
+                style={{
+                  marginBottom: 12,
+                  padding: "12px 14px",
+                  borderRadius: 10,
+                  background: "#eef4ff",
+                  border: "1px solid #c9d8ff",
+                  color: "#0d47a1",
+                  fontSize: currentFont.base,
+                  lineHeight: 1.7,
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 800,
+                    marginBottom: 6,
+                  }}
+                >
+                  この{selectedGuide.type}について意見できます
+                </div>
 
-<div
-  style={{
-    marginTop: 16,
-    paddingTop: 10,
-    borderTop: "1px solid #ddd",
-  }}
->
-  <div
-    style={{
-      fontSize: currentFont.base,
-      fontWeight: 800,
-      marginBottom: 6,
-      color: "#444",
-    }}
-  >
-    この論点を深める
-  </div>
+                <div style={{ fontWeight: 700 }}>{selectedGuide.text}</div>
+              </div>
+            )}
 
-  <div style={{ display: "grid", gap: 8 }}>
-{Array.from(
-  new Map(
-    relatedPosts
-      .filter((post) => String(post.thread_id) !== String(threadId))
-      .map((post) => [post.thread_id, post])
-  ).values()
-)
-  .slice(0, 3)
-  .map((post) => (
-    <a
-      key={`jump-${post.thread_id}`}
-      href={`/${tenant}/forum/thread/${post.thread_id}`}
-      style={{
-        display: "block",
-        border: "1px solid #ddd",
-        borderRadius: 8,
-        padding: "10px 12px",
-        background: "#fff",
-        textDecoration: "none",
-      }}
-    >
-      <div
-        style={{
-          fontSize: currentFont.base,
-          color: "#999",
-          marginBottom: 4,
-        }}
-      >
-        他スレの関連投稿
-      </div>
+            {selectedGuide && (
+              <div
+                id="related-section"
+                style={{
+                  marginBottom: 12,
+                  padding: "12px 14px",
+                  borderRadius: 10,
+                  background: "#fafafa",
+                  border: "1px solid #e5e5e5",
+                  color: "#111",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: currentFont.base,
+                    fontWeight: 800,
+                    marginBottom: 8,
+                    color: "#444",
+                  }}
+                >
+                  過去に投稿された関連内容
+                </div>
 
-      <div
-        style={{
-          fontSize: currentFont.base,
-          color: "#0d47a1",
-          fontWeight: 800,
-          lineHeight: 1.6,
-          marginBottom: 4,
-        }}
-      >
-        👉 {post.content.length > 40
-          ? `${post.content.slice(0, 40)}...`
-          : post.content}
-      </div>
+                {loadingRelated ? (
+                  <div style={{ color: "#666", fontSize: currentFont.base }}>
+                    検索中...
+                  </div>
+                ) : relatedPosts.length > 0 ? (
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {relatedPosts.map((post) => (
+                      <div
+                        key={post.id}
+                        style={{
+                          border: "1px solid #ddd",
+                          borderRadius: 8,
+                          padding: "10px 12px",
+                          background: "#fff",
+                          color: "#111",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: currentFont.base,
+                            fontWeight: 700,
+                            color: "#666",
+                            marginBottom: 4,
+                          }}
+                        >
+                          {roleLabel(post.post_role)} / {formatDate(post.created_at)}
+                        </div>
+                        <div style={{ fontSize: currentFont.base, lineHeight: 1.6 }}>
+                          <div
+                            style={{
+                              fontSize: currentFont.base,
+                              fontWeight: 800,
+                              color: "#111",
+                              marginBottom: 4,
+                            }}
+                          >
+                            {post.thread_title || "関連スレ"}
+                          </div>
+                          {post.content}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ color: "#666", fontSize: currentFont.base }}>
+                    まだ投稿はありません。この内容について最初の意見を書けます。
+                  </div>
+                )}
 
-      <div
-        style={{
-          fontSize: currentFont.base,
-          color: "#666",
-          marginBottom: 4,
-          fontWeight: 700,
-        }}
-      >
-        {roleLabel(post.post_role)}
-      </div>
+                {relatedSummary && (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      padding: "10px 12px",
+                      borderRadius: 8,
+                      background: "#f0f4ff",
+                      border: "1px solid #ccd",
+                      fontSize: currentFont.base,
+                      lineHeight: 1.6,
+                      color: "#111",
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>関連要約</div>
+                    <div>{relatedSummary}</div>
+                  </div>
+                )}
 
-      <div
-        style={{
-          marginTop: 4,
-          fontSize: currentFont.base,
-          color: "#666",
-        }}
-      >
-        → この話題の別スレを見る
-      </div>
-    </a>
-  ))}
-  </div>
-</div>
-  </div>
-)}
+                <div
+                  style={{
+                    marginTop: 16,
+                    paddingTop: 10,
+                    borderTop: "1px solid #ddd",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: currentFont.base,
+                      fontWeight: 800,
+                      marginBottom: 6,
+                      color: "#444",
+                    }}
+                  >
+                    この論点を深める
+                  </div>
+
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {Array.from(
+                      new Map(
+                        relatedPosts
+                          .filter((post) => String(post.thread_id) !== String(threadId))
+                          .map((post) => [post.thread_id, post])
+                      ).values()
+                    )
+                      .slice(0, 3)
+                      .map((post) => (
+                        <a
+                          key={`jump-${post.thread_id}`}
+                          href={`/${tenant}/forum/thread/${post.thread_id}`}
+                          style={{
+                            display: "block",
+                            border: "1px solid #ddd",
+                            borderRadius: 8,
+                            padding: "10px 12px",
+                            background: "#fff",
+                            textDecoration: "none",
+                            color: "#111",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: currentFont.base,
+                              color: "#999",
+                              marginBottom: 4,
+                            }}
+                          >
+                            他スレの関連投稿
+                          </div>
+
+                          <div
+                            style={{
+                              fontSize: currentFont.base,
+                              color: "#0d47a1",
+                              fontWeight: 800,
+                              lineHeight: 1.6,
+                              marginBottom: 4,
+                            }}
+                          >
+                            👉{" "}
+                            {post.content.length > 40
+                              ? `${post.content.slice(0, 40)}...`
+                              : post.content}
+                          </div>
+
+                          <div
+                            style={{
+                              fontSize: currentFont.base,
+                              color: "#666",
+                              marginBottom: 4,
+                              fontWeight: 700,
+                            }}
+                          >
+                            {roleLabel(post.post_role)}
+                          </div>
+
+                          <div
+                            style={{
+                              marginTop: 4,
+                              fontSize: currentFont.base,
+                              color: "#666",
+                            }}
+                          >
+                            → この話題の別スレを見る
+                          </div>
+                        </a>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div style={{ marginBottom: 14 }}>
               <label
@@ -2338,6 +2153,7 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
                   marginBottom: 8,
                   fontSize: currentFont.base,
                   fontWeight: 700,
+                  color: "#111",
                 }}
               >
                 投稿分類
@@ -2358,6 +2174,7 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
                   padding: "10px 12px",
                   fontSize: currentFont.base,
                   background: "#fff",
+                  color: "#111",
                 }}
               >
                 {POST_ROLE_OPTIONS.map((option) => (
@@ -2368,72 +2185,75 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
               </select>
             </div>
 
-{postRole === "rebuttal" ? (
-  <div style={{ display: "grid", gap: 10 }}>
+            {postRole === "rebuttal" ? (
+              <div style={{ display: "grid", gap: 10 }}>
+                <textarea
+                  value={rebuttalClaim}
+                  onChange={(e) => setRebuttalClaim(e.target.value)}
+                  placeholder="反論の主張（何が間違っているか・どう考えるべきか）"
+                  rows={3}
+                  style={{
+                    width: "100%",
+                    border: "1px solid #ccc",
+                    borderRadius: 10,
+                    padding: 12,
+                    fontSize: currentFont.base,
+                    resize: "vertical",
+                    outline: "none",
+                    color: "#111",
+                  }}
+                />
 
-<textarea
-  value={rebuttalClaim}
-  onChange={(e) => setRebuttalClaim(e.target.value)}
-  placeholder="反論の主張（何が間違っているか・どう考えるべきか）"
-  rows={3}
-  style={{
-    width: "100%",
-    border: "1px solid #ccc",
-    borderRadius: 10,
-    padding: 12,
-    fontSize: currentFont.base,
-    resize: "vertical",
-    outline: "none",
-  }}
-/>
+                <input
+                  value={rebuttalPremise}
+                  onChange={(e) => setRebuttalPremise(e.target.value)}
+                  placeholder="反論の前提"
+                  style={{
+                    width: "100%",
+                    border: "1px solid #ccc",
+                    borderRadius: 10,
+                    padding: 12,
+                    fontSize: currentFont.base,
+                    outline: "none",
+                    color: "#111",
+                  }}
+                />
 
-    <input
-      value={rebuttalPremise}
-      onChange={(e) => setRebuttalPremise(e.target.value)}
-      placeholder="反論の前提"
-      style={{
-        width: "100%",
-        border: "1px solid #ccc",
-        borderRadius: 10,
-        padding: 12,
-        fontSize: currentFont.base,
-        outline: "none",
-      }}
-    />
-
-    <textarea
-      value={rebuttalReason}
-      onChange={(e) => setRebuttalReason(e.target.value)}
-      placeholder="反論の根拠"
-      rows={4}
-      style={{
-        width: "100%",
-        border: "1px solid #ccc",
-        borderRadius: 10,
-        padding: 12,
-        fontSize: currentFont.base,
-        resize: "vertical",
-        outline: "none",
-      }}
-    />
-  </div>
-) : (
-  <textarea
-    value={text}
-    onChange={(e) => setText(e.target.value)}
-    placeholder="あなたの考えを書く（主張・前提・根拠でもOK）"
-    rows={5}
-    style={{
-      width: "100%",
-      border: "1px solid #ccc",
-      borderRadius: 10,
-      padding: 12,
-      fontSize: currentFont.base,
-      resize: "vertical",
-      outline: "none",
-    }}
-  />
-)}
+                <textarea
+                  value={rebuttalReason}
+                  onChange={(e) => setRebuttalReason(e.target.value)}
+                  placeholder="反論の根拠"
+                  rows={4}
+                  style={{
+                    width: "100%",
+                    border: "1px solid #ccc",
+                    borderRadius: 10,
+                    padding: 12,
+                    fontSize: currentFont.base,
+                    resize: "vertical",
+                    outline: "none",
+                    color: "#111",
+                  }}
+                />
+              </div>
+            ) : (
+              <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="あなたの考えを書く（主張・前提・根拠でもOK）"
+                rows={5}
+                style={{
+                  width: "100%",
+                  border: "1px solid #ccc",
+                  borderRadius: 10,
+                  padding: 12,
+                  fontSize: currentFont.base,
+                  resize: "vertical",
+                  outline: "none",
+                  color: "#111",
+                }}
+              />
+            )}
 
             <div style={{ marginTop: 12, display: "flex", gap: 12 }}>
               <button
@@ -2453,23 +2273,21 @@ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
               </button>
 
               <button
-onClick={() => {
-  setText("");
-  setSelectedGuide(null);
-  setPostRole("opinion");
-  setPredictionFlag(false);
-  setPredictionTarget("");
-  setPredictionDeadline("");
-  setRebuttalClaim("");
-  setRebuttalPremise("");
-  setRebuttalReason("");
-  setReplyToOpinionId(null);
-setRelatedPosts([]);
-setRelatedSummary(null);
-setLoadingRelated(false);
-}}
-
-
+                onClick={() => {
+                  setText("");
+                  setSelectedGuide(null);
+                  setPostRole("opinion");
+                  setPredictionFlag(false);
+                  setPredictionTarget("");
+                  setPredictionDeadline("");
+                  setRebuttalClaim("");
+                  setRebuttalPremise("");
+                  setRebuttalReason("");
+                  setReplyToOpinionId(null);
+                  setRelatedPosts([]);
+                  setRelatedSummary(null);
+                  setLoadingRelated(false);
+                }}
                 disabled={posting}
                 style={{
                   border: "1px solid #ccc",
@@ -2478,6 +2296,7 @@ setLoadingRelated(false);
                   background: "#fff",
                   cursor: posting ? "default" : "pointer",
                   fontWeight: 700,
+                  color: "#111",
                 }}
               >
                 クリア
