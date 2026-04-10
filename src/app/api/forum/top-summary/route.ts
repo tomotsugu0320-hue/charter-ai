@@ -13,7 +13,7 @@ export async function GET() {
     // スレッド取得
     const { data: threads, error: threadError } = await supabase
       .from("forum_threads")
-      .select("id, title, category, created_at")
+      .select("id, title, category, created_at, original_post")
 
     if (threadError) {
       throw threadError;
@@ -22,7 +22,15 @@ export async function GET() {
     // 投稿取得
     const { data: posts, error: postError } = await supabase
       .from("forum_posts")
-      .select("thread_id, logic_score");
+.select("thread_id, logic_score, content");
+const postsContentMap: Record<string, string> = {};
+
+for (const post of posts ?? []) {
+  if (!postsContentMap[post.thread_id]) {
+    postsContentMap[post.thread_id] = "";
+  }
+  postsContentMap[post.thread_id] += " " + (post.content || "");
+}
 
     if (postError) {
       throw postError;
@@ -54,6 +62,7 @@ return {
   created_at: t.created_at,
   post_count: stat.count,
   avg_logic_score: avg,
+  posts_content: postsContentMap[t.id] || "",
 };
       }) ?? [];
 
@@ -65,7 +74,7 @@ return {
         }
         return b.post_count - a.post_count;
       })
-      .slice(0, 5);
+      .slice(0, 100);
 
     // 活発スレ
     const activeThreads = [...threadStats]

@@ -3,6 +3,14 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+
+await supabase.from("forum_posts").insert({
+  thread_id: newThread.id,
+  source_type: "human",
+  post_role: "issue_raise",
+  content: draftText, // 元の入力テキスト
+});
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
