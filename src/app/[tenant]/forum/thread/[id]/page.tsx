@@ -4,6 +4,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import SectionCard from "@/components/forum/SectionCard";
+import SectionTitle from "@/components/forum/SectionTitle";
+import PostCard from "@/components/forum/PostCard";
+import PrimaryButton from "@/components/forum/PrimaryButton";
+import SelectableCardButton from "@/components/forum/SelectableCardButton";
+import LinkButton from "@/components/forum/LinkButton";
+import OpinionView from "@/components/forum/OpinionView";
+
 
 type ThreadRow = {
   id: string;
@@ -51,6 +59,7 @@ type ThreadSummary = {
     explanation: number;
   };
   summary_text: string;
+  easy_summary_text?: string;
   key_points: {
     issues: string[];
     opinions: string[];
@@ -60,13 +69,6 @@ type ThreadSummary = {
   };
 };
 
-type FeedbackSummary = {
-  term_unknown: number;
-  premise_unknown: number;
-  conclusion_unknown: number;
-  evidence_unknown: number;
-  counterargument_unknown: number;
-};
 
 type PageProps = {
   params: Promise<{
@@ -173,11 +175,10 @@ function trustBonus(label?: string) {
 }
 
 export default function ForumThreadPage({ params }: PageProps) {
-  const [structureType, setStructureType] = useState("");
   const [conflicts, setConflicts] = useState<
     { opinion: string; rebuttal: string }[]
   >([]);
-  const [explanations, setExplanations] = useState<Record<string, string>>({});
+
   const [fontSize, setFontSize] = useState<"small" | "medium" | "large">(
     "medium"
   );
@@ -185,11 +186,28 @@ export default function ForumThreadPage({ params }: PageProps) {
   const [tenant, setTenant] = useState("");
   const [threadId, setThreadId] = useState("");
 
+
   const [sortType, setSortType] = useState<"score" | "new">("score");
   const [hideLowScore, setHideLowScore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+const [explanations, setExplanations] = useState<Record<string, string>>({});
+const [feedbackLoadingPostId, setFeedbackLoadingPostId] = useState<string | null>(null);
+
+
+const [mode, setMode] = useState<"normal" | "easy">("normal");
+useEffect(() => {
+  const saved = localStorage.getItem("forum_default_mode");
+  if (saved === "easy" || saved === "normal") {
+    setMode(saved);
+  }
+}, []);
+
+
+const [summaryLoading, setSummaryLoading] = useState(false);
+
 
   const [thread, setThread] = useState<ThreadRow | null>(null);
   const [posts, setPosts] = useState<PostRow[]>([]);
@@ -221,8 +239,6 @@ export default function ForumThreadPage({ params }: PageProps) {
   const [rebuttalReason, setRebuttalReason] = useState("");
 
   const [summary, setSummary] = useState<ThreadSummary | null>(null);
-  const [feedbackSummary, setFeedbackSummary] =
-    useState<FeedbackSummary | null>(null);
 
   const [replyToOpinionId, setReplyToOpinionId] = useState<string | null>(null);
 
@@ -231,9 +247,8 @@ export default function ForumThreadPage({ params }: PageProps) {
   const [predictionFlag, setPredictionFlag] = useState(false);
   const [predictionTarget, setPredictionTarget] = useState("");
   const [predictionDeadline, setPredictionDeadline] = useState("");
-  const [feedbackLoadingPostId, setFeedbackLoadingPostId] = useState<
-    string | null
-  >(null);
+
+
 
   useEffect(() => {
     (async () => {
@@ -267,38 +282,6 @@ export default function ForumThreadPage({ params }: PageProps) {
   const currentUrl =
     typeof window !== "undefined" ? window.location.href : "";
 
-  const whiteCardStyle: React.CSSProperties = {
-    marginTop: 24,
-    border: "1px solid #ddd",
-    borderRadius: 16,
-    padding: 20,
-    background: "#fff",
-    color: "#111",
-  };
-
-  const whiteButtonCardStyle: React.CSSProperties = {
-    width: "100%",
-    display: "grid",
-    gap: 8,
-    textAlign: "left",
-    border: "1px solid #ddd",
-    borderRadius: 10,
-    padding: "12px 14px",
-    background: "#fff",
-    color: "#111",
-    fontSize: currentFont.base,
-    cursor: "pointer",
-  };
-
-  const postCardBaseStyle: React.CSSProperties = {
-    marginBottom: 16,
-    padding: 12,
-    borderRadius: 10,
-    border: "1px solid #ddd",
-    background: "#fff",
-    color: "#111",
-  };
-
   const visiblePosts = useMemo(() => {
     return posts.filter((post) => {
       const matchRole =
@@ -315,6 +298,34 @@ export default function ForumThreadPage({ params }: PageProps) {
       return matchRole && matchSearch;
     });
   }, [posts, searchText]);
+
+
+
+const handleGenerateSummary = async () => {
+  try {
+    setSummaryLoading(true);
+
+    const res = await fetch(
+      `/api/forum/thread-summary?threadId=${threadId}`,
+      {
+        method: "GET",
+      }
+    );
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data?.error || "AIまとめ生成失敗");
+    }
+
+setSummary(data?.summary || null);
+  } catch (e) {
+    console.error(e);
+  } finally {
+    setSummaryLoading(false);
+  }
+};
+
 
   const sortedVisiblePosts = useMemo(() => {
     const arr = [...visiblePosts];
@@ -608,12 +619,10 @@ export default function ForumThreadPage({ params }: PageProps) {
         throw new Error(summaryResult?.error || "要約読込失敗");
       }
 
-      setStructureType(summaryResult.structure_type || "");
       setConflicts(summaryResult.conflict_pairs || []);
-
       setThread(result.thread ?? null);
       setPosts(result.posts ?? []);
-      setFeedbackSummary(result.feedback_summary ?? null);
+      setSummary(null);
       setSummary(summaryResult.summary ?? null);
     } catch (e: any) {
       console.error(e);
@@ -750,27 +759,45 @@ export default function ForumThreadPage({ params }: PageProps) {
       }}
     >
       <div style={{ marginBottom: 16 }}>
-        <a
-          href={`/${tenant}/forum`}
-          style={{
-            color: "#0d47a1",
-            textDecoration: "none",
-            fontWeight: 700,
-          }}
-        >
+        <LinkButton href={`/${tenant}/forum`} variant="subtle">
           ← 掲示板トップに戻る
-        </a>
+        </LinkButton>
       </div>
 
-      <div style={{ marginBottom: 12 }}>
-        <span style={{ marginRight: 8 }}>文字サイズ：</span>
-        <button onClick={() => setFontSize("small")}>小</button>
-        <button onClick={() => setFontSize("medium")} style={{ marginLeft: 6 }}>
+      <div
+        style={{
+          marginBottom: 12,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          flexWrap: "wrap",
+        }}
+      >
+        <span style={{ marginRight: 4 }}>文字サイズ：</span>
+
+        <PrimaryButton
+          variant={fontSize === "small" ? "primary" : "secondary"}
+          onClick={() => setFontSize("small")}
+          style={{ padding: "6px 10px" }}
+        >
+          小
+        </PrimaryButton>
+
+        <PrimaryButton
+          variant={fontSize === "medium" ? "primary" : "secondary"}
+          onClick={() => setFontSize("medium")}
+          style={{ padding: "6px 10px" }}
+        >
           中
-        </button>
-        <button onClick={() => setFontSize("large")} style={{ marginLeft: 6 }}>
+        </PrimaryButton>
+
+        <PrimaryButton
+          variant={fontSize === "large" ? "primary" : "secondary"}
+          onClick={() => setFontSize("large")}
+          style={{ padding: "6px 10px" }}
+        >
           大
-        </button>
+        </PrimaryButton>
       </div>
 
       {loading ? (
@@ -783,7 +810,55 @@ export default function ForumThreadPage({ params }: PageProps) {
         </div>
       ) : (
         <>
-          <section style={whiteCardStyle}>
+
+
+<div style={{ marginBottom: 12 }}>
+  <PrimaryButton
+    onClick={() => setMode(mode === "normal" ? "easy" : "normal")}
+  >
+    {mode === "normal"
+      ? "🐵 やさしくする（小学生向け）"
+      : "🧠 通常表示に戻す"}
+  </PrimaryButton>
+</div>
+
+<SectionCard variant="info">
+  <div style={{ fontWeight: 800, marginBottom: 8 }}>
+    {mode === "normal" ? "🧠 AIまとめ" : "🐵 やさしい要約"}
+  </div>
+
+{mode === "normal" ? (
+  <>
+    {!summaryLoading && (
+      <PrimaryButton onClick={handleGenerateSummary}>
+        {summary?.summary_text
+          ? "AIまとめを更新する"
+          : "AIでこの議論をまとめる"}
+      </PrimaryButton>
+    )}
+
+    {summaryLoading && (
+      <div style={{ color: "#666", marginTop: 8 }}>
+        AIが議論を分析中...
+      </div>
+    )}
+
+    {summary?.summary_text && (
+      <div style={{ marginTop: 10 }}>
+        {summary.summary_text}
+      </div>
+    )}
+  </>
+) : (
+  <div>
+{summary?.easy_summary_text || "やさしい要約を読み込み中..."}
+  </div>
+)}
+
+</SectionCard>
+
+
+          <SectionCard variant="white" style={{ marginTop: 24 }}>
             <h1
               style={{
                 margin: 0,
@@ -796,39 +871,20 @@ export default function ForumThreadPage({ params }: PageProps) {
               {thread.title}
             </h1>
 
-            <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-              <button
-                onClick={handleShare}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: "#111",
-                  color: "#fff",
-                  cursor: "pointer",
-                  fontWeight: 700,
-                }}
-              >
+            <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <PrimaryButton onClick={handleShare} style={{ padding: "8px 12px" }}>
                 この議論を共有
-              </button>
+              </PrimaryButton>
 
-              <a
+              <LinkButton
                 href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
                   `${thread.title} ${currentUrl}`
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                  border: "1px solid #ccc",
-                  textDecoration: "none",
-                  fontWeight: 700,
-                  color: "#111",
-                }}
               >
                 Xで共有
-              </a>
+              </LinkButton>
 
               {copied && <span style={{ color: "#2e7d32" }}>コピーした</span>}
             </div>
@@ -895,15 +951,9 @@ export default function ForumThreadPage({ params }: PageProps) {
               最高スコア: {maxLogicScore ?? "未評価"}
             </div>
 
-            <div
-              style={{
-                marginTop: 18,
-                padding: 16,
-                borderRadius: 12,
-                background: "#f6f6f6",
-                border: "1px solid #e5e5e5",
-                color: "#111",
-              }}
+            <SectionCard
+              variant="soft"
+              style={{ marginTop: 18, marginBottom: 0 }}
             >
               <div
                 style={{
@@ -925,49 +975,14 @@ export default function ForumThreadPage({ params }: PageProps) {
               >
                 {thread.original_post}
               </div>
-            </div>
-          </section>
+            </SectionCard>
+          </SectionCard>
 
-          <section style={whiteCardStyle}>
-            <h2
-              style={{
-                margin: 0,
-                marginBottom: 16,
-                fontSize: currentFont.title,
-                fontWeight: 800,
-                color: "#111",
-              }}
-            >
-              やさしい要約
-            </h2>
 
-            {!summary ? (
-              <p style={{ margin: 0, color: "#666" }}>要約を読み込み中...</p>
-            ) : (
-              <div
-                style={{
-                  color: "#444",
-                  lineHeight: 1.8,
-                  fontSize: currentFont.base,
-                }}
-              >
-                {summary.summary_text}
-              </div>
-            )}
-          </section>
-
-          <section style={whiteCardStyle}>
-            <h2
-              style={{
-                margin: 0,
-                marginBottom: 12,
-                fontSize: currentFont.title,
-                fontWeight: 800,
-                color: "#111",
-              }}
-            >
+          <SectionCard variant="white" style={{ marginTop: 24 }}>
+            <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
               主な論点
-            </h2>
+            </SectionTitle>
 
             <p
               style={{
@@ -983,42 +998,23 @@ export default function ForumThreadPage({ params }: PageProps) {
             <div style={{ display: "grid", gap: 10 }}>
               {summary?.key_points?.issues?.length ? (
                 summary.key_points.issues.map((item, index) => (
-                  <button
-                    key={`${item}-${index}`}
-                    onClick={() => handleNodeClick("論点", item)}
-                    style={whiteButtonCardStyle}
-                  >
-                    <span style={{ lineHeight: 1.6 }}>{item}</span>
-                    <span
-                      style={{
-                        fontSize: currentFont.base,
-                        color: "#0d47a1",
-                        fontWeight: 700,
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      議論を見る・ここから意見を書く →
-                    </span>
-                  </button>
+<SelectableCardButton
+  key={`${item}-${index}`}
+  title={item}
+  onClick={() => handleNodeClick("論点", item)}
+  style={{ fontSize: currentFont.base }}
+/>
                 ))
               ) : (
                 <div style={{ color: "#666" }}>まだ論点は整理されていない。</div>
               )}
             </div>
-          </section>
+          </SectionCard>
 
-          <section style={whiteCardStyle}>
-            <h2
-              style={{
-                margin: 0,
-                marginBottom: 12,
-                fontSize: currentFont.title,
-                fontWeight: 800,
-                color: "#111",
-              }}
-            >
+          <SectionCard variant="white" style={{ marginTop: 24 }}>
+            <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
               主な前提
-            </h2>
+            </SectionTitle>
 
             <p
               style={{
@@ -1034,42 +1030,23 @@ export default function ForumThreadPage({ params }: PageProps) {
             <div style={{ display: "grid", gap: 10 }}>
               {originalStructure.premises.length > 0 ? (
                 originalStructure.premises.map((item, index) => (
-                  <button
-                    key={`${item}-${index}`}
-                    onClick={() => handleNodeClick("前提", item)}
-                    style={whiteButtonCardStyle}
-                  >
-                    <span style={{ lineHeight: 1.6 }}>{item}</span>
-                    <span
-                      style={{
-                        fontSize: currentFont.base,
-                        color: "#0d47a1",
-                        fontWeight: 700,
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      議論を見る・ここから意見を書く →
-                    </span>
-                  </button>
+<SelectableCardButton
+  key={`${item}-${index}`}
+  title={item}
+  onClick={() => handleNodeClick("前提", item)}
+  style={{ fontSize: currentFont.base }}
+/>
                 ))
               ) : (
                 <div style={{ color: "#666" }}>まだ前提は整理されていない。</div>
               )}
             </div>
-          </section>
+          </SectionCard>
 
-          <section style={whiteCardStyle}>
-            <h2
-              style={{
-                margin: 0,
-                marginBottom: 12,
-                fontSize: currentFont.title,
-                fontWeight: 800,
-                color: "#111",
-              }}
-            >
+          <SectionCard variant="white" style={{ marginTop: 24 }}>
+            <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
               主な根拠
-            </h2>
+            </SectionTitle>
 
             <p
               style={{
@@ -1085,42 +1062,23 @@ export default function ForumThreadPage({ params }: PageProps) {
             <div style={{ display: "grid", gap: 10 }}>
               {originalStructure.reasons.length > 0 ? (
                 originalStructure.reasons.map((item, index) => (
-                  <button
-                    key={`${item}-${index}`}
-                    onClick={() => handleNodeClick("根拠", item)}
-                    style={whiteButtonCardStyle}
-                  >
-                    <span style={{ lineHeight: 1.6 }}>{item}</span>
-                    <span
-                      style={{
-                        fontSize: currentFont.base,
-                        color: "#0d47a1",
-                        fontWeight: 700,
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      議論を見る・ここから意見を書く →
-                    </span>
-                  </button>
+<SelectableCardButton
+  key={`${item}-${index}`}
+  title={item}
+  onClick={() => handleNodeClick("根拠", item)}
+  style={{ fontSize: currentFont.base }}
+/>
                 ))
               ) : (
                 <div style={{ color: "#666" }}>まだ根拠は整理されていない。</div>
               )}
             </div>
-          </section>
+          </SectionCard>
 
-          <section style={whiteCardStyle}>
-            <h2
-              style={{
-                margin: 0,
-                marginBottom: 12,
-                fontSize: currentFont.title,
-                fontWeight: 800,
-                color: "#111",
-              }}
-            >
+          <SectionCard variant="white" style={{ marginTop: 24 }}>
+            <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
               主な対立
-            </h2>
+            </SectionTitle>
 
             <p
               style={{
@@ -1135,98 +1093,47 @@ export default function ForumThreadPage({ params }: PageProps) {
 
             {conflicts && conflicts.length > 0 ? (
               <div style={{ display: "grid", gap: 10 }}>
-                {conflicts.map((c, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      padding: 10,
-                      borderRadius: 8,
-                      background: "#fafafa",
-                      border: "1px solid #eee",
-                      display: "grid",
-                      gap: 8,
-                      color: "#111",
-                    }}
-                  >
-                    <button
-                      onClick={() => handleNodeClick("論点", c.opinion)}
-                      style={{
-                        width: "100%",
-                        display: "grid",
-                        gap: 8,
-                        textAlign: "left",
-                        border: "1px solid #f44336",
-                        borderRadius: 10,
-                        padding: "10px 12px",
-                        background: "#fff5f5",
-                        cursor: "pointer",
-                        fontWeight: 700,
-                        color: "#111",
-                      }}
-                    >
-                      <span style={{ lineHeight: 1.6 }}>🔴 A：{c.opinion}</span>
-                      <span
-                        style={{
-                          fontSize: currentFont.base,
-                          color: "#b71c1c",
-                          fontWeight: 700,
-                          lineHeight: 1.4,
-                        }}
-                      >
-                        議論を見る・ここから意見を書く →
-                      </span>
-                    </button>
 
-                    <button
-                      onClick={() => handleNodeClick("論点", c.rebuttal)}
-                      style={{
-                        width: "100%",
-                        display: "grid",
-                        gap: 8,
-                        textAlign: "left",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        border: "1px solid #2196f3",
-                        borderRadius: 10,
-                        padding: "10px 12px",
-                        background: "#f0f6ff",
-                        cursor: "pointer",
-                        fontWeight: 700,
-                        color: "#111",
-                      }}
-                    >
-                      <span>🔵 B：{c.rebuttal}</span>
-                      <span
-                        style={{
-                          fontSize: currentFont.base,
-                          color: "#0d47a1",
-                          fontWeight: 700,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        議論を見る・ここから意見を書く →
-                      </span>
-                    </button>
-                  </div>
-                ))}
+{conflicts.map((c, i) => (
+
+  <SectionCard
+    key={i}
+    variant="soft"
+    style={{
+      padding: 10,
+      borderRadius: 8,
+      display: "grid",
+      gap: 8,
+      color: "#111",
+      marginBottom: 0,
+    }}
+  >
+
+    <SelectableCardButton
+      title={`🔴 A：${c.opinion}`}
+      variant="danger"
+      onClick={() => handleNodeClick("論点", c.opinion)}
+      style={{ fontSize: currentFont.base }}
+    />
+
+    <SelectableCardButton
+      title={`🔵 B：${c.rebuttal}`}
+      variant="info"
+      onClick={() => handleNodeClick("論点", c.rebuttal)}
+      style={{ fontSize: currentFont.base }}
+    />
+    </SectionCard>
+))}
               </div>
             ) : (
               <div style={{ color: "#666" }}>対立はまだ抽出されていない。</div>
             )}
-          </section>
+          </SectionCard>
 
-          <section style={whiteCardStyle}>
-            <h2
-              style={{
-                margin: 0,
-                marginBottom: 16,
-                fontSize: currentFont.title,
-                fontWeight: 800,
-                color: "#111",
-              }}
-            >
+          <SectionCard variant="white" style={{ marginTop: 24 }}>
+            <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
               投稿一覧
-            </h2>
+            </SectionTitle>
 
             <div style={{ marginBottom: 12 }}>
               <input
@@ -1264,618 +1171,54 @@ export default function ForumThreadPage({ params }: PageProps) {
               低スコア投稿を薄く表示する
             </label>
 
-            <div style={{ marginBottom: 12 }}>
-              <button
+            <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <PrimaryButton
                 onClick={() => setSortType("score")}
                 style={{
-                  border: "none",
-                  borderRadius: 8,
-                  padding: "8px 12px",
                   background: sortType === "score" ? "#111" : "#eee",
                   color: sortType === "score" ? "#fff" : "#333",
-                  fontWeight: 700,
-                  cursor: "pointer",
                 }}
               >
                 スコア順
-              </button>
+              </PrimaryButton>
 
-              <button
+              <PrimaryButton
                 onClick={() => setSortType("new")}
                 style={{
-                  marginLeft: 8,
-                  border: "none",
-                  borderRadius: 8,
-                  padding: "8px 12px",
                   background: sortType === "new" ? "#111" : "#eee",
                   color: sortType === "new" ? "#fff" : "#333",
-                  fontWeight: 700,
-                  cursor: "pointer",
                 }}
               >
                 新着順
-              </button>
+              </PrimaryButton>
             </div>
 
             {sortedVisiblePosts.length === 0 ? (
               <div style={{ color: "#666" }}>まだ投稿がない。</div>
             ) : (
               <div style={{ display: "grid", gap: 14 }}>
-                {groupedByOpinion.map((group, groupIndex) => (
-                  <div
-                    key={group.issue?.id ?? `group-${groupIndex}`}
-                    style={{
-                      border: "1px solid #e5e5e5",
-                      borderRadius: 14,
-                      padding: 16,
-                      background: "#fafafa",
-                      color: "#111",
-                    }}
-                  >
-                    <details open style={{ marginBottom: 12 }}>
-                      <summary
-                        style={{
-                          fontSize: currentFont.base,
-                          fontWeight: 800,
-                          color: "#0d47a1",
-                          cursor: "pointer",
-                        }}
-                      >
-                        {group.issue
-                          ? `問い: ${group.issue.content}`
-                          : `問い: ${
-                              thread?.title ?? thread?.original_post ?? "このスレのテーマ"
-                            }`}
-                      </summary>
 
-                      <div style={{ marginTop: 12 }}>
-                        {bestOpinionsByIssue[groupIndex]?.best && (
-                          <div
-                            style={{
-                              marginBottom: 16,
-                              padding: 12,
-                              borderRadius: 12,
-                              border: "2px solid #2e7d32",
-                              background: "#f1f8f4",
-                              color: "#111",
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: currentFont.base,
-                                fontWeight: 800,
-                                color: "#2e7d32",
-                                marginBottom: 6,
-                              }}
-                            >
-                              🏆 ベスト意見
-                            </div>
+<OpinionView
+  groupedByOpinion={groupedByOpinion}
+  bestOpinionsByIssue={bestOpinionsByIssue}
+  hideLowScore={hideLowScore}
+  currentFont={currentFont}
+  thread={thread}
+  setSelectedGuide={setSelectedGuide}
+  setPostRole={setPostRole}
+  setReplyToOpinionId={setReplyToOpinionId}
+  explanations={explanations}
+  feedbackLoadingPostId={feedbackLoadingPostId}
+  handleFeedback={handleFeedback}
+/>
 
-                            <div style={{ marginBottom: 6 }}>
-                              {bestOpinionsByIssue[groupIndex].best.opinion.content}
-                            </div>
-
-                            <div
-                              style={{
-                                fontSize: currentFont.base,
-                                color: "#555",
-                              }}
-                            >
-                              スコア：
-                              {bestOpinionsByIssue[groupIndex].best.effectiveScore}
-                            </div>
-                          </div>
-                        )}
-
-                        {group.opinions.length === 0 ? (
-                          <div style={{ color: "#777", fontSize: currentFont.base }}>
-                            まだ意見がない。
-                          </div>
-                        ) : (
-                          group.opinions.map((op) => {
-                            const score = op.opinion.logic_score ?? 0;
-
-                            return (
-                              <div
-                                key={op.opinion.id}
-                                style={{
-                                  ...postCardBaseStyle,
-                                  opacity:
-                                    hideLowScore && score > 0 && score < 60
-                                      ? 0.65
-                                      : score >= 80
-                                      ? 1
-                                      : score >= 60
-                                      ? 0.95
-                                      : score >= 40
-                                      ? 0.85
-                                      : 0.75,
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    fontWeight: 700,
-                                    marginBottom: 6,
-                                    color: roleColor(op.opinion.post_role),
-                                  }}
-                                >
-                                  💬 {roleLabel(op.opinion.post_role)}
-                                  <span
-                                    style={{
-                                      marginLeft: 8,
-                                      fontSize: currentFont.base,
-                                      color: scoreColor(op.opinion.logic_score),
-                                    }}
-                                  >
-                                    {op.opinion.logic_score ?? "未評価"}｜
-                                    {(op.opinion.logic_score ?? 0) >= 80
-                                      ? "🔥 強い"
-                                      : (op.opinion.logic_score ?? 0) >= 60
-                                      ? "👍 普通"
-                                      : "⚠️ 弱い"}
-                                  </span>
-                                </div>
-
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    gap: 8,
-                                    marginTop: 8,
-                                    marginBottom: 8,
-                                  }}
-                                >
-                                  <button
-                                    onClick={() => {
-                                      setSelectedGuide(null);
-                                      setPostRole("rebuttal");
-                                      setReplyToOpinionId(op.opinion.id);
-                                      window.scrollTo({
-                                        top: document.body.scrollHeight,
-                                        behavior: "smooth",
-                                      });
-                                    }}
-                                    style={{
-                                      padding: "6px 10px",
-                                      borderRadius: 6,
-                                      border: "1px solid #ccc",
-                                      background: "#fff",
-                                      fontSize: currentFont.base,
-                                      cursor: "pointer",
-                                      color: "#111",
-                                    }}
-                                  >
-                                    この意見に反論する
-                                  </button>
-
-                                  <button
-                                    onClick={() => {
-                                      setSelectedGuide(null);
-                                      setPostRole("supplement");
-                                      setReplyToOpinionId(op.opinion.id);
-                                      window.scrollTo({
-                                        top: document.body.scrollHeight,
-                                        behavior: "smooth",
-                                      });
-                                    }}
-                                    style={{
-                                      padding: "6px 10px",
-                                      borderRadius: 6,
-                                      border: "1px solid #ccc",
-                                      background: "#fff",
-                                      fontSize: currentFont.base,
-                                      cursor: "pointer",
-                                      color: "#111",
-                                    }}
-                                  >
-                                    この意見を補足する
-                                  </button>
-                                </div>
-
-                                <div style={{ marginBottom: 8 }}>
-                                  {(() => {
-                                    const { claim, premises, reasons } = splitContent(
-                                      op.opinion.content
-                                    );
-
-                                    return (
-                                      <div>
-                                        <div style={{ marginBottom: 6 }}>
-                                          <div style={{ fontWeight: 800 }}>主張</div>
-                                          <div>{claim}</div>
-                                        </div>
-
-                                        {premises.length > 0 && (
-                                          <div style={{ marginBottom: 6 }}>
-                                            <div style={{ fontWeight: 800 }}>前提</div>
-                                            <ul style={{ paddingLeft: 20 }}>
-                                              {premises.map((p, i) => (
-                                                <li key={i}>{p}</li>
-                                              ))}
-                                            </ul>
-                                          </div>
-                                        )}
-
-                                        {reasons.length > 0 && (
-                                          <div>
-                                            <div style={{ fontWeight: 800 }}>根拠</div>
-                                            <ul style={{ paddingLeft: 20 }}>
-                                              {reasons.map((r, i) => (
-                                                <li key={i}>{r}</li>
-                                              ))}
-                                            </ul>
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })()}
-                                </div>
-
-                                <div
-                                  style={{
-                                    marginBottom: 10,
-                                    display: "flex",
-                                    flexWrap: "wrap",
-                                    gap: 8,
-                                  }}
-                                >
-                                  {[
-                                    ["term_unknown", "❓ 言葉がわからん", op.opinion.feedback_counts?.term_unknown],
-                                    ["premise_unknown", "❓ 前提がわからん", op.opinion.feedback_counts?.premise_unknown],
-                                    ["conclusion_unknown", "❓ 結論がわからん", op.opinion.feedback_counts?.conclusion_unknown],
-                                    ["evidence_unknown", "❓ 根拠がわからん", op.opinion.feedback_counts?.evidence_unknown],
-                                    ["counterargument_unknown", "❓ 反対意見がわからん", op.opinion.feedback_counts?.counterargument_unknown],
-                                  ].map(([type, label, count]) => (
-                                    <button
-                                      key={type}
-                                      onClick={() => handleFeedback(op.opinion.id, String(type))}
-                                      disabled={feedbackLoadingPostId === op.opinion.id}
-                                      style={{
-                                        border: "1px solid #ccc",
-                                        borderRadius: 999,
-                                        padding: "6px 10px",
-                                        background: "#fff",
-                                        fontSize: currentFont.base,
-                                        cursor:
-                                          feedbackLoadingPostId === op.opinion.id
-                                            ? "default"
-                                            : "pointer",
-                                        color: "#111",
-                                      }}
-                                    >
-                                      {label} ({count ?? 0})
-                                    </button>
-                                  ))}
-                                </div>
-
-                                {feedbackLoadingPostId === op.opinion.id &&
-                                  !explanations[op.opinion.id] && (
-                                    <div
-                                      style={{
-                                        marginTop: 8,
-                                        fontSize: currentFont.base,
-                                        color: "#666",
-                                      }}
-                                    >
-                                      説明を生成中...
-                                    </div>
-                                  )}
-
-                                {explanations[op.opinion.id] && (
-                                  <div
-                                    style={{
-                                      marginTop: 8,
-                                      padding: 10,
-                                      borderRadius: 8,
-                                      background: "#f0f4ff",
-                                      border: "1px solid #ccd",
-                                      fontSize: currentFont.base,
-                                      lineHeight: 1.6,
-                                      color: "#111",
-                                    }}
-                                  >
-                                    <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                                      AI解説
-                                    </div>
-                                    <div>{explanations[op.opinion.id]}</div>
-                                  </div>
-                                )}
-
-                                {op.children.length > 0 && (
-                                  <details style={{ marginTop: 10 }}>
-                                    <summary
-                                      style={{
-                                        cursor: "pointer",
-                                        fontSize: currentFont.base,
-                                        fontWeight: 700,
-                                        color: "#555",
-                                      }}
-                                    >
-                                      返信を見る（{op.children.length}件）
-                                    </summary>
-
-                                    <div
-                                      style={{
-                                        marginTop: 10,
-                                        paddingLeft: 12,
-                                        borderLeft: "3px solid #ddd",
-                                        display: "grid",
-                                        gap: 8,
-                                      }}
-                                    >
-                                      {op.children
-                                        .filter(
-                                          (child) =>
-                                            child.parent_opinion_id === op.opinion.id
-                                        )
-                                        .map((child) => {
-                                          const childScore = child.logic_score ?? 0;
-                                          const childOpacity =
-                                            hideLowScore &&
-                                            childScore > 0 &&
-                                            childScore < 60
-                                              ? 0.65
-                                              : childScore >= 80
-                                              ? 1
-                                              : childScore >= 60
-                                              ? 0.95
-                                              : childScore >= 40
-                                              ? 0.85
-                                              : 0.75;
-
-                                          return (
-                                            <div
-                                              key={child.id}
-                                              style={{ opacity: childOpacity, color: "#111" }}
-                                            >
-                                              {child.post_role === "rebuttal" ? (
-                                                <div
-                                                  style={{
-                                                    display: "grid",
-                                                    gridTemplateColumns:
-                                                      "repeat(auto-fit, minmax(260px, 1fr))",
-                                                    gap: 12,
-                                                    alignItems: "start",
-                                                  }}
-                                                >
-                                                  <div
-                                                    style={{
-                                                      border: "1px solid #ddd",
-                                                      borderRadius: 10,
-                                                      padding: 10,
-                                                      background: "#f5f5f5",
-                                                      color: "#111",
-                                                    }}
-                                                  >
-                                                    <div
-                                                      style={{
-                                                        fontSize: currentFont.base,
-                                                        fontWeight: 700,
-                                                        color: roleColor(op.opinion.post_role),
-                                                        marginBottom: 8,
-                                                      }}
-                                                    >
-                                                      意見
-                                                    </div>
-
-                                                    {(() => {
-                                                      const { claim, premises, reasons } =
-                                                        splitContent(op.opinion.content);
-
-                                                      return (
-                                                        <div>
-                                                          <div style={{ marginBottom: 6 }}>
-                                                            <div style={{ fontWeight: 800 }}>
-                                                              主張
-                                                            </div>
-                                                            <div>{claim}</div>
-                                                          </div>
-
-                                                          {premises.length > 0 && (
-                                                            <div style={{ marginBottom: 6 }}>
-                                                              <div style={{ fontWeight: 800 }}>
-                                                                前提
-                                                              </div>
-                                                              <ul style={{ paddingLeft: 20 }}>
-                                                                {premises.map((p, i) => (
-                                                                  <li key={i}>{p}</li>
-                                                                ))}
-                                                              </ul>
-                                                            </div>
-                                                          )}
-
-                                                          {reasons.length > 0 && (
-                                                            <div>
-                                                              <div style={{ fontWeight: 800 }}>
-                                                                根拠
-                                                              </div>
-                                                              <ul style={{ paddingLeft: 20 }}>
-                                                                {reasons.map((r, i) => (
-                                                                  <li key={i}>{r}</li>
-                                                                ))}
-                                                              </ul>
-                                                            </div>
-                                                          )}
-                                                        </div>
-                                                      );
-                                                    })()}
-                                                  </div>
-
-                                                  <div
-                                                    style={{
-                                                      border: "1px solid #ddd",
-                                                      borderRadius: 10,
-                                                      padding: 10,
-                                                      background:
-                                                        childScore >= 80
-                                                          ? "#e8f5e9"
-                                                          : childScore >= 60
-                                                          ? "#e3f2fd"
-                                                          : "#ffebee",
-                                                      color: "#111",
-                                                    }}
-                                                  >
-                                                    <div
-                                                      style={{
-                                                        fontSize: currentFont.base,
-                                                        fontWeight: 700,
-                                                        color: roleColor(child.post_role),
-                                                        marginBottom: 8,
-                                                      }}
-                                                    >
-                                                      反論（
-                                                      <span
-                                                        style={{
-                                                          marginLeft: 4,
-                                                          color: scoreColor(child.logic_score),
-                                                        }}
-                                                      >
-                                                        {child.logic_score ?? "未評価"}
-                                                      </span>
-                                                      ）
-                                                      <span style={{ marginLeft: 6 }}>
-                                                        {childScore >= 80
-                                                          ? "🔥 強い"
-                                                          : childScore >= 60
-                                                          ? "👍 普通"
-                                                          : "⚠️ 弱い"}
-                                                      </span>
-                                                    </div>
-
-                                                    {(() => {
-                                                      const { claim, premises, reasons } =
-                                                        splitContent(child.content);
-
-                                                      return (
-                                                        <div>
-                                                          <div style={{ marginBottom: 6 }}>
-                                                            <div style={{ fontWeight: 800 }}>
-                                                              主張
-                                                            </div>
-                                                            <div>{claim}</div>
-                                                          </div>
-
-                                                          {premises.length > 0 && (
-                                                            <div style={{ marginBottom: 6 }}>
-                                                              <div style={{ fontWeight: 800 }}>
-                                                                前提
-                                                              </div>
-                                                              <ul style={{ paddingLeft: 20 }}>
-                                                                {premises.map((p, i) => (
-                                                                  <li key={i}>{p}</li>
-                                                                ))}
-                                                              </ul>
-                                                            </div>
-                                                          )}
-
-                                                          {reasons.length > 0 && (
-                                                            <div>
-                                                              <div style={{ fontWeight: 800 }}>
-                                                                根拠
-                                                              </div>
-                                                              <ul style={{ paddingLeft: 20 }}>
-                                                                {reasons.map((r, i) => (
-                                                                  <li key={i}>{r}</li>
-                                                                ))}
-                                                              </ul>
-                                                            </div>
-                                                          )}
-                                                        </div>
-                                                      );
-                                                    })()}
-                                                  </div>
-                                                </div>
-                                              ) : (
-                                                <div style={{ color: "#111" }}>
-                                                  <div
-                                                    style={{
-                                                      fontSize: currentFont.base,
-                                                      fontWeight: 700,
-                                                      color: roleColor(child.post_role),
-                                                    }}
-                                                  >
-                                                    {roleLabel(child.post_role)}（
-                                                    <span
-                                                      style={{
-                                                        marginLeft: 6,
-                                                        color: scoreColor(child.logic_score),
-                                                      }}
-                                                    >
-                                                      {child.logic_score ?? "未評価"}
-                                                    </span>
-                                                    ）
-                                                    <span style={{ marginLeft: 6 }}>
-                                                      {childScore >= 80
-                                                        ? "🔥 強い"
-                                                        : childScore >= 60
-                                                        ? "👍 普通"
-                                                        : "⚠️ 弱い"}
-                                                    </span>
-                                                  </div>
-
-                                                  {(() => {
-                                                    const { claim, premises, reasons } =
-                                                      splitContent(child.content);
-
-                                                    return (
-                                                      <div>
-                                                        <div style={{ marginBottom: 6 }}>
-                                                          <div style={{ fontWeight: 800 }}>
-                                                            主張
-                                                          </div>
-                                                          <div>{claim}</div>
-                                                        </div>
-
-                                                        {premises.length > 0 && (
-                                                          <div style={{ marginBottom: 6 }}>
-                                                            <div style={{ fontWeight: 800 }}>
-                                                              前提
-                                                            </div>
-                                                            <ul style={{ paddingLeft: 20 }}>
-                                                              {premises.map((p, i) => (
-                                                                <li key={i}>{p}</li>
-                                                              ))}
-                                                            </ul>
-                                                          </div>
-                                                        )}
-
-                                                        {reasons.length > 0 && (
-                                                          <div>
-                                                            <div style={{ fontWeight: 800 }}>
-                                                              根拠
-                                                            </div>
-                                                            <ul style={{ paddingLeft: 20 }}>
-                                                              {reasons.map((r, i) => (
-                                                                <li key={i}>{r}</li>
-                                                              ))}
-                                                            </ul>
-                                                          </div>
-                                                        )}
-                                                      </div>
-                                                    );
-                                                  })()}
-                                                </div>
-                                              )}
-                                            </div>
-                                          );
-                                        })}
-                                    </div>
-                                  </details>
-                                )}
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </details>
-                  </div>
-                ))}
               </div>
             )}
-          </section>
+          </SectionCard>
 
-          <section style={whiteCardStyle}>
+          <SectionCard variant="white" style={{ marginTop: 24 }}>
             <div style={{ marginTop: 16, marginBottom: 16 }}>
-              <button
+              <PrimaryButton
                 onClick={() => {
                   setSelectedGuide(null);
                   setPostRole("opinion");
@@ -1890,29 +1233,16 @@ export default function ForumThreadPage({ params }: PageProps) {
                 }}
                 style={{
                   width: "100%",
-                  border: "none",
                   borderRadius: 12,
                   padding: "14px 16px",
-                  background: "#111",
-                  color: "#fff",
                   fontSize: currentFont.base,
-                  fontWeight: 800,
-                  cursor: "pointer",
                 }}
               >
                 まだ誰も書いていない。このテーマの最初の意見を書く
-              </button>
+              </PrimaryButton>
             </div>
 
-            <h2
-              style={{
-                margin: 0,
-                marginBottom: 12,
-                fontSize: currentFont.title,
-                fontWeight: 800,
-                color: "#111",
-              }}
-            >
+            <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
               {replyToOpinionId
                 ? `この意見への${
                     postRole === "rebuttal"
@@ -1922,7 +1252,7 @@ export default function ForumThreadPage({ params }: PageProps) {
                       : "投稿"
                   }`
                 : "新しい投稿"}
-            </h2>
+            </SectionTitle>
 
             <p
               style={{
@@ -1937,14 +1267,9 @@ export default function ForumThreadPage({ params }: PageProps) {
             </p>
 
             {selectedGuide && (
-              <div
+              <SectionCard
+                variant="info"
                 style={{
-                  marginBottom: 12,
-                  padding: "12px 14px",
-                  borderRadius: 10,
-                  background: "#eef4ff",
-                  border: "1px solid #c9d8ff",
-                  color: "#0d47a1",
                   fontSize: currentFont.base,
                   lineHeight: 1.7,
                 }}
@@ -1959,190 +1284,172 @@ export default function ForumThreadPage({ params }: PageProps) {
                 </div>
 
                 <div style={{ fontWeight: 700 }}>{selectedGuide.text}</div>
-              </div>
+              </SectionCard>
             )}
 
             {selectedGuide && (
-              <div
-                id="related-section"
-                style={{
-                  marginBottom: 12,
-                  padding: "12px 14px",
-                  borderRadius: 10,
-                  background: "#fafafa",
-                  border: "1px solid #e5e5e5",
-                  color: "#111",
-                }}
+              <SectionCard
+                variant="soft"
+                style={{ marginBottom: 12 }}
               >
-                <div
-                  style={{
-                    fontSize: currentFont.base,
-                    fontWeight: 800,
-                    marginBottom: 8,
-                    color: "#444",
-                  }}
-                >
-                  過去に投稿された関連内容
-                </div>
-
-                {loadingRelated ? (
-                  <div style={{ color: "#666", fontSize: currentFont.base }}>
-                    検索中...
-                  </div>
-                ) : relatedPosts.length > 0 ? (
-                  <div style={{ display: "grid", gap: 8 }}>
-                    {relatedPosts.map((post) => (
-                      <div
-                        key={post.id}
-                        style={{
-                          border: "1px solid #ddd",
-                          borderRadius: 8,
-                          padding: "10px 12px",
-                          background: "#fff",
-                          color: "#111",
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: currentFont.base,
-                            fontWeight: 700,
-                            color: "#666",
-                            marginBottom: 4,
-                          }}
-                        >
-                          {roleLabel(post.post_role)} / {formatDate(post.created_at)}
-                        </div>
-                        <div style={{ fontSize: currentFont.base, lineHeight: 1.6 }}>
-                          <div
-                            style={{
-                              fontSize: currentFont.base,
-                              fontWeight: 800,
-                              color: "#111",
-                              marginBottom: 4,
-                            }}
-                          >
-                            {post.thread_title || "関連スレ"}
-                          </div>
-                          {post.content}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ color: "#666", fontSize: currentFont.base }}>
-                    まだ投稿はありません。この内容について最初の意見を書けます。
-                  </div>
-                )}
-
-                {relatedSummary && (
-                  <div
-                    style={{
-                      marginTop: 10,
-                      padding: "10px 12px",
-                      borderRadius: 8,
-                      background: "#f0f4ff",
-                      border: "1px solid #ccd",
-                      fontSize: currentFont.base,
-                      lineHeight: 1.6,
-                      color: "#111",
-                    }}
-                  >
-                    <div style={{ fontWeight: 700, marginBottom: 4 }}>関連要約</div>
-                    <div>{relatedSummary}</div>
-                  </div>
-                )}
-
-                <div
-                  style={{
-                    marginTop: 16,
-                    paddingTop: 10,
-                    borderTop: "1px solid #ddd",
-                  }}
-                >
+<div id="related-section" style={{ scrollMarginTop: 80 }}>
                   <div
                     style={{
                       fontSize: currentFont.base,
                       fontWeight: 800,
-                      marginBottom: 6,
+                      marginBottom: 8,
                       color: "#444",
                     }}
                   >
-                    この論点を深める
+                    過去に投稿された関連内容
                   </div>
 
-                  <div style={{ display: "grid", gap: 8 }}>
-                    {Array.from(
-                      new Map(
-                        relatedPosts
-                          .filter((post) => String(post.thread_id) !== String(threadId))
-                          .map((post) => [post.thread_id, post])
-                      ).values()
-                    )
-                      .slice(0, 3)
-                      .map((post) => (
-                        <a
-                          key={`jump-${post.thread_id}`}
-                          href={`/${tenant}/forum/thread/${post.thread_id}`}
+                  {loadingRelated ? (
+                    <div style={{ color: "#666", fontSize: currentFont.base }}>
+                      検索中...
+                    </div>
+                  ) : relatedPosts.length > 0 ? (
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {relatedPosts.map((post) => (
+                        <PostCard
+                          key={post.id}
                           style={{
-                            display: "block",
-                            border: "1px solid #ddd",
-                            borderRadius: 8,
-                            padding: "10px 12px",
                             background: "#fff",
-                            textDecoration: "none",
                             color: "#111",
+                            border: "1px solid #ddd",
                           }}
                         >
                           <div
                             style={{
                               fontSize: currentFont.base,
-                              color: "#999",
-                              marginBottom: 4,
-                            }}
-                          >
-                            他スレの関連投稿
-                          </div>
-
-                          <div
-                            style={{
-                              fontSize: currentFont.base,
-                              color: "#0d47a1",
-                              fontWeight: 800,
-                              lineHeight: 1.6,
-                              marginBottom: 4,
-                            }}
-                          >
-                            👉{" "}
-                            {post.content.length > 40
-                              ? `${post.content.slice(0, 40)}...`
-                              : post.content}
-                          </div>
-
-                          <div
-                            style={{
-                              fontSize: currentFont.base,
-                              color: "#666",
-                              marginBottom: 4,
                               fontWeight: 700,
-                            }}
-                          >
-                            {roleLabel(post.post_role)}
-                          </div>
-
-                          <div
-                            style={{
-                              marginTop: 4,
-                              fontSize: currentFont.base,
                               color: "#666",
+                              marginBottom: 4,
                             }}
                           >
-                            → この話題の別スレを見る
+                            {roleLabel(post.post_role)} / {formatDate(post.created_at)}
                           </div>
-                        </a>
+                          <div style={{ fontSize: currentFont.base, lineHeight: 1.6 }}>
+                            <div
+                              style={{
+                                fontSize: currentFont.base,
+                                fontWeight: 800,
+                                color: "#111",
+                                marginBottom: 4,
+                              }}
+                            >
+                              {post.thread_title || "関連スレ"}
+                            </div>
+                            {post.content}
+                          </div>
+                        </PostCard>
                       ))}
+                    </div>
+                  ) : (
+                    <div style={{ color: "#666", fontSize: currentFont.base }}>
+                      まだ投稿はありません。この内容について最初の意見を書いてみよう。
+                    </div>
+                  )}
+
+                  {relatedSummary && (
+                    <SectionCard
+                      variant="info"
+                      style={{
+                        marginTop: 10,
+                        fontSize: currentFont.base,
+                        lineHeight: 1.6,
+                        color: "#111",
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>関連要約</div>
+                      <div>{relatedSummary}</div>
+                    </SectionCard>
+                  )}
+
+                  <div
+                    style={{
+                      marginTop: 16,
+                      paddingTop: 10,
+                      borderTop: "1px solid #ddd",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: currentFont.base,
+                        fontWeight: 800,
+                        marginBottom: 6,
+                        color: "#444",
+                      }}
+                    >
+                      この論点を深める
+                    </div>
+
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {Array.from(
+                        new Map(
+                          relatedPosts
+                            .filter((post) => String(post.thread_id) !== String(threadId))
+                            .map((post) => [post.thread_id, post])
+                        ).values()
+                      )
+                        .slice(0, 3)
+                        .map((post) => (
+                          <LinkButton
+                            key={`jump-${post.thread_id}`}
+                            href={`/${tenant}/forum/thread/${post.thread_id}`}
+                            variant="card"
+                          >
+                            <div
+                              style={{
+                                fontSize: currentFont.base,
+                                color: "#999",
+                                marginBottom: 4,
+                              }}
+                            >
+                              他スレの関連投稿
+                            </div>
+
+                            <div
+                              style={{
+                                fontSize: currentFont.base,
+                                color: "#0d47a1",
+                                fontWeight: 800,
+                                lineHeight: 1.6,
+                                marginBottom: 4,
+                              }}
+                            >
+                              👉{" "}
+                              {post.content.length > 40
+                                ? `${post.content.slice(0, 40)}...`
+                                : post.content}
+                            </div>
+
+                            <div
+                              style={{
+                                fontSize: currentFont.base,
+                                color: "#666",
+                                marginBottom: 4,
+                                fontWeight: 700,
+                              }}
+                            >
+                              {roleLabel(post.post_role)}
+                            </div>
+
+                            <div
+                              style={{
+                                marginTop: 4,
+                                fontSize: currentFont.base,
+                                color: "#666",
+                              }}
+                            >
+                              → この話題の別スレを見る
+                            </div>
+                          </LinkButton>
+                        ))}
+                    </div>
                   </div>
                 </div>
-              </div>
+              </SectionCard>
             )}
 
             <div style={{ marginBottom: 14 }}>
@@ -2255,24 +1562,13 @@ export default function ForumThreadPage({ params }: PageProps) {
               />
             )}
 
-            <div style={{ marginTop: 12, display: "flex", gap: 12 }}>
-              <button
-                onClick={handlePost}
-                disabled={posting}
-                style={{
-                  border: "none",
-                  borderRadius: 10,
-                  padding: "10px 16px",
-                  background: posting ? "#999" : "#111",
-                  color: "#fff",
-                  cursor: posting ? "default" : "pointer",
-                  fontWeight: 700,
-                }}
-              >
+            <div style={{ marginTop: 12, display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <PrimaryButton onClick={handlePost} disabled={posting}>
                 {posting ? "投稿中..." : "この内容について意見を書く"}
-              </button>
+              </PrimaryButton>
 
-              <button
+              <PrimaryButton
+                variant="secondary"
                 onClick={() => {
                   setText("");
                   setSelectedGuide(null);
@@ -2289,20 +1585,11 @@ export default function ForumThreadPage({ params }: PageProps) {
                   setLoadingRelated(false);
                 }}
                 disabled={posting}
-                style={{
-                  border: "1px solid #ccc",
-                  borderRadius: 10,
-                  padding: "10px 16px",
-                  background: "#fff",
-                  cursor: posting ? "default" : "pointer",
-                  fontWeight: 700,
-                  color: "#111",
-                }}
               >
                 クリア
-              </button>
+              </PrimaryButton>
             </div>
-          </section>
+          </SectionCard>
         </>
       )}
     </main>

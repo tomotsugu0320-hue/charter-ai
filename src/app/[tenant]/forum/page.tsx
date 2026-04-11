@@ -1,11 +1,15 @@
 // src/app/[tenant]/forum/page.tsx
 
+
 "use client";
 
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import SectionCard from "@/components/forum/SectionCard";
+import SectionTitle from "@/components/forum/SectionTitle";
+import PostCard from "@/components/forum/PostCard";
+import PrimaryButton from "@/components/forum/PrimaryButton";
 
 type ThreadRow = {
   id: string;
@@ -34,15 +38,6 @@ type GeneratedIssue = {
   claim: string;
   premises: string[];
   reasons: string[];
-};
-
-const threadCardStyle: React.CSSProperties = {
-  border: "1px solid #333",
-  borderRadius: 10,
-  padding: 12,
-  marginBottom: 8,
-  background: "#1a1a1a",
-  color: "#fff",
 };
 
 const darkInputStyle: React.CSSProperties = {
@@ -77,6 +72,7 @@ export default function ForumPage() {
 
   const [popularThreads, setPopularThreads] = useState<ThreadRow[]>([]);
   const [activeThreads, setActiveThreads] = useState<ThreadRow[]>([]);
+const [defaultMode, setDefaultMode] = useState<"normal" | "easy">("normal");
 
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState("すべて");
@@ -86,6 +82,14 @@ export default function ForumPage() {
   const [generatedIssue, setGeneratedIssue] = useState<GeneratedIssue | null>(null);
 
   const hasSearch = searchQuery.trim() !== "";
+
+
+useEffect(() => {
+  const saved = localStorage.getItem("forum_default_mode");
+  if (saved === "easy" || saved === "normal") {
+    setDefaultMode(saved);
+  }
+}, []);
 
   useEffect(() => {
     (async () => {
@@ -221,6 +225,35 @@ export default function ForumPage() {
     <main style={{ maxWidth: 760, margin: "0 auto", padding: 24 }}>
       <h1 style={{ fontSize: 28, fontWeight: 800 }}>AI掲示板</h1>
 
+<SectionCard style={{ marginTop: 16 }}>
+  <div style={{ fontWeight: 700, marginBottom: 8 }}>
+    表示モード
+  </div>
+
+  <div style={{ display: "flex", gap: 8 }}>
+    <PrimaryButton
+      onClick={() => {
+        localStorage.setItem("forum_default_mode", "normal");
+        setDefaultMode("normal");
+      }}
+      variant={defaultMode === "normal" ? "primary" : "secondary"}
+    >
+      🧠 大人向け
+    </PrimaryButton>
+
+    <PrimaryButton
+      onClick={() => {
+        localStorage.setItem("forum_default_mode", "easy");
+        setDefaultMode("easy");
+      }}
+      variant={defaultMode === "easy" ? "primary" : "secondary"}
+    >
+      🐵 子供向け
+    </PrimaryButton>
+  </div>
+</SectionCard>
+
+
       <SectionCard>
         <div style={{ fontWeight: 800, marginBottom: 6 }}>
           これは「正解を出す掲示板」ではありません。
@@ -299,9 +332,9 @@ export default function ForumPage() {
       )}
 
       <section style={{ marginTop: 24 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800 }}>
+        <SectionTitle>
           🔥 人気スレ {hasSearch ? "（検索結果）" : ""}
-        </h2>
+        </SectionTitle>
 
         {hasSearch && filteredPopularThreads.length === 0 && (
           <p style={{ color: "#666" }}>
@@ -310,7 +343,7 @@ export default function ForumPage() {
         )}
 
         {filteredPopularThreads.map((t) => (
-          <div key={t.id} style={threadCardStyle}>
+          <PostCard key={t.id}>
             <Link
               href={`/${tenant}/forum/thread/${t.id}`}
               style={{
@@ -340,14 +373,14 @@ export default function ForumPage() {
             <div style={{ fontSize: 12, color: "#ddd" }}>
               平均スコア: {t.avg_logic_score ?? 0} / 投稿数: {t.post_count ?? 0}
             </div>
-          </div>
+          </PostCard>
         ))}
       </section>
 
       <section style={{ marginTop: 24 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800 }}>
+        <SectionTitle>
           📈 活発スレ {hasSearch ? "（検索結果）" : ""}
-        </h2>
+        </SectionTitle>
 
         {hasSearch && filteredActiveThreads.length === 0 && (
           <p style={{ color: "#666" }}>
@@ -356,7 +389,7 @@ export default function ForumPage() {
         )}
 
         {filteredActiveThreads.map((t) => (
-          <div key={t.id} style={threadCardStyle}>
+          <PostCard key={t.id}>
             <Link
               href={`/${tenant}/forum/thread/${t.id}`}
               style={{
@@ -386,27 +419,27 @@ export default function ForumPage() {
             <div style={{ fontSize: 12, color: "#ddd" }}>
               投稿数: {t.post_count ?? 0} / 平均スコア: {t.avg_logic_score ?? 0}
             </div>
-          </div>
+          </PostCard>
         ))}
       </section>
 
-      <div style={{ marginBottom: 12 }}>
-        <a
-          href={`/${tenant}/macro`}
-          style={{
-            display: "inline-block",
-            border: "1px solid #333",
-            borderRadius: 8,
-            padding: 12,
-            fontSize: 16,
-            background: "#1a1a1a",
-            color: "#fff",
-            textDecoration: "none",
-          }}
-        >
-          このテーマをマクロで整理する
-        </a>
-      </div>
+<div style={{ marginBottom: 12 }}>
+  <a
+    href={`/${tenant}/macro`}
+    style={{
+      display: "inline-block",
+      padding: "10px 16px",
+      borderRadius: 8,
+      background: "#1a1a1a",
+      color: "#fff",
+      fontWeight: 700,
+      textDecoration: "none",
+      border: "none",
+    }}
+  >
+    このテーマをマクロで整理する
+  </a>
+</div>
 
       <section style={{ marginTop: 32 }}>
         <div style={{ marginBottom: 10 }}>
@@ -555,8 +588,8 @@ export default function ForumPage() {
                   ))}
                 </div>
 
-                <div style={{ marginTop: 10 }}>
-                  <button
+                <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+                  <PrimaryButton
                     disabled={!selectedThreadId}
                     onClick={() => {
                       if (!selectedThreadId) return;
@@ -564,10 +597,10 @@ export default function ForumPage() {
                     }}
                   >
                     このスレに参加する
-                  </button>
+                  </PrimaryButton>
 
-                  <button
-                    style={{ marginLeft: 8 }}
+                  <PrimaryButton
+                    style={{ marginLeft: 0 }}
                     onClick={async () => {
                       if (!generatedIssue) return;
 
@@ -603,7 +636,7 @@ export default function ForumPage() {
                     }}
                   >
                     新しいスレを作る
-                  </button>
+                  </PrimaryButton>
                 </div>
               </div>
             )}
@@ -630,22 +663,9 @@ export default function ForumPage() {
           }}
         />
 
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          style={{
-            marginTop: 12,
-            padding: "10px 16px",
-            borderRadius: 8,
-            background: "#1a1a1a",
-            color: "#fff",
-            fontWeight: 700,
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
+        <PrimaryButton onClick={handleSubmit} disabled={loading} style={{ marginTop: 12 }}>
           {loading ? "処理中..." : "構造化して投稿する"}
-        </button>
+        </PrimaryButton>
 
         <p style={{ fontSize: 12, color: "#ddd", marginTop: 6 }}>
           投稿すると、主張・前提・根拠に分解されます
@@ -654,4 +674,3 @@ export default function ForumPage() {
     </main>
   );
 }
-
