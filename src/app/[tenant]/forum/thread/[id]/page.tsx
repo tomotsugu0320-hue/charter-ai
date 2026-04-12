@@ -11,7 +11,7 @@ import PrimaryButton from "@/components/forum/PrimaryButton";
 import SelectableCardButton from "@/components/forum/SelectableCardButton";
 import LinkButton from "@/components/forum/LinkButton";
 import OpinionView from "@/components/forum/OpinionView";
-
+import DiscussionTree from "@/components/forum/DiscussionTree";
 
 type ThreadRow = {
   id: string;
@@ -239,6 +239,49 @@ const [summaryLoading, setSummaryLoading] = useState(false);
   const [rebuttalReason, setRebuttalReason] = useState("");
 
   const [summary, setSummary] = useState<ThreadSummary | null>(null);
+const keywords = useMemo(() => {
+const postText = posts
+  .slice(0, 30)
+  .map(p => p.content)
+  .join(" ");
+const sourceText = [
+  (thread?.title ?? "") + " ".repeat(5),
+  thread?.original_post ?? "",
+  summary?.summary_text ?? "",
+  summary?.easy_summary_text ?? "",
+  postText,
+].join(" ");
+const stopWords = new Set([
+  "こと","これ","それ","ため","よう","もの",
+  "ここ","みたい","感じ","議論","主張","前提",
+  "根拠","意見","反論","補足","解説","投稿",
+  "内容","整理","AI","スレ","スレッド",
+  "自分","相手","日本",
+  "ある","ない","する","できる","なる","いる",
+  "思う","考える","言う","見る","使う"
+]);
+
+
+  const matches =
+    sourceText.match(/[一-龠ぁ-んァ-ヶA-Za-z0-9ー]{2,12}/g) ?? [];
+
+  const counts: Record<string, number> = {};
+
+for (const word of matches) {
+  const w = word.trim();
+  if (!w) continue;
+  if (w.length <= 1) continue;
+  if (stopWords.has(w)) continue;
+  if (/^\d+$/.test(w)) continue;
+
+  counts[w] = (counts[w] ?? 0) + 1;
+}
+
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([word]) => word)
+    .slice(0, 5);
+   }, [posts, thread?.title, thread?.original_post, summary?.summary_text, summary?.easy_summary_text]);
 
   const [replyToOpinionId, setReplyToOpinionId] = useState<string | null>(null);
 
@@ -855,7 +898,50 @@ setSummary(data?.summary || null);
   </div>
 )}
 
+
+<div
+  style={{
+    fontSize: currentFont.base,
+    color: "#666",
+    marginBottom: 6,
+  }}
+>
+  🔍 関連キーワード（タップで検索）
+</div>
+
+  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+{keywords.length > 0 ? (
+  keywords.map((k) => (
+    <button
+      key={k}
+      onClick={() =>
+        window.open(
+          `https://www.google.com/search?q=${encodeURIComponent(k)}`,
+          "_blank"
+        )
+      }
+      style={{
+        padding: "6px 10px",
+        borderRadius: 999,
+        border: "1px solid #ddd",
+        background: "#f5f5f5",
+        transition: "0.15s",
+        fontSize: currentFont.base,
+        color: "#111",
+        cursor: "pointer",
+      }}
+    >
+      {k}
+    </button>
+  ))
+) : (
+  <div style={{ fontSize: currentFont.base, color: "#999" }}>
+    関連キーワードはまだありません
+  </div>
+)}
+  </div>
 </SectionCard>
+
 
 
           <SectionCard variant="white" style={{ marginTop: 24 }}>
@@ -1130,6 +1216,35 @@ setSummary(data?.summary || null);
             )}
           </SectionCard>
 
+<DiscussionTree
+  tenant={tenant}
+  threadId={threadId}
+  groupedByOpinion={groupedByOpinion}
+  currentFont={currentFont}
+  onSelectNode={(node) => {
+    setSelectedGuide({
+      type:
+        node.type === "論点"
+          ? "論点"
+          : node.type === "意見"
+          ? "根拠"
+          : node.type === "反論"
+          ? "根拠"
+          : "前提",
+      text: node.text,
+    });
+    setPostRole("opinion");
+    setReplyToOpinionId(null);
+
+    setTimeout(() => {
+      window.scrollTo({
+        top: document.body.scrollHeight,
+        behavior: "smooth",
+      });
+    }, 100);
+  }}
+/>
+
           <SectionCard variant="white" style={{ marginTop: 24 }}>
             <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
               投稿一覧
@@ -1266,23 +1381,14 @@ setSummary(data?.summary || null);
                 : "このスレの問いに対して投稿します。"}
             </p>
 
-            {selectedGuide && (
-              <SectionCard
-                variant="info"
-                style={{
-                  fontSize: currentFont.base,
-                  lineHeight: 1.7,
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: 800,
-                    marginBottom: 6,
-                  }}
-                >
-                  この{selectedGuide.type}について意見できます
-                </div>
-
+{selectedGuide && (
+  <SectionCard>
+    <div style={{ fontWeight: 800, marginBottom: 6 }}>
+      「{selectedGuide.text.length > 60
+        ? selectedGuide.text.slice(0, 60) + "..."
+        : selectedGuide.text}」
+      に対して意見を書いています
+    </div>
                 <div style={{ fontWeight: 700 }}>{selectedGuide.text}</div>
               </SectionCard>
             )}
