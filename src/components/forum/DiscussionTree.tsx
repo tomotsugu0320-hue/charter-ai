@@ -142,13 +142,17 @@ export default function DiscussionTree({
         throw new Error(result?.error || "関連スレッド取得失敗");
       }
 
-      const uniqueThreads = Array.from(
-        new Map(
-          (result.posts || [])
-            .filter((post: RelatedThread) => String(post.thread_id) !== String(threadId))
-            .map((post: RelatedThread) => [post.thread_id, post])
-        ).values()
-      ).slice(0, 3);
+const posts = Array.isArray(result.posts)
+  ? (result.posts as RelatedThread[])
+  : [];
+
+const uniqueThreads: RelatedThread[] = Array.from(
+  new Map<string, RelatedThread>(
+    posts
+      .filter((post) => String(post.thread_id) !== String(threadId))
+      .map((post) => [post.thread_id, post])
+  ).values()
+).slice(0, 3);
 
       setRelatedMap((prev) => ({
         ...prev,
