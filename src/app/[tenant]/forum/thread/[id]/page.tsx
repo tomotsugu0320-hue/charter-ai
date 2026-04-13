@@ -912,16 +912,15 @@ function jumpToMainIssues() {
     この議論を共有
   </PrimaryButton>
 
-  <LinkButton
-    href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
-      `${thread.title} ${currentUrl}`
-    )}`}
-    target="_blank"
-    rel="noopener noreferrer"
-    onClick={(e) => e.stopPropagation()}
-  >
-    Xで共有
-  </LinkButton>
+<LinkButton
+  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
+    `${thread.title} ${currentUrl}`
+  )}`}
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  Xで共有
+</LinkButton>
 
   {copied && <span style={{ color: "#2e7d32" }}>コピーした</span>}
 </div>
