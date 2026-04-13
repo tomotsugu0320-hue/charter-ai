@@ -1,5 +1,6 @@
 //   src/components/forum/DiscussionTree.tsx
 
+
 "use client";
 
 import { useState } from "react";
@@ -45,18 +46,17 @@ type RelatedThread = {
   thread_title?: string;
 };
 
-
 type DiscussionTreeProps = {
   tenant: string;
   threadId: string;
   groupedByOpinion: IssueGroup[];
+  variant: "A" | "C";
   currentFont: {
     base: number;
     title: number;
   };
   onSelectNode: (node: { type: string; text: string }) => void;
 };
-
 
 function cutText(text: string, max = 52) {
   if (!text) return "";
@@ -102,6 +102,7 @@ export default function DiscussionTree({
   threadId,
   groupedByOpinion,
   currentFont,
+  variant,
   onSelectNode,
 }: DiscussionTreeProps) {
   const [relatedMap, setRelatedMap] = useState<Record<string, RelatedThread[]>>(
@@ -109,6 +110,8 @@ export default function DiscussionTree({
   );
   const [loadingNodeId, setLoadingNodeId] = useState<string | null>(null);
   const [openNodeMap, setOpenNodeMap] = useState<Record<string, boolean>>({});
+
+  const isCompact = variant === "A";
 
   async function loadRelated(nodeId: string, text: string) {
     const alreadyLoaded = relatedMap[nodeId];
@@ -142,17 +145,17 @@ export default function DiscussionTree({
         throw new Error(result?.error || "関連スレッド取得失敗");
       }
 
-const posts = Array.isArray(result.posts)
-  ? (result.posts as RelatedThread[])
-  : [];
+      const posts = Array.isArray(result.posts)
+        ? (result.posts as RelatedThread[])
+        : [];
 
-const uniqueThreads: RelatedThread[] = Array.from(
-  new Map<string, RelatedThread>(
-    posts
-      .filter((post) => String(post.thread_id) !== String(threadId))
-      .map((post) => [post.thread_id, post])
-  ).values()
-).slice(0, 3);
+      const uniqueThreads: RelatedThread[] = Array.from(
+        new Map<string, RelatedThread>(
+          posts
+            .filter((post) => String(post.thread_id) !== String(threadId))
+            .map((post) => [post.thread_id, post])
+        ).values()
+      ).slice(0, 3);
 
       setRelatedMap((prev) => ({
         ...prev,
@@ -245,116 +248,127 @@ const uniqueThreads: RelatedThread[] = Array.from(
     );
   }
 
+  function renderNode(post: PostRow, depth: number) {
+    const nodeId = post.id;
+    const isOpen = !!openNodeMap[nodeId];
+    const hasLoaded = !!relatedMap[nodeId];
 
-function renderNode(post: PostRow, depth: number) {
-  const nodeId = post.id;
-  const isOpen = !!openNodeMap[nodeId];
-  const hasLoaded = !!relatedMap[nodeId];
+    const targetOpinion = groupedByOpinion
+      .flatMap((g) => g.opinions)
+      .find((o) => o.opinion.id === post.id);
 
-  const targetOpinion = groupedByOpinion
-    .flatMap((g) => g.opinions)
-    .find((o) => o.opinion.id === post.id);
+    const childRebuttals =
+      targetOpinion?.children.filter((c) => c.post_role === "rebuttal").length ??
+      0;
 
-  const childRebuttals =
-    targetOpinion?.children.filter((c) => c.post_role === "rebuttal").length ?? 0;
+    const childSupplements =
+      targetOpinion?.children.filter((c) => c.post_role === "supplement").length ??
+      0;
 
-  const childSupplements =
-    targetOpinion?.children.filter((c) => c.post_role === "supplement").length ?? 0;
-
-  return (
-    <div
-      key={post.id}
-      style={{
-        marginLeft: depth * 20,
-        marginTop: 8,
-      }}
-    >
+    return (
       <div
+        key={post.id}
         style={{
-          minWidth: 260,
-          borderLeft: `4px solid ${nodeBorderColor(post.post_role)}`,
-          background: "#fff",
-          borderRadius: 10,
-          padding: "10px 12px",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+          marginLeft: isCompact ? depth * 14 : depth * 26,
+          marginTop: 8,
         }}
       >
+        {variant === "C" && depth >= 2 && (
+          <div style={{ fontSize: 12, color: "#999", marginBottom: 4 }}>
+            └ 構造階層 {depth}
+          </div>
+        )}
+
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 10,
-            flexWrap: "wrap",
+            minWidth: 260,
+            borderLeft: isCompact
+              ? `2px solid ${nodeBorderColor(post.post_role)}`
+              : `5px solid ${nodeBorderColor(post.post_role)}`,
+            background: "#fff",
+            borderRadius: 10,
+            padding: isCompact ? "8px 10px" : "12px 14px",
+            boxShadow: isCompact
+              ? "0 1px 2px rgba(0,0,0,0.05)"
+              : "0 2px 6px rgba(0,0,0,0.08)",
           }}
         >
           <div
             style={{
-              fontSize: currentFont.base,
-              fontWeight: 800,
-              color: "#222",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              flexWrap: "wrap",
             }}
           >
-            {roleLabel(post.post_role)}
-            <span style={{ marginLeft: 6, color: "#f59e0b", fontWeight: 700 }}>
-              ⭐{post.logic_score ?? "-"}
-            </span>
-
-            {post.post_role === "opinion" && (
-              <span
-                style={{
-                  marginLeft: 8,
-                  fontSize: currentFont.base,
-                  color: "#666",
-                  fontWeight: 600,
-                }}
-              >
-                反論{childRebuttals} / 補足{childSupplements}
+            <div
+              style={{
+                fontSize: currentFont.base,
+                fontWeight: 800,
+                color: "#222",
+              }}
+            >
+              {roleLabel(post.post_role)}
+              <span style={{ marginLeft: 6, color: "#f59e0b", fontWeight: 700 }}>
+                ⭐{post.logic_score ?? "-"}
               </span>
-            )}
+
+              {post.post_role === "opinion" && (
+                <span
+                  style={{
+                    marginLeft: 8,
+                    fontSize: currentFont.base,
+                    color: "#666",
+                    fontWeight: 600,
+                  }}
+                >
+                  反論{childRebuttals} / 補足{childSupplements}
+                </span>
+              )}
+            </div>
+
+            <button
+              onClick={() => loadRelated(nodeId, post.content)}
+              style={{
+                border: "1px solid #ddd",
+                background: "#f7f7f7",
+                borderRadius: 999,
+                padding: "4px 10px",
+                fontSize: currentFont.base,
+                cursor: "pointer",
+                color: "#444",
+              }}
+            >
+              {hasLoaded && isOpen ? "閉じる" : "🔗 関連を見る"}
+            </button>
           </div>
-
-          <button
-            onClick={() => loadRelated(nodeId, post.content)}
-            style={{
-              border: "1px solid #ddd",
-              background: "#f7f7f7",
-              borderRadius: 999,
-              padding: "4px 10px",
-              fontSize: currentFont.base,
-              cursor: "pointer",
-              color: "#444",
-            }}
-          >
-            {hasLoaded && isOpen ? "閉じる" : "🔗 関連を見る"}
-          </button>
         </div>
+
+        <div
+          onClick={() =>
+            onSelectNode({
+              type: roleLabel(post.post_role),
+              text: post.content,
+            })
+          }
+          style={{
+            marginTop: 8,
+            fontSize: currentFont.base,
+            lineHeight: 1.7,
+            color: "#111",
+            whiteSpace: "pre-wrap",
+            cursor: "pointer",
+          }}
+          title="この内容について書く"
+        >
+          {cutText(post.content, 120)}
+        </div>
+
+        {renderRelated(nodeId)}
       </div>
-<div
-  onClick={() =>
-    onSelectNode({
-      type: roleLabel(post.post_role),
-      text: post.content,
-    })
+    );
   }
-  style={{
-    marginTop: 8,
-    fontSize: currentFont.base,
-    lineHeight: 1.7,
-    color: "#111",
-    whiteSpace: "pre-wrap",
-    cursor: "pointer",
-  }}
-  title="この内容について書く"
->
-  {cutText(post.content, 120)}
-</div>
-
-
-      {renderRelated(nodeId)}
-    </div>
-  );
-}
 
   return (
     <SectionCard variant="white" style={{ marginTop: 24 }}>
@@ -376,7 +390,9 @@ function renderNode(post: PostRow, depth: number) {
           color: "#666",
         }}
       >
-        主張 → 意見 → 反論 / 補足 の流れを見られます。スマホではこの枠だけ横スクロールできます。
+        {variant === "A"
+          ? "主張 → 意見 → 反論 / 補足 を見やすく整理しています"
+          : "主張 → 意見 → 反論 → 補足 の構造を詳細に表示しています"}
       </div>
 
       <div
@@ -408,12 +424,17 @@ function renderNode(post: PostRow, depth: number) {
                   {group.opinions.map((op) => (
                     <div key={op.opinion.id}>
                       {renderNode(op.opinion, 1)}
-{op.children.map((child) =>
-  renderNode(
-    child,
-    child.post_role === "rebuttal" ? 2 : 3
-  )
-)}
+
+                      {op.children.map((child) =>
+                        renderNode(
+                          child,
+                          variant === "A"
+                            ? 2
+                            : child.post_role === "rebuttal"
+                              ? 2
+                              : 3
+                        )
+                      )}
                     </div>
                   ))}
                 </div>

@@ -23,6 +23,13 @@ function splitContent(content: string) {
   };
 }
 
+
+function scrollToPostForm() {
+  const el = document.getElementById("post-form");
+  el?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+
 function roleLabel(role: string) {
   switch (role) {
     case "opinion":
@@ -114,11 +121,12 @@ export default function OpinionCard({
         }}
       >
         <PrimaryButton
-          onClick={() => {
-            setSelectedGuide(null);
-            setPostRole("rebuttal");
-            setReplyToOpinionId(op.opinion.id);
-          }}
+onClick={() => {
+  setSelectedGuide({ type: "根拠", text: op.opinion.content });
+  setPostRole("rebuttal");
+  setReplyToOpinionId(op.opinion.id);
+window.dispatchEvent(new Event("scroll-to-post-form"));
+}}
           style={{
             padding: "6px 10px",
             borderRadius: 6,
@@ -129,11 +137,13 @@ export default function OpinionCard({
         </PrimaryButton>
 
         <PrimaryButton
-          onClick={() => {
-            setSelectedGuide(null);
-            setPostRole("supplement");
-            setReplyToOpinionId(op.opinion.id);
-          }}
+onClick={() => {
+  setSelectedGuide({ type: "前提", text: op.opinion.content });
+  setPostRole("supplement");
+  setReplyToOpinionId(op.opinion.id);
+
+window.dispatchEvent(new Event("scroll-to-post-form"));
+}}
           style={{
             padding: "6px 10px",
             borderRadius: 6,

@@ -33,11 +33,13 @@ type RelatedThread = {
   stance?: "pro" | "con" | "neutral";
 };
 
+
 type GeneratedIssue = {
   mode: "expand" | "split";
   claim: string;
   premises: string[];
   reasons: string[];
+  easySummary?: string;
 };
 
 const darkInputStyle: React.CSSProperties = {
@@ -69,6 +71,13 @@ export default function ForumPage() {
 
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
+
+const [organizing, setOrganizing] = useState(false);
+const [organizedResult, setOrganizedResult] = useState<{
+  summary: string;
+  postText: string;
+} | null>(null);
+
 
   const [popularThreads, setPopularThreads] = useState<ThreadRow[]>([]);
   const [activeThreads, setActiveThreads] = useState<ThreadRow[]>([]);
@@ -162,14 +171,15 @@ useEffect(() => {
         }),
       });
 
-      const { mode, claim, premises, reasons } = await res.json();
 
-      setGeneratedIssue({
-        mode,
-        claim,
-        premises,
-        reasons,
-      });
+const { mode, claim, premises, reasons, easySummary } = await res.json();
+setGeneratedIssue({
+  mode,
+  claim,
+  premises,
+  reasons,
+  easySummary,
+});
 
       const relatedRes = await fetch("/api/forum/search-related", {
         method: "POST",
@@ -180,6 +190,7 @@ useEffect(() => {
           reasons,
         }),
       });
+
 
       const related = await relatedRes.json();
 
@@ -221,11 +232,183 @@ useEffect(() => {
     }
   };
 
+
+const handleOrganizePost = async () => {
+  if (!text.trim()) return;
+
+  try {
+    setOrganizing(true);
+    setOrganizedResult(null);
+
+    const res = await fetch("/api/forum/organize-post", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert("AI整理失敗");
+      return;
+    }
+
+    setOrganizedResult({
+      summary: data.summary,
+      postText: data.postText,
+    });
+  } catch (e) {
+    console.error(e);
+    alert("AI整理失敗");
+  } finally {
+    setOrganizing(false);
+  }
+};
+
+
+const handleUseOrganizedAndAnalyze = async () => {
+  if (!organizedResult?.postText?.trim()) return;
+
+  const nextText = organizedResult.postText.trim();
+  setText(nextText);
+
+  setLoading(true);
+  setSelectedThreadId(null);
+
+  try {
+    const res = await fetch("/api/forum/generate-issue", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        content: nextText,
+        type: "auto",
+      }),
+    });
+
+const { mode, claim, premises, reasons, easySummary } = await res.json();
+setGeneratedIssue({
+  mode,
+  claim,
+  premises,
+  reasons,
+  easySummary,
+});
+
+    const relatedRes = await fetch("/api/forum/search-related", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        claim,
+        premises,
+        reasons,
+      }),
+    });
+
+    const related = await relatedRes.json();
+
+    setRelatedThreads(
+      (Array.isArray(related) ? related : []).map((t: any) => {
+        const judgeText = `${t.title ?? ""} ${t.summary ?? ""}`.toLowerCase();
+
+        let stance: "pro" | "con" | "neutral" = "neutral";
+
+        if (
+          judgeText.includes("問題") ||
+          judgeText.includes("危険") ||
+          judgeText.includes("不要") ||
+          judgeText.includes("反対")
+        ) {
+          stance = "con";
+        } else if (
+          judgeText.includes("必要") ||
+          judgeText.includes("有効") ||
+          judgeText.includes("賛成")
+        ) {
+          stance = "pro";
+        }
+
+        return {
+          id: t.id,
+          title: t.title,
+          category: t.category ?? "未分類",
+          summary: t.summary ?? "",
+          reason: "この論点と前提が近いため関連しています",
+          stance,
+        };
+      })
+    );
+  } catch (e) {
+    console.error(e);
+    alert("AI整理に失敗しました");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
   return (
     <main style={{ maxWidth: 760, margin: "0 auto", padding: 24 }}>
       <h1 style={{ fontSize: 28, fontWeight: 800 }}>AI掲示板</h1>
 
-<SectionCard style={{ marginTop: 16 }}>
+{generatedIssue?.easySummary && (
+  <SectionCard
+    style={{
+      marginBottom: 12,
+      border: defaultMode === "easy" ? "2px solid #2a7" : undefined,
+      background: defaultMode === "easy" ? "#13261d" : undefined,
+      boxShadow:
+        defaultMode === "easy"
+          ? "0 0 0 1px rgba(42, 167, 110, 0.15)"
+          : undefined,
+    }}
+  >
+<div
+  style={{
+    fontWeight: 800,
+    marginBottom: 8,
+    fontSize: defaultMode === "easy" ? 18 : 16,
+    color: defaultMode === "easy" ? "#9df0c7" : undefined,
+  }}
+>
+  🐵 やさしい要約
+</div>
+
+<div
+  style={{
+    whiteSpace: "pre-wrap",
+    lineHeight: defaultMode === "easy" ? 2.0 : 1.8,
+    fontSize: defaultMode === "easy" ? 18 : 15,
+    color: "#f3f3f3",
+  }}
+>
+  {generatedIssue.easySummary}
+</div>
+
+{defaultMode === "easy" && (
+  <div
+    style={{
+      marginTop: 10,
+      fontSize: 12,
+      color: "#a7d9bf",
+    }}
+  >
+    まずはここだけ読めばOK。詳しく見たいときだけ下を読んでください。
+  </div>
+)}
+  </SectionCard>
+)}
+
+
+<SectionCard
+  style={{
+    opacity: defaultMode === "easy" ? 0.92 : 1,
+    border: defaultMode === "easy" ? "1px solid #3a3a3a" : undefined,
+  }}
+>
   <div style={{ fontWeight: 700, marginBottom: 8 }}>
     表示モード
   </div>
@@ -452,201 +635,236 @@ useEffect(() => {
           </div>
         </div>
 
-        {generatedIssue && (
-          <SectionCard>
-            <div style={{ fontWeight: 800, marginBottom: 8 }}>
-              {generatedIssue.mode === "expand" ? "AI展開結果" : "AI整理結果"}
-            </div>
+{generatedIssue && (
+  <>
+    <SectionCard>
+<div
+  style={{
+    fontWeight: 800,
+    marginBottom: 8,
+    fontSize: defaultMode === "easy" ? 15 : 16,
+    color: defaultMode === "easy" ? "#cfcfcf" : undefined,
+  }}
+>
+  STEP2：AIが整理した結果
+</div>
+      {generatedIssue.mode === "expand" ? (
+        <>
+          <div style={{ fontWeight: 700 }}>問い</div>
+          <div style={{ marginTop: 4 }}>{generatedIssue.claim}</div>
 
-            {generatedIssue.mode === "expand" ? (
-              <>
-                <div style={{ fontWeight: 700 }}>問い</div>
-                <div style={{ marginTop: 4 }}>{generatedIssue.claim}</div>
+          <div style={{ marginTop: 10, fontWeight: 700 }}>
+            考えられる前提
+          </div>
+          <ul style={{ marginTop: 4, paddingLeft: 20 }}>
+            {generatedIssue.premises.map((p, i) => (
+              <li key={i}>{p}</li>
+            ))}
+          </ul>
 
-                <div style={{ marginTop: 10, fontWeight: 700 }}>
-                  考えられる前提
-                </div>
-                <ul style={{ marginTop: 4, paddingLeft: 20 }}>
-                  {generatedIssue.premises.map((p, i) => (
-                    <li key={i}>{p}</li>
-                  ))}
-                </ul>
+          <div style={{ marginTop: 10, fontWeight: 700 }}>
+            考えられる根拠
+          </div>
+          <ul style={{ marginTop: 4, paddingLeft: 20 }}>
+            {generatedIssue.reasons.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <>
+          <div style={{ fontWeight: 700 }}>主張</div>
+          <div style={{ marginTop: 4 }}>{generatedIssue.claim}</div>
 
-                <div style={{ marginTop: 10, fontWeight: 700 }}>
-                  考えられる根拠
-                </div>
-                <ul style={{ marginTop: 4, paddingLeft: 20 }}>
-                  {generatedIssue.reasons.map((r, i) => (
-                    <li key={i}>{r}</li>
-                  ))}
-                </ul>
-              </>
-            ) : (
-              <>
-                <div style={{ fontWeight: 700 }}>主張</div>
-                <div style={{ marginTop: 4 }}>{generatedIssue.claim}</div>
+          <div style={{ marginTop: 10, fontWeight: 700 }}>前提</div>
+          <ul style={{ marginTop: 4, paddingLeft: 20 }}>
+            {generatedIssue.premises.map((p, i) => (
+              <li key={i}>{p}</li>
+            ))}
+          </ul>
 
-                <div style={{ marginTop: 10, fontWeight: 700 }}>前提</div>
-                <ul style={{ marginTop: 4, paddingLeft: 20 }}>
-                  {generatedIssue.premises.map((p, i) => (
-                    <li key={i}>{p}</li>
-                  ))}
-                </ul>
+          <div style={{ marginTop: 10, fontWeight: 700 }}>根拠</div>
+          <ul style={{ marginTop: 4, paddingLeft: 20 }}>
+            {generatedIssue.reasons.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        </>
+      )}
+    </SectionCard>
 
-                <div style={{ marginTop: 10, fontWeight: 700 }}>根拠</div>
-                <ul style={{ marginTop: 4, paddingLeft: 20 }}>
-                  {generatedIssue.reasons.map((r, i) => (
-                    <li key={i}>{r}</li>
-                  ))}
-                </ul>
-              </>
-            )}
+    <SectionCard style={{ marginTop: 12 }}>
+      <div style={{ fontWeight: 800, marginBottom: 8 }}>
+        STEP3：既存の議論を確認
+      </div>
 
-            {relatedThreads.length > 0 && (
+      {relatedThreads.length > 0 ? (
+        <>
+          <div style={{ fontSize: 13, color: "#9ad", marginBottom: 10 }}>
+            近い議論があれば、先にそちらに参加できます
+          </div>
+
+          <div style={{ display: "grid", gap: 10 }}>
+            {relatedThreads.map((t) => (
               <div
+                key={t.id}
+                onClick={() => {
+                  if (selectedThreadId === t.id) {
+                    window.location.href = `/${tenant}/forum/thread/${t.id}`;
+                  } else {
+                    setSelectedThreadId(t.id);
+                  }
+                }}
                 style={{
-                  border: "1px solid #333",
-                  padding: 12,
-                  borderRadius: 8,
-                  marginTop: 12,
-                  background: "#1a1a1a",
-                  color: "#fff",
+                  border:
+                    selectedThreadId === t.id
+                      ? "1px solid #2a7"
+                      : t.stance === "con"
+                      ? "1px solid #4a6fdc"
+                      : "1px solid #444",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  background:
+                    selectedThreadId === t.id
+                      ? "#0f2a1f"
+                      : t.stance === "con"
+                      ? "#1b2238"
+                      : "#222",
+                  cursor: "pointer",
                 }}
               >
-                <div style={{ fontWeight: 800, marginBottom: 6 }}>
-                  次に読むべき議論
+                <div style={{ fontSize: 12, color: "#bbb", marginBottom: 4 }}>
+                  {t.category ?? "未分類"}
                 </div>
 
-                <div style={{ fontSize: 13, color: "#9ad", marginBottom: 10 }}>
-                  → 別の視点・反対意見も見てみる
+                <div style={{ fontWeight: 800, fontSize: 16 }}>
+                  {t.title}
                 </div>
 
-                <div style={{ display: "grid", gap: 10 }}>
-                  {relatedThreads.map((t) => (
-                    <div
-                      key={t.id}
-                      onClick={() => {
-                        if (selectedThreadId === t.id) {
-                          window.location.href = `/${tenant}/forum/thread/${t.id}`;
-                        } else {
-                          setSelectedThreadId(t.id);
-                        }
-                      }}
-                      style={{
-                        border:
-                          selectedThreadId === t.id
-                            ? "1px solid #2a7"
-                            : t.stance === "con"
-                            ? "1px solid #4a6fdc"
-                            : "1px solid #444",
-                        borderRadius: 10,
-                        padding: "10px 12px",
-                        background:
-                          selectedThreadId === t.id
-                            ? "#0f2a1f"
-                            : t.stance === "con"
-                            ? "#1b2238"
-                            : "#222",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <div style={{ fontSize: 12, color: "#bbb", marginBottom: 4 }}>
-                        {t.category ?? "未分類"}
-                      </div>
+                {t.reason && (
+                  <div style={{ fontSize: 13, color: "#ddd", marginTop: 6 }}>
+                    → {t.reason}
+                  </div>
+                )}
 
-                      <div style={{ fontWeight: 800, fontSize: 16 }}>
-                        {t.title}
-                      </div>
-
-                      {t.reason && (
-                        <div style={{ fontSize: 13, color: "#ddd", marginTop: 6 }}>
-                          → {t.reason}
-                        </div>
-                      )}
-
-                      {t.stance && (
-                        <div
-                          style={{
-                            fontSize: 12,
-                            color: t.stance === "con" ? "#8fb3ff" : "#9ad",
-                            marginTop: 6,
-                            fontWeight: t.stance === "con" ? 700 : 400,
-                          }}
-                        >
-                          {t.stance === "pro" && "賛成寄り"}
-                          {t.stance === "con" && "← 反対意見あり"}
-                          {t.stance === "neutral" && "中立"}
-                        </div>
-                      )}
-
-                      {selectedThreadId === t.id && (
-                        <div style={{ color: "#2a7", fontSize: 12, marginTop: 6 }}>
-                          選択中
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                  <PrimaryButton
-                    disabled={!selectedThreadId}
-                    onClick={() => {
-                      if (!selectedThreadId) return;
-                      window.location.href = `/${tenant}/forum/thread/${selectedThreadId}`;
+                {t.stance && (
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: t.stance === "con" ? "#8fb3ff" : "#9ad",
+                      marginTop: 6,
+                      fontWeight: t.stance === "con" ? 700 : 400,
                     }}
                   >
-                    このスレに参加する
-                  </PrimaryButton>
+                    {t.stance === "pro" && "賛成寄り"}
+                    {t.stance === "con" && "← 反対意見あり"}
+                    {t.stance === "neutral" && "中立"}
+                  </div>
+                )}
 
-                  <PrimaryButton
-                    style={{ marginLeft: 0 }}
-                    onClick={async () => {
-                      if (!generatedIssue) return;
-
-                      const res = await fetch("/api/forum/create-thread-from-draft", {
-                        method: "POST",
-                        headers: {
-                          "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-                          tenantSlug: tenant,
-                          title: generatedIssue.claim,
-                          claim: generatedIssue.claim,
-                          premises: generatedIssue.premises,
-                          reasons: generatedIssue.reasons,
-                          postType: "auto",
-                        }),
-                      });
-
-                      const result = await res.json();
-
-                      if (!res.ok) {
-                        alert(result?.error || "スレッド作成失敗");
-                        return;
-                      }
-
-                      if (!result?.threadId) {
-                        alert("threadId が返ってきてない");
-                        console.error(result);
-                        return;
-                      }
-
-                      window.location.href = `/${tenant}/forum/thread/${result.threadId}`;
-                    }}
-                  >
-                    新しいスレを作る
-                  </PrimaryButton>
-                </div>
+                {selectedThreadId === t.id && (
+                  <div style={{ color: "#2a7", fontSize: 12, marginTop: 6 }}>
+                    選択中
+                  </div>
+                )}
               </div>
-            )}
-          </SectionCard>
-        )}
+            ))}
+          </div>
 
-        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
-          あなたの考え
-        </h3>
+          <div style={{ marginTop: 12 }}>
+            <PrimaryButton
+              disabled={!selectedThreadId}
+              onClick={() => {
+                if (!selectedThreadId) return;
+                window.location.href = `/${tenant}/forum/thread/${selectedThreadId}`;
+              }}
+              variant="secondary"
+            >
+              選んだスレに参加する
+            </PrimaryButton>
+          </div>
+        </>
+      ) : (
+        <div style={{ color: "#aaa", fontSize: 14 }}>
+          関連する既存スレはまだありません
+        </div>
+      )}
+    </SectionCard>
 
+    <div style={{ marginTop: 12 }}>
+      <div
+        style={{
+          fontSize: 14,
+          color: "#666",
+          marginBottom: 6,
+          fontWeight: 700,
+        }}
+      >
+        STEP4：新しく作る
+      </div>
+
+      <div
+        style={{
+          fontSize: 13,
+          color: "#666",
+          marginBottom: 8,
+        }}
+      >
+        内容がよければ、ここで新しいスレとして保存します
+      </div>
+
+      <PrimaryButton
+        style={{
+          width: "100%",
+          padding: "16px",
+          fontSize: "18px",
+          fontWeight: "bold",
+          borderRadius: "12px",
+          background: "#2a7",
+          color: "#fff",
+        }}
+        onClick={async () => {
+          const res = await fetch("/api/forum/create-thread-from-draft", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              tenantSlug: tenant,
+              title: generatedIssue.claim,
+              claim: generatedIssue.claim,
+              premises: generatedIssue.premises,
+              reasons: generatedIssue.reasons,
+              postType: "auto",
+            }),
+          });
+
+          const result = await res.json();
+
+          if (!res.ok) {
+            alert(result?.error || "スレッド作成失敗");
+            return;
+          }
+
+          if (!result?.threadId) {
+            alert("threadId が返ってきてない");
+            console.error(result);
+            return;
+          }
+
+          window.location.href = `/${tenant}/forum/thread/${result.threadId}`;
+        }}
+      >
+        🚀 この内容で新しいスレを作る
+      </PrimaryButton>
+    </div>
+  </>
+)}
+
+
+<h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
+  STEP1：あなたの考えを書く
+</h3>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -663,13 +881,73 @@ useEffect(() => {
           }}
         />
 
-        <PrimaryButton onClick={handleSubmit} disabled={loading} style={{ marginTop: 12 }}>
-          {loading ? "処理中..." : "構造化して投稿する"}
-        </PrimaryButton>
+{organizedResult && (
+  <div style={{ marginTop: 12, padding: 12, border: "1px solid #555", borderRadius: 8 }}>
+    <div style={{ fontWeight: 700 }}>要点まとめ</div>
+    <div style={{ whiteSpace: "pre-wrap", marginBottom: 8 }}>
+      {organizedResult.summary}
+    </div>
 
-        <p style={{ fontSize: 12, color: "#ddd", marginTop: 6 }}>
-          投稿すると、主張・前提・根拠に分解されます
-        </p>
+    <div style={{ fontWeight: 700 }}>投稿文</div>
+    <div style={{ whiteSpace: "pre-wrap" }}>
+      {organizedResult.postText}
+    </div>
+
+<button
+  type="button"
+  onClick={() => setText(organizedResult.postText)}
+  style={{ marginTop: 8 }}
+>
+  この内容を入力欄に反映
+</button>
+
+<button
+  type="button"
+  onClick={handleUseOrganizedAndAnalyze}
+  style={{
+    marginTop: 8,
+    marginLeft: 8,
+    padding: "8px 12px",
+    borderRadius: 8,
+    background: "#2a7",
+    color: "#fff",
+    border: "none",
+    cursor: "pointer",
+  }}
+>
+  この内容でそのまま整理する
+</button>
+  </div>
+)}
+
+
+
+
+
+
+
+<PrimaryButton onClick={handleSubmit} disabled={loading} style={{ marginTop: 12 }}>
+  {loading ? "AIで整理中..." : "AIで整理する"}
+</PrimaryButton>
+
+<button
+  onClick={handleOrganizePost}
+  disabled={organizing || !text.trim()}
+  style={{
+    marginTop: 8,
+    padding: "8px 12px",
+    borderRadius: 8,
+    background: "#444",
+    color: "#fff",
+  }}
+>
+  🚀 投稿文だけ整形する
+</button>
+
+
+<p style={{ fontSize: 12, color: "#ddd", marginTop: 6 }}>
+  まずAIで整理します。保存は「新しいスレを作る」を押したときです
+</p>
       </section>
     </main>
   );

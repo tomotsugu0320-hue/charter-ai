@@ -287,9 +287,6 @@ for (const word of matches) {
 
   const [postRole, setPostRole] =
     useState<PostRoleOption["value"]>("opinion");
-
-const [treeVariant, setTreeVariant] = useState<"A" | "C">("A");
-
   const [predictionFlag, setPredictionFlag] = useState(false);
   const [predictionTarget, setPredictionTarget] = useState("");
   const [predictionDeadline, setPredictionDeadline] = useState("");
@@ -308,20 +305,6 @@ const [treeVariant, setTreeVariant] = useState<"A" | "C">("A");
     if (!threadId) return;
     loadThread();
   }, [threadId]);
-
-
-useEffect(() => {
-  const handler = () => {
-    setTimeout(() => {
-      const el = document.getElementById("post-form");
-      el?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
-  };
-
-  window.addEventListener("scroll-to-post-form", handler);
-  return () => window.removeEventListener("scroll-to-post-form", handler);
-}, []);
-
 
   const fontSizeMap = {
     small: {
@@ -639,10 +622,10 @@ setSummary(data?.summary || null);
       setRelatedPosts(result.posts || []);
       setRelatedSummary(result.summary || null);
 
-setTimeout(() => {
-  const el = document.getElementById("related-section");
-  el?.scrollIntoView({ behavior: "smooth", block: "start" });
-}, 100);
+      setTimeout(() => {
+        const el = document.getElementById("related-section");
+        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
     } catch (e: any) {
       console.error(e);
       setError(e?.message || "関連検索失敗");
@@ -901,132 +884,29 @@ function jumpToMainIssues() {
             >
               {thread.title}
             </h1>
-<div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-  <PrimaryButton
-    onClick={(e) => {
-      e.stopPropagation();
-      handleShare();
-    }}
-    style={{ padding: "8px 12px" }}
+
+  <div
+    onClick={jumpToMainIssues}
+    style={{ cursor: "pointer" }}
   >
-    この議論を共有
-  </PrimaryButton>
+    <div style={{ fontWeight: 800, marginBottom: 8 }}>
+      {mode === "normal" ? "🧠 AIまとめ" : "🐵 やさしい要約"}
+    </div>
 
-  <LinkButton
-    href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
-      `${thread.title} ${currentUrl}`
-    )}`}
-    target="_blank"
-    rel="noopener noreferrer"
-    onClick={(e) => e.stopPropagation()}
-  >
-    Xで共有
-  </LinkButton>
-
-  {copied && <span style={{ color: "#2e7d32" }}>コピーした</span>}
-</div>
-
-<div style={{ marginTop: 8, fontSize: currentFont.base * 0.9, color: "#666" }}>
-  作成日時: {formatDate(thread.created_at)}
-</div>
-
-<div style={{ marginTop: 4, fontSize: currentFont.base * 0.9, color: "#666" }}>
-  カテゴリ：{thread.category ?? "未設定"}
-</div>
-
-<div
-  style={{
-    marginTop: 8,
-    fontSize: currentFont.base,
-    fontWeight: 700,
-    color: "#0d47a1",
-  }}
->
-  {averageLogicScore > 0 ? (
-    <>
-      平均スコア: {averageLogicScore}
-      <span
-        style={{
-          marginLeft: 8,
-          fontSize: currentFont.base * 0.9,
-          fontWeight: 500,
-          color: "#666",
-        }}
-      >
-        {averageLogicScore >= 80
-          ? "（高品質）"
-          : averageLogicScore >= 60
-          ? "（標準）"
-          : "（要改善）"}
-      </span>
-    </>
-  ) : (
-    <>平均スコア: 未評価</>
-  )}
-</div>
-
-<div
-  style={{
-    marginTop: 4,
-    fontSize: currentFont.base * 0.95,
-    color: maxLogicScore && maxLogicScore >= 80 ? "#2e7d32" : "#555",
-    fontWeight: maxLogicScore && maxLogicScore >= 80 ? 700 : 500,
-  }}
->
-  最高スコア: {maxLogicScore ?? "未評価"}
-</div>
-
-  <div>
-
-<div
-  style={{
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    marginTop: 16,
-    marginBottom: 8,
-    flexWrap: "wrap",
-  }}
->
-  <h2
-    style={{
-      margin: 0,
-      fontSize: currentFont.title,
-      fontWeight: 800,
-      lineHeight: 1.4,
-      color: "#111",
-    }}
-  >
-
-{mode === "normal" ? "🧠 全体理解（AIまとめ）" : "🐵 全体理解（やさしい要約）"}
-  </h2>
-<PrimaryButton
-  onClick={jumpToMainIssues}
-  style={{
-    padding: "8px 14px",
-    fontSize: currentFont.base * 0.95,
-    whiteSpace: "nowrap",
-    background: "#111",
-    color: "#fff",
-    fontWeight: 700,
-  }}
->
-  👇 主な論点を見る
-</PrimaryButton>
-
-</div>
+    <div
+      style={{
+        fontSize: currentFont.base,
+        color: "#666",
+        marginBottom: 8,
+      }}
+    >
+      ここを押すと、下の「主な論点」に移動します。
+    </div>
 
     {mode === "normal" ? (
       <>
         {!summaryLoading && (
-
-<PrimaryButton
-  onClick={(e) => {
-    e.stopPropagation();
-    handleGenerateSummary();
-  }}
->
+          <PrimaryButton onClick={handleGenerateSummary}>
             {summary?.summary_text
               ? "AIまとめを更新する"
               : "AIでこの議論をまとめる"}
@@ -1046,44 +926,33 @@ function jumpToMainIssues() {
             lineHeight: 1.8,
           }}
         >
-{summary?.summary_text ? (
-  summary.summary_text
-) : (
-  <div style={{ color: "#999" }}>
-    まだAIまとめはありません。「AIでこの議論をまとめる」を押してください。
-  </div>
-)}
+          {summary?.summary_text}
         </div>
       </>
     ) : (
       <div
         style={{
-          marginTop: 14,
+          marginTop: 10,
           fontSize: currentFont.base,
           lineHeight: 1.8,
         }}
       >
-{summary?.easy_summary_text ? (
-  summary.easy_summary_text
-) : (
-  <div style={{ color: "#999" }}>
-    まだやさしい要約はありません。
-  </div>
-)}
+        {summary?.easy_summary_text || "..."}
       </div>
     )}
   </div>
+</SectionCard>
+{/* ←ここで完全に閉じる */}
 
-
-<div style={{ marginTop: 14 }}>
+<SectionCard variant="soft" style={{ marginTop: 12 }}>
   <div
     style={{
-      fontSize: currentFont.base * 0.85,
+      fontSize: currentFont.base,
       color: "#666",
       marginBottom: 6,
     }}
   >
-    🔍 関連キーワード
+    🔍 関連キーワード（タップで検索）
   </div>
 
   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -1091,19 +960,18 @@ function jumpToMainIssues() {
       keywords.map((k) => (
         <button
           key={k}
-          onClick={(e) => {
-            e.stopPropagation();
+          onClick={() =>
             window.open(
               `https://www.google.com/search?q=${encodeURIComponent(k)}`,
               "_blank"
-            );
-          }}
+            )
+          }
           style={{
-            padding: "5px 8px",
+            padding: "6px 10px",
             borderRadius: 999,
             border: "1px solid #ddd",
             background: "#f5f5f5",
-            fontSize: currentFont.base * 0.85,
+            fontSize: currentFont.base,
             color: "#111",
             cursor: "pointer",
           }}
@@ -1112,32 +980,140 @@ function jumpToMainIssues() {
         </button>
       ))
     ) : (
-      <div style={{ fontSize: currentFont.base * 0.85, color: "#999" }}>
+      <div style={{ fontSize: currentFont.base, color: "#999" }}>
         関連キーワードはまだありません
       </div>
     )}
   </div>
-</div>
-
 </SectionCard>
-{/* ←ここで完全に閉じる */}
 
+
+          <SectionCard variant="white" style={{ marginTop: 24 }}>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: currentFont.title,
+                fontWeight: 800,
+                lineHeight: 1.4,
+                color: "#111",
+              }}
+            >
+              {thread.title}
+            </h1>
+
+            <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <PrimaryButton onClick={handleShare} style={{ padding: "8px 12px" }}>
+                この議論を共有
+              </PrimaryButton>
+
+              <LinkButton
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
+                  `${thread.title} ${currentUrl}`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Xで共有
+              </LinkButton>
+
+              {copied && <span style={{ color: "#2e7d32" }}>コピーした</span>}
+            </div>
+
+            <div
+              style={{
+                marginTop: 10,
+                fontSize: currentFont.base,
+                color: "#666",
+              }}
+            >
+              作成日時: {formatDate(thread.created_at)}
+            </div>
+
+            <div
+              style={{
+                marginTop: 6,
+                fontSize: currentFont.base,
+                color: "#666",
+              }}
+            >
+              カテゴリ：{thread.category ?? "未設定"}
+            </div>
+
+            <div
+              style={{
+                marginTop: 8,
+                fontSize: currentFont.base,
+                fontWeight: 700,
+                color: "#0d47a1",
+              }}
+            >
+              {averageLogicScore > 0 ? (
+                <>
+                  平均スコア: {averageLogicScore}
+                  <span
+                    style={{
+                      marginLeft: 8,
+                      fontSize: currentFont.base,
+                      fontWeight: 500,
+                      color: "#666",
+                    }}
+                  >
+                    {averageLogicScore >= 80
+                      ? "（高品質）"
+                      : averageLogicScore >= 60
+                      ? "（標準）"
+                      : "（要改善）"}
+                  </span>
+                </>
+              ) : (
+                <>平均スコア: 未評価</>
+              )}
+            </div>
+
+            <div
+              style={{
+                marginTop: 4,
+                fontSize: currentFont.base,
+                color: maxLogicScore && maxLogicScore >= 80 ? "#2e7d32" : "#555",
+                fontWeight: maxLogicScore && maxLogicScore >= 80 ? 700 : 500,
+              }}
+            >
+              最高スコア: {maxLogicScore ?? "未評価"}
+            </div>
+
+            <SectionCard
+              variant="soft"
+              style={{ marginTop: 18, marginBottom: 0 }}
+            >
+              <div
+                style={{
+                  fontSize: currentFont.base,
+                  fontWeight: 700,
+                  color: "#555",
+                  marginBottom: 8,
+                }}
+              >
+                元投稿
+              </div>
+
+<div
+  style={{
+    whiteSpace: "pre-wrap",
+    lineHeight: 1.8,
+    fontSize: currentFont.base,
+    color: "#111",
+  }}
+>
+  {originalStructure.claim || thread.original_post}
+</div>
+            </SectionCard>
+          </SectionCard>
 
 <SectionCard variant="white" style={{ marginTop: 24 }}>
   <div id="main-issues" style={{ scrollMarginTop: 80 }} />
 
-<div
-  style={{
-    fontSize: currentFont.base * 0.9,
-    color: "#666",
-    marginBottom: 6,
-  }}
->
-  {thread.title}
-</div>
-
   <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
-    🧩 論点整理
+    AIが整理した論点構造
   </SectionTitle>
 
   <p
@@ -1307,10 +1283,38 @@ function jumpToMainIssues() {
   </div>
 </SectionCard>
 
+<DiscussionTree
+  tenant={tenant}
+  threadId={threadId}
+  groupedByOpinion={groupedByOpinion}
+  currentFont={currentFont}
+  onSelectNode={(node) => {
+    setSelectedGuide({
+      type:
+        node.type === "論点"
+          ? "論点"
+          : node.type === "意見"
+          ? "根拠"
+          : node.type === "反論"
+          ? "根拠"
+          : "前提",
+      text: node.text,
+    });
+    setPostRole("opinion");
+    setReplyToOpinionId(null);
+
+    setTimeout(() => {
+      window.scrollTo({
+        top: document.body.scrollHeight,
+        behavior: "smooth",
+      });
+    }, 100);
+  }}
+/>
 
           <SectionCard variant="white" style={{ marginTop: 24 }}>
             <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
-              📊 投稿一覧
+              投稿一覧
             </SectionTitle>
 
             <div style={{ marginBottom: 12 }}>
@@ -1376,8 +1380,6 @@ function jumpToMainIssues() {
             ) : (
               <div style={{ display: "grid", gap: 14 }}>
 
-
-
 <OpinionView
   groupedByOpinion={groupedByOpinion}
   bestOpinionsByIssue={bestOpinionsByIssue}
@@ -1392,76 +1394,35 @@ function jumpToMainIssues() {
   handleFeedback={handleFeedback}
 />
 
-</div>
+              </div>
             )}
           </SectionCard>
 
-
-
-<div style={{ marginTop: 24 }}>
-  <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
-    🌳 深掘り（議論ツリー）
-  </SectionTitle>
-
-<div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-  <PrimaryButton
-    variant={treeVariant === "A" ? "primary" : "secondary"}
-    onClick={() => setTreeVariant("A")}
-    style={{ padding: "6px 12px" }}
-  >
-    A表示（読みやすい）
-  </PrimaryButton>
-
-  <PrimaryButton
-    variant={treeVariant === "C" ? "primary" : "secondary"}
-    onClick={() => setTreeVariant("C")}
-    style={{ padding: "6px 12px" }}
-  >
-    C表示（構造重視）
-  </PrimaryButton>
-</div>
-
-  <div
-    style={{
-      fontSize: currentFont.base,
-      color: "#666",
-      marginBottom: 12,
-    }}
-  >
-    主張 → 意見 → 反論 / 補足 の流れを見られます
-  </div>
-
-<DiscussionTree
-  tenant={tenant}
-  threadId={threadId}
-  groupedByOpinion={groupedByOpinion}
-  currentFont={currentFont}
-  variant={treeVariant}
-  onSelectNode={(node) => {
-    setSelectedGuide({
-      type:
-        node.type === "論点"
-          ? "論点"
-          : node.type === "意見"
-          ? "根拠"
-          : node.type === "反論"
-          ? "根拠"
-          : "前提",
-      text: node.text,
-    });
-    setPostRole("opinion");
-    setReplyToOpinionId(null);
-
-    setTimeout(() => {
-      const el = document.getElementById("post-form");
-      el?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
-  }}
-/>
-</div>
-
           <SectionCard variant="white" style={{ marginTop: 24 }}>
-           <div id="post-form" style={{ scrollMarginTop: 120 }} />
+            <div style={{ marginTop: 16, marginBottom: 16 }}>
+              <PrimaryButton
+                onClick={() => {
+                  setSelectedGuide(null);
+                  setPostRole("opinion");
+                  setReplyToOpinionId(null);
+
+                  setTimeout(() => {
+                    window.scrollTo({
+                      top: document.body.scrollHeight,
+                      behavior: "smooth",
+                    });
+                  }, 100);
+                }}
+                style={{
+                  width: "100%",
+                  borderRadius: 12,
+                  padding: "14px 16px",
+                  fontSize: currentFont.base,
+                }}
+              >
+                まだ誰も書いていない。このテーマの最初の意見を書く
+              </PrimaryButton>
+            </div>
 
             <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
               {replyToOpinionId
@@ -1472,7 +1433,7 @@ function jumpToMainIssues() {
                       ? "補足"
                       : "投稿"
                   }`
-                : "✍️ 新しい投稿"}
+                : "新しい投稿"}
             </SectionTitle>
 
             <p

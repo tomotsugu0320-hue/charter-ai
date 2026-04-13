@@ -23,3 +23,4 @@ export default function PostCard({ children, style }: Props) {
     </div>
   );
 }
+
