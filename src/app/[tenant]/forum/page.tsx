@@ -87,6 +87,8 @@ const [defaultMode, setDefaultMode] = useState<"normal" | "easy">("normal");
   const [categoryFilter, setCategoryFilter] = useState("すべて");
   const [searchQuery, setSearchQuery] = useState("");
 
+const [analyzeScrollKey, setAnalyzeScrollKey] = useState(0);
+
   const [relatedThreads, setRelatedThreads] = useState<RelatedThread[]>([]);
   const [generatedIssue, setGeneratedIssue] = useState<GeneratedIssue | null>(null);
 
@@ -113,6 +115,17 @@ useEffect(() => {
       }
     })();
   }, []);
+
+
+useEffect(() => {
+  if (!analyzeScrollKey) return;
+
+  requestAnimationFrame(() => {
+    const el = document.getElementById("step2-result");
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}, [analyzeScrollKey]);
+
 
   const filteredPopularThreads = popularThreads.filter((t) => {
     const q = searchQuery.trim().toLowerCase();
@@ -153,6 +166,7 @@ useEffect(() => {
   });
 
   const handleSubmit = async () => {
+
     const trimmed = text.trim();
     if (!trimmed) return;
 
@@ -170,6 +184,9 @@ useEffect(() => {
           type: "auto",
         }),
       });
+
+
+setAnalyzeScrollKey((prev) => prev + 1);
 
 
 const { mode, claim, premises, reasons, easySummary } = await res.json();
@@ -192,10 +209,20 @@ setGeneratedIssue({
       });
 
 
-      const related = await relatedRes.json();
 
-      setRelatedThreads(
-        (Array.isArray(related) ? related : []).map((t: any) => {
+const related = await relatedRes.json();
+
+const relatedList = Array.isArray(related)
+  ? related
+  : Array.isArray(related?.threads)
+  ? related.threads
+  : Array.isArray(related?.results)
+  ? related.results
+  : [];
+
+setRelatedThreads(
+  relatedList.map((t: any) => {
+
           const judgeText = `${t.title ?? ""} ${t.summary ?? ""}`.toLowerCase();
 
           let stance: "pro" | "con" | "neutral" = "neutral";
@@ -308,10 +335,19 @@ setGeneratedIssue({
       }),
     });
 
-    const related = await relatedRes.json();
+const related = await relatedRes.json();
 
-    setRelatedThreads(
-      (Array.isArray(related) ? related : []).map((t: any) => {
+const relatedList = Array.isArray(related)
+  ? related
+  : Array.isArray(related?.threads)
+  ? related.threads
+  : Array.isArray(related?.results)
+  ? related.results
+  : [];
+
+setRelatedThreads(
+  relatedList.map((t: any) => {
+
         const judgeText = `${t.title ?? ""} ${t.summary ?? ""}`.toLowerCase();
 
         let stance: "pro" | "con" | "neutral" = "neutral";
@@ -491,7 +527,7 @@ setGeneratedIssue({
       </div>
 
       {hasSearch && (
-        <div style={{ marginTop: 8, color: "#ddd", fontSize: 13 }}>
+        <div style={{ marginTop: 8, color: "#666", fontSize: 13 }}>
           検索結果：
           人気スレ {filteredPopularThreads.length}件 / 活発スレ{" "}
           {filteredActiveThreads.length}件
@@ -500,7 +536,7 @@ setGeneratedIssue({
 
       {goal && (
         <SectionCard>
-          <div style={{ fontSize: 12, color: "#ddd" }}>
+          <div style={{ fontSize: 12, color: "#666" }}>
             マクロから渡されたゴール
           </div>
           <div style={{ fontWeight: 700 }}>{goal}</div>
@@ -509,7 +545,7 @@ setGeneratedIssue({
 
       {keyword && (
         <SectionCard>
-          <div style={{ fontSize: 12, color: "#ddd" }}>注目している論点</div>
+          <div style={{ fontSize: 12, color: "#666" }}>注目している論点</div>
           <div style={{ fontWeight: 700 }}>{keyword}</div>
         </SectionCard>
       )}
@@ -535,7 +571,7 @@ setGeneratedIssue({
                 display: "block",
               }}
             >
-              <div style={{ fontSize: 12, color: "#ddd", marginBottom: 6 }}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>
                 {t.category ?? "未設定"}
               </div>
               <div style={{ fontWeight: 800, fontSize: 18 }}>{t.title}</div>
@@ -553,7 +589,7 @@ setGeneratedIssue({
               </div>
             )}
 
-            <div style={{ fontSize: 12, color: "#ddd" }}>
+            <div style={{ fontSize: 12, color: "#666" }}>
               平均スコア: {t.avg_logic_score ?? 0} / 投稿数: {t.post_count ?? 0}
             </div>
           </PostCard>
@@ -581,7 +617,7 @@ setGeneratedIssue({
                 display: "block",
               }}
             >
-              <div style={{ fontSize: 12, color: "#ddd", marginBottom: 6 }}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>
                 {t.category ?? "未設定"}
               </div>
               <div style={{ fontWeight: 800, fontSize: 18 }}>{t.title}</div>
@@ -599,7 +635,7 @@ setGeneratedIssue({
               </div>
             )}
 
-            <div style={{ fontSize: 12, color: "#ddd" }}>
+            <div style={{ fontSize: 12, color: "#666" }}>
               投稿数: {t.post_count ?? 0} / 平均スコア: {t.avg_logic_score ?? 0}
             </div>
           </PostCard>
@@ -630,68 +666,170 @@ setGeneratedIssue({
             議論が噛み合わない原因は「前提のズレ」です。
           </div>
 
-          <div style={{ color: "#ddd", fontSize: 13, marginTop: 4 }}>
+          <div style={{ color: "#666", fontSize: 13, marginTop: 4 }}>
             あなたの考えを書くと、それを分解して見える化します。
           </div>
         </div>
 
-{generatedIssue && (
-  <>
-    <SectionCard>
-<div
+
+
+
+
+
+
+
+
+<h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
+  STEP1：あなたの考えを書く
+</h3>
+<div style={{ fontSize: 13, color: "#444", marginBottom: 6 }}>
+  <div style={{ fontSize: 13, color: "#333", marginBottom: 6, fontWeight: 700 }}>
+  書き方の例
+</div>
+  <br />
+  ・〇〇は問題だと思う
+  <br />
+  ・なぜなら△△だから
+  <br />
+  ・でも□□という意見もある
+</div>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={`例：
+消費税は減税すべき。
+日本は需要不足であり、消費税は消費を抑えるため。`}
+          rows={5}
+          style={{
+            width: "100%",
+            border: "1px solid #ccc",
+            borderRadius: 8,
+            padding: 12,
+            fontSize: 16,
+          }}
+        />
+
+{organizedResult && (
+  <div style={{ marginTop: 12, padding: 12, border: "1px solid #555", borderRadius: 8 }}>
+
+
+    <div style={{ fontWeight: 700 }}>AIが読み取った要点</div>
+    <div style={{ whiteSpace: "pre-wrap", marginBottom: 8 }}>
+      {organizedResult.summary}
+    </div>
+
+    <div style={{ fontWeight: 700 }}>そのまま使える投稿文（コピペOK）</div>
+    <div style={{ whiteSpace: "pre-wrap" }}>
+      {organizedResult.postText}
+    </div>
+
+<button
+  type="button"
+  onClick={() => setText(organizedResult.postText)}
+  style={{ marginTop: 8 }}
+>
+  この内容を入力欄に反映
+</button>
+
+<button
+  type="button"
+  onClick={handleUseOrganizedAndAnalyze}
   style={{
-    fontWeight: 800,
-    marginBottom: 8,
-    fontSize: defaultMode === "easy" ? 15 : 16,
-    color: defaultMode === "easy" ? "#cfcfcf" : undefined,
+    marginTop: 8,
+    marginLeft: 8,
+    padding: "8px 12px",
+    borderRadius: 8,
+    background: "#2a7",
+    color: "#fff",
+    border: "none",
+    cursor: "pointer",
   }}
 >
-  STEP2：AIが整理した結果
-</div>
-      {generatedIssue.mode === "expand" ? (
-        <>
-          <div style={{ fontWeight: 700 }}>問い</div>
-          <div style={{ marginTop: 4 }}>{generatedIssue.claim}</div>
+  この内容で議論を開始する
+</button>
+  </div>
+)}
 
-          <div style={{ marginTop: 10, fontWeight: 700 }}>
-            考えられる前提
-          </div>
-          <ul style={{ marginTop: 4, paddingLeft: 20 }}>
-            {generatedIssue.premises.map((p, i) => (
-              <li key={i}>{p}</li>
-            ))}
-          </ul>
 
-          <div style={{ marginTop: 10, fontWeight: 700 }}>
-            考えられる根拠
-          </div>
-          <ul style={{ marginTop: 4, paddingLeft: 20 }}>
-            {generatedIssue.reasons.map((r, i) => (
-              <li key={i}>{r}</li>
-            ))}
-          </ul>
-        </>
-      ) : (
-        <>
-          <div style={{ fontWeight: 700 }}>主張</div>
-          <div style={{ marginTop: 4 }}>{generatedIssue.claim}</div>
+<PrimaryButton onClick={handleSubmit} disabled={loading} style={{ marginTop: 12 }}>
+  {loading ? "AIで整理中..." : "🤖 この考えを整理する"}
+</PrimaryButton>
 
-          <div style={{ marginTop: 10, fontWeight: 700 }}>前提</div>
-          <ul style={{ marginTop: 4, paddingLeft: 20 }}>
-            {generatedIssue.premises.map((p, i) => (
-              <li key={i}>{p}</li>
-            ))}
-          </ul>
+<p style={{ fontSize: 12, color: "#666", marginTop: 6 }}>
+  書くだけでOK。AIが主張・前提・根拠に整理します
+</p>
 
-          <div style={{ marginTop: 10, fontWeight: 700 }}>根拠</div>
-          <ul style={{ marginTop: 4, paddingLeft: 20 }}>
-            {generatedIssue.reasons.map((r, i) => (
-              <li key={i}>{r}</li>
-            ))}
-          </ul>
-        </>
-      )}
-    </SectionCard>
+      </section>
+
+
+
+
+
+{generatedIssue && (
+  <>
+
+<SectionCard>
+  <div
+    style={{
+      fontWeight: 800,
+      marginBottom: 8,
+      fontSize: defaultMode === "easy" ? 15 : 16,
+      color: defaultMode === "easy" ? "#cfcfcf" : undefined,
+    }}
+  >
+    <div id="step2-result" style={{ marginTop: 24 }}>
+      <h2>STEP2：AIが整理した結果</h2>
+    </div>
+
+    {generatedIssue.mode === "expand" ? (
+      <>
+        <div style={{ fontWeight: 700 }}>問い</div>
+        <div style={{ marginTop: 4 }}>{generatedIssue.claim}</div>
+
+        <div style={{ marginTop: 10, fontWeight: 700 }}>
+          考えられる前提
+        </div>
+        <ul style={{ marginTop: 4, paddingLeft: 20 }}>
+          {generatedIssue.premises.map((p, i) => (
+            <li key={i}>{p}</li>
+          ))}
+        </ul>
+
+        <div style={{ marginTop: 10, fontWeight: 700 }}>
+          考えられる根拠
+        </div>
+        <ul style={{ marginTop: 4, paddingLeft: 20 }}>
+          {generatedIssue.reasons.map((r, i) => (
+            <li key={i}>{r}</li>
+          ))}
+        </ul>
+      </>
+    ) : (
+      <>
+        <div style={{ fontWeight: 700 }}>主張</div>
+        <div style={{ marginTop: 4 }}>{generatedIssue.claim}</div>
+
+        <div style={{ marginTop: 10, fontWeight: 700 }}>前提</div>
+        <ul style={{ marginTop: 4, paddingLeft: 20 }}>
+          {generatedIssue.premises.map((p, i) => (
+            <li key={i}>{p}</li>
+          ))}
+        </ul>
+
+        <div style={{ marginTop: 10, fontWeight: 700 }}>根拠</div>
+        <ul style={{ marginTop: 4, paddingLeft: 20 }}>
+          {generatedIssue.reasons.map((r, i) => (
+            <li key={i}>{r}</li>
+          ))}
+        </ul>
+      </>
+    )}
+  </div>
+</SectionCard>
+
+
+
+
 
     <SectionCard style={{ marginTop: 12 }}>
       <div style={{ fontWeight: 800, marginBottom: 8 }}>
@@ -742,7 +880,7 @@ setGeneratedIssue({
                 </div>
 
                 {t.reason && (
-                  <div style={{ fontSize: 13, color: "#ddd", marginTop: 6 }}>
+                  <div style={{ fontSize: 13, color: "#666", marginTop: 6 }}>
                     → {t.reason}
                   </div>
                 )}
@@ -793,7 +931,8 @@ setGeneratedIssue({
 
     <div style={{ marginTop: 12 }}>
       <div
-        style={{
+        style
+={{
           fontSize: 14,
           color: "#666",
           marginBottom: 6,
@@ -862,63 +1001,6 @@ setGeneratedIssue({
 )}
 
 
-<h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
-  STEP1：あなたの考えを書く
-</h3>
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder={`例：
-消費税は減税すべき。
-日本は需要不足であり、消費税は消費を抑えるため。`}
-          rows={5}
-          style={{
-            width: "100%",
-            border: "1px solid #ccc",
-            borderRadius: 8,
-            padding: 12,
-            fontSize: 16,
-          }}
-        />
-
-{organizedResult && (
-  <div style={{ marginTop: 12, padding: 12, border: "1px solid #555", borderRadius: 8 }}>
-    <div style={{ fontWeight: 700 }}>要点まとめ</div>
-    <div style={{ whiteSpace: "pre-wrap", marginBottom: 8 }}>
-      {organizedResult.summary}
-    </div>
-
-    <div style={{ fontWeight: 700 }}>投稿文</div>
-    <div style={{ whiteSpace: "pre-wrap" }}>
-      {organizedResult.postText}
-    </div>
-
-<button
-  type="button"
-  onClick={() => setText(organizedResult.postText)}
-  style={{ marginTop: 8 }}
->
-  この内容を入力欄に反映
-</button>
-
-<button
-  type="button"
-  onClick={handleUseOrganizedAndAnalyze}
-  style={{
-    marginTop: 8,
-    marginLeft: 8,
-    padding: "8px 12px",
-    borderRadius: 8,
-    background: "#2a7",
-    color: "#fff",
-    border: "none",
-    cursor: "pointer",
-  }}
->
-  この内容でそのまま整理する
-</button>
-  </div>
-)}
 
 
 
@@ -926,29 +1008,12 @@ setGeneratedIssue({
 
 
 
-<PrimaryButton onClick={handleSubmit} disabled={loading} style={{ marginTop: 12 }}>
-  {loading ? "AIで整理中..." : "AIで整理する"}
-</PrimaryButton>
-
-<button
-  onClick={handleOrganizePost}
-  disabled={organizing || !text.trim()}
-  style={{
-    marginTop: 8,
-    padding: "8px 12px",
-    borderRadius: 8,
-    background: "#444",
-    color: "#fff",
-  }}
->
-  🚀 投稿文だけ整形する
-</button>
 
 
-<p style={{ fontSize: 12, color: "#ddd", marginTop: 6 }}>
-  まずAIで整理します。保存は「新しいスレを作る」を押したときです
-</p>
-      </section>
+
+
     </main>
   );
 }
+
+

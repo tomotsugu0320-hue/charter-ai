@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { checkPrivacyRisk } from "@/lib/privacy";
 
 type ForumPost = {
   id: string;
@@ -333,6 +334,7 @@ if (!isAllowedPostRole(postRole)) {
   return NextResponse.json({ success: false, error: "invalid postRole" }, { status: 400 });
 }
 
+const privacy = checkPrivacyRisk(content);
 const logicResult = await evaluateLogicScore(content, postRole);
 let logicBreakType: string | null = null;
 let logicBreakNote: string | null = null;
@@ -412,6 +414,11 @@ const { data: insertedRows, error } = await supabase
   content,
   author_key: authorKey,
   trust_status: "trusted",
+  raw_text: content,
+  sanitized_text: privacy.maskedText,
+  is_sensitive: privacy.isSensitive,
+  privacy_flags: privacy.flags,
+  privacy_score: privacy.score,
   logic_score: logicResult.score,
   logic_score_reason: logicResult.reason,
   logic_break_type: logicBreakType,

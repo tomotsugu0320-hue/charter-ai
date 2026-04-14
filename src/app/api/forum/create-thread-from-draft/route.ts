@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { checkPrivacyRisk } from "@/lib/privacy";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -64,14 +65,14 @@ if (title.includes("売上") || title.includes("経営") || title.includes("集�
         : claim;
 
 
-
+const privacy = checkPrivacyRisk(content);
 
     const { data: thread, error: threadError } = await supabase
       .from("forum_threads")
       .insert({
         title,
         slug: `${title}-${Date.now()}`,
-        original_post: content,
+        original_post: privacy.maskedText,
         visibility: "public",
         category: category,
       })
@@ -92,14 +93,20 @@ if (title.includes("売上") || title.includes("経営") || title.includes("集�
       );
     }
 
-    const { error: postError } = await supabase
-      .from("forum_posts")
-      .insert({
-        thread_id: thread.id,
-        source_type: "human",
-        post_role: "issue_raise",
-        content,
-      });
+const { error: postError } = await supabase
+  .from("forum_posts")
+  .insert({
+    thread_id: thread.id,
+    source_type: "human",
+    post_role: "issue_raise",
+    content,
+    raw_text: content,
+    sanitized_text: privacy.maskedText,
+    is_sensitive: privacy.isSensitive,
+    privacy_flags: privacy.flags,
+    privacy_score: privacy.score,
+  });
+
 
     if (postError) {
       console.error("post create error:", postError);

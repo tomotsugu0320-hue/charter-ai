@@ -1735,75 +1735,78 @@ function jumpToMainIssues() {
               </select>
             </div>
 
-            {postRole === "rebuttal" ? (
-              <div style={{ display: "grid", gap: 10 }}>
-                <textarea
-                  value={rebuttalClaim}
-                  onChange={(e) => setRebuttalClaim(e.target.value)}
-                  placeholder="反論の主張（何が間違っているか・どう考えるべきか）"
-                  rows={3}
-                  style={{
-                    width: "100%",
-                    border: "1px solid #ccc",
-                    borderRadius: 10,
-                    padding: 12,
-                    fontSize: currentFont.base,
-                    resize: "vertical",
-                    outline: "none",
-                    color: "#111",
-                  }}
-                />
+{postRole === "rebuttal" ? (
+  <div style={{ display: "grid", gap: 10 }}>
+    <textarea
+      value={rebuttalClaim}
+      onChange={(e) => setRebuttalClaim(e.target.value)}
+      placeholder="主張を書く"
+      style={{
+        width: "100%",
+        border: "1px solid #ccc",
+        borderRadius: 10,
+        padding: 10,
+        fontSize: currentFont.base,
+      }}
+    ></textarea>
 
-                <input
-                  value={rebuttalPremise}
-                  onChange={(e) => setRebuttalPremise(e.target.value)}
-                  placeholder="反論の前提"
-                  style={{
-                    width: "100%",
-                    border: "1px solid #ccc",
-                    borderRadius: 10,
-                    padding: 12,
-                    fontSize: currentFont.base,
-                    outline: "none",
-                    color: "#111",
-                  }}
-                />
+    <input
+      value={rebuttalPremise}
+      onChange={(e) => setRebuttalPremise(e.target.value)}
+      placeholder="前提を書く"
+      style={{
+        width: "100%",
+        border: "1px solid #ccc",
+        borderRadius: 10,
+        padding: 10,
+        fontSize: currentFont.base,
+      }}
+    />
 
-                <textarea
-                  value={rebuttalReason}
-                  onChange={(e) => setRebuttalReason(e.target.value)}
-                  placeholder="反論の根拠"
-                  rows={4}
-                  style={{
-                    width: "100%",
-                    border: "1px solid #ccc",
-                    borderRadius: 10,
-                    padding: 12,
-                    fontSize: currentFont.base,
-                    resize: "vertical",
-                    outline: "none",
-                    color: "#111",
-                  }}
-                />
-              </div>
-            ) : (
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="あなたの考えを書く（主張・前提・根拠でもOK）"
-                rows={5}
-                style={{
-                  width: "100%",
-                  border: "1px solid #ccc",
-                  borderRadius: 10,
-                  padding: 12,
-                  fontSize: currentFont.base,
-                  resize: "vertical",
-                  outline: "none",
-                  color: "#111",
-                }}
-              />
-            )}
+    <textarea
+      value={rebuttalReason}
+      onChange={(e) => setRebuttalReason(e.target.value)}
+      placeholder="根拠を書く"
+      style={{
+        width: "100%",
+        border: "1px solid #ccc",
+        borderRadius: 10,
+        padding: 10,
+        fontSize: currentFont.base,
+      }}
+    ></textarea>
+  </div>
+) : (
+  <>
+    <textarea
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      placeholder="あなたの考えを書く（主張・前提・根拠でもOK）"
+      rows={5}
+      style={{
+        width: "100%",
+        border: "1px solid #ccc",
+        borderRadius: 10,
+        padding: 12,
+        fontSize: currentFont.base,
+        resize: "vertical",
+        outline: "none",
+        color: "#111",
+      }}
+></textarea>
+
+    <div
+      style={{
+        marginTop: 8,
+        fontSize: currentFont.base * 0.85,
+        color: "#666",
+        lineHeight: 1.6,
+      }}
+    >
+      ※ 個人情報や攻撃的表現は自動で調整されます
+    </div>
+  </>
+)}
 
             <div style={{ marginTop: 12, display: "flex", gap: 12, flexWrap: "wrap" }}>
               <PrimaryButton onClick={handlePost} disabled={posting}>

@@ -78,7 +78,12 @@ export default function OpinionCard({
   handleFeedback,
 }: any) {
   const score = op.opinion.logic_score ?? 0;
-  const { claim, premises, reasons } = splitContent(op.opinion.content);
+
+const displayText = op.opinion.is_sensitive
+  ? "（非公開）プライバシー保護のため一部内容を表示していません"
+  : (op.opinion.sanitized_text || op.opinion.content);
+
+const { claim, premises, reasons } = splitContent(displayText);
 
   return (
     <PostCard
@@ -112,6 +117,24 @@ export default function OpinionCard({
         </span>
       </div>
 
+{op.opinion.is_sensitive && (
+  <div
+    style={{
+      marginBottom: 10,
+      padding: "8px 10px",
+      borderRadius: 8,
+      background: "#fff8e1",
+      border: "1px solid #f0c36d",
+      color: "#8a5a00",
+      fontSize: currentFont?.base ? currentFont.base * 0.9 : 14,
+      lineHeight: 1.6,
+      fontWeight: 700,
+    }}
+  >
+    ⚠ プライバシー保護のため元の文章は非公開です
+  </div>
+)}
+
       <div
         style={{
           display: "flex",
@@ -122,7 +145,7 @@ export default function OpinionCard({
       >
         <PrimaryButton
 onClick={() => {
-  setSelectedGuide({ type: "根拠", text: op.opinion.content });
+setSelectedGuide({ type: "根拠", text: displayText });
   setPostRole("rebuttal");
   setReplyToOpinionId(op.opinion.id);
 window.dispatchEvent(new Event("scroll-to-post-form"));
@@ -138,7 +161,7 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
 
         <PrimaryButton
 onClick={() => {
-  setSelectedGuide({ type: "前提", text: op.opinion.content });
+setSelectedGuide({ type: "前提", text: displayText });
   setPostRole("supplement");
   setReplyToOpinionId(op.opinion.id);
 

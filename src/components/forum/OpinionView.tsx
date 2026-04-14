@@ -74,6 +74,10 @@ export default function OpinionView({
                   const isExpanded = isBest || expandedMap[op.opinion.id] === true;
                   const short = getShortSummary(op.opinion.content);
 
+const displayText = op.opinion.is_sensitive
+  ? "プライバシー保護のため一部非公開"
+  : (op.opinion.sanitized_text || op.opinion.content);
+
                   return (
                     <PostCard
                       key={op.opinion.id}
@@ -198,7 +202,7 @@ export default function OpinionView({
                               color: "#111",
                             }}
                           >
-                            👉 {short}
+                           👉 {op.opinion.is_sensitive ? "プライバシー保護のため一部非公開" : short}
                           </div>
 
                           <div
