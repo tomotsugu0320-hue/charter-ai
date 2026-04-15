@@ -13,6 +13,7 @@ import LinkButton from "@/components/forum/LinkButton";
 import OpinionView from "@/components/forum/OpinionView";
 import DiscussionTree from "@/components/forum/DiscussionTree";
 
+
 type ThreadRow = {
   id: string;
   title: string;
@@ -20,7 +21,11 @@ type ThreadRow = {
   original_post: string;
   category?: string;
   created_at?: string;
+  ai_premises?: string[];
+  ai_reasons?: string[];
+  ai_conflicts?: { opinion: string; rebuttal: string }[];
 };
+
 
 type PostRow = {
   id: string;
@@ -441,47 +446,74 @@ setSummary(data?.summary || null);
     return groups;
   }, [sortedVisiblePosts]);
 
-  const groupedByOpinion = useMemo(() => {
-    return groupedByIssue.map((group) => {
-      const opinionGroups: {
-        opinion: PostRow;
-        children: PostRow[];
-      }[] = [];
 
-      let currentOpinion:
-        | {
-            opinion: PostRow;
-            children: PostRow[];
-          }
-        | null = null;
+const groupedByOpinion = useMemo(() => {
+  return groupedByIssue.map((group) => {
+    const opinionGroups: {
+      opinion: PostRow;
+      children: PostRow[];
+    }[] = [];
 
-      for (const post of group.items) {
-        if (post.post_role === "opinion") {
-          currentOpinion = {
-            opinion: post,
-            children: [],
-          };
-          opinionGroups.push(currentOpinion);
-          continue;
-        }
+    const hasOpinion = group.items.some((p) => p.post_role === "opinion");
 
-        if (
-          post.post_role === "rebuttal" ||
-          post.post_role === "supplement" ||
-          post.post_role === "explanation"
-        ) {
-          if (currentOpinion) {
-            currentOpinion.children.push(post);
-          }
-        }
-      }
+    if (!hasOpinion && group.issue) {
+      opinionGroups.push({
+        opinion: {
+          ...group.issue,
+          id: `virtual-${group.issue.id}`,
+          post_role: "opinion",
+          content: group.issue.content,
+          logic_score: 50,
+        },
+        children: group.items.filter(
+          (p) =>
+            p.post_role === "rebuttal" ||
+            p.post_role === "supplement" ||
+            p.post_role === "explanation"
+        ),
+      });
 
       return {
         issue: group.issue,
         opinions: opinionGroups,
       };
-    });
-  }, [groupedByIssue]);
+    }
+
+    let currentOpinion:
+      | {
+          opinion: PostRow;
+          children: PostRow[];
+        }
+      | null = null;
+
+    for (const post of group.items) {
+      if (post.post_role === "opinion") {
+        currentOpinion = {
+          opinion: post,
+          children: [],
+        };
+        opinionGroups.push(currentOpinion);
+        continue;
+      }
+
+      if (
+        post.post_role === "rebuttal" ||
+        post.post_role === "supplement" ||
+        post.post_role === "explanation"
+      ) {
+        if (currentOpinion) {
+          currentOpinion.children.push(post);
+        }
+      }
+    }
+
+    return {
+      issue: group.issue,
+      opinions: opinionGroups,
+    };
+  });
+}, [groupedByIssue]);
+
 
   const authorTrustMap = useMemo(() => {
     const map: Record<
@@ -584,6 +616,28 @@ setSummary(data?.summary || null);
   const originalStructure = useMemo(() => {
     return splitContent(thread?.original_post ?? "");
   }, [thread?.original_post]);
+
+
+
+
+const displayPremises =
+  summary?.key_points?.opinions?.length
+    ? summary.key_points.opinions
+    : thread?.ai_premises ?? [];
+
+const displayReasons =
+  summary?.key_points?.explanations?.length
+    ? summary.key_points.explanations
+    : thread?.ai_reasons ?? [];
+
+const displayConflicts =
+  conflicts.length > 0
+    ? conflicts
+    : thread?.ai_conflicts ?? [];
+
+
+
+
 
   async function handleShare() {
     const url = window.location.href;
@@ -723,6 +777,11 @@ setTimeout(() => {
       alert("threadIdがない。");
       return;
     }
+
+if (postRole === "rebuttal" && !replyToOpinionId) {
+  alert("反論は、先に『この意見への反論』を選んでから投稿して。");
+  return;
+}
 
     setPosting(true);
     setError(null);
@@ -1202,8 +1261,8 @@ function jumpToMainIssues() {
     </div>
 
     <div style={{ display: "grid", gap: 10 }}>
-      {summary?.key_points?.opinions?.length ? (
-        summary.key_points.opinions.map((item, index) => (
+{displayPremises.length ? (
+  displayPremises.map((item, index) => (
           <SelectableCardButton
             key={`premise-${item}-${index}`}
             title={item}
@@ -1236,8 +1295,8 @@ function jumpToMainIssues() {
     </div>
 
     <div style={{ display: "grid", gap: 10 }}>
-      {summary?.key_points?.explanations?.length ? (
-        summary.key_points.explanations.map((item, index) => (
+{displayReasons.length ? (
+  displayReasons.map((item, index) => (
           <SelectableCardButton
             key={`reason-${item}-${index}`}
             title={item}
@@ -1268,10 +1327,9 @@ function jumpToMainIssues() {
     >
       主な対立
     </div>
-
-    {conflicts && conflicts.length > 0 ? (
-      <div style={{ display: "grid", gap: 10 }}>
-        {conflicts.map((c, i) => (
+{displayConflicts.length > 0 ? (
+  <div style={{ display: "grid", gap: 10 }}>
+    {displayConflicts.map((c, i) => (
           <SectionCard
             key={i}
             variant="soft"

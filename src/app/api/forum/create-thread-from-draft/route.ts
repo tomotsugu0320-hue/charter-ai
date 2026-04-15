@@ -13,14 +13,14 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    const {
-      tenantSlug,
-      title,
-      claim,
-      premises,
-      reasons,
-    } = body;
-
+const {
+  tenantSlug,
+  title,
+  claim,
+  premises,
+  reasons,
+  conflicts,
+} = body;
     if (!tenantSlug || !title || !claim) {
       return NextResponse.json(
         { error: "tenantSlug, title and claim are required" },
@@ -69,13 +69,16 @@ const privacy = checkPrivacyRisk(content);
 
     const { data: thread, error: threadError } = await supabase
       .from("forum_threads")
-      .insert({
-        title,
-        slug: `${title}-${Date.now()}`,
-        original_post: privacy.maskedText,
-        visibility: "public",
-        category: category,
-      })
+.insert({
+  title,
+  slug: `${title}-${Date.now()}`,
+  original_post: privacy.maskedText,
+  visibility: "public",
+  category: category,
+  ai_premises: Array.isArray(premises) ? premises : [],
+  ai_reasons: Array.isArray(reasons) ? reasons : [],
+  ai_conflicts: Array.isArray(conflicts) ? conflicts : [],
+})
       .select("id")
       .single();
 

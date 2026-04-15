@@ -3,16 +3,15 @@
 
 type Props = {
   children: React.ReactNode;
+  fontSize?: number;
   style?: React.CSSProperties;
 };
 
-export default function SectionTitle({ children, style }: Props) {
+export default function SectionTitle({ children, fontSize, style }: Props) {
   return (
     <h2
       style={{
-        fontSize: 20,
-        fontWeight: 800,
-        marginBottom: 12,
+        fontSize: fontSize ?? 18,
         ...style,
       }}
     >

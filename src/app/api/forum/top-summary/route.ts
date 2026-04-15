@@ -1,7 +1,11 @@
 // src/app/api/forum/top-summary/route.ts
 
+
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET() {
   const supabase = createClient(
@@ -10,79 +14,55 @@ export async function GET() {
   );
 
   try {
-    // スレッド取得
-    const { data: threads, error: threadError } = await supabase
+    const { data: threads } = await supabase
       .from("forum_threads")
-      .select("id, title, category, created_at, original_post")
+      .select("id, title, category, created_at");
 
-    if (threadError) {
-      throw threadError;
-    }
-
-    // 投稿取得
-    const { data: posts, error: postError } = await supabase
+    const { data: posts } = await supabase
       .from("forum_posts")
-.select("thread_id, logic_score, content");
-const postsContentMap: Record<string, string> = {};
+      .select("thread_id, content");
 
-for (const post of posts ?? []) {
-  if (!postsContentMap[post.thread_id]) {
-    postsContentMap[post.thread_id] = "";
-  }
-  postsContentMap[post.thread_id] += " " + (post.content || "");
-}
-
-    if (postError) {
-      throw postError;
-    }
-
-    // 集計
-    const map = new Map<string, { count: number; totalScore: number }>();
+    const map = new Map<string, number>();
 
     for (const post of posts ?? []) {
-      const entry = map.get(post.thread_id) || { count: 0, totalScore: 0 };
-
-      entry.count += 1;
-      entry.totalScore += post.logic_score ?? 0;
-
-      map.set(post.thread_id, entry);
+      map.set(post.thread_id, (map.get(post.thread_id) ?? 0) + 1);
     }
 
     const threadStats =
       threads?.map((t) => {
-        const stat = map.get(t.id) || { count: 0, totalScore: 0 };
+        const count = map.get(t.id) ?? 0;
 
-        const avg =
-          stat.count > 0 ? Math.round(stat.totalScore / stat.count) : 0;
-
-return {
-  id: t.id,
-  title: t.title,
-  category: t.category,
-  created_at: t.created_at,
-  post_count: stat.count,
-  avg_logic_score: avg,
-  posts_content: postsContentMap[t.id] || "",
-};
+        return {
+          id: t.id,
+          title: t.title,
+          category: t.category,
+          created_at: t.created_at,
+          post_count: count,
+          avg_logic_score: 0,
+        };
       }) ?? [];
 
-    // 人気スレ
     const popularThreads = [...threadStats]
       .sort((a, b) => {
         if (b.avg_logic_score !== a.avg_logic_score) {
           return b.avg_logic_score - a.avg_logic_score;
         }
-        return b.post_count - a.post_count;
+        if (b.post_count !== a.post_count) {
+          return b.post_count - a.post_count;
+        }
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       })
       .slice(0, 100);
 
-    // 活発スレ
     const activeThreads = [...threadStats]
       .sort((a, b) => {
         if (b.post_count !== a.post_count) {
           return b.post_count - a.post_count;
         }
-        return b.avg_logic_score - a.avg_logic_score;
+        if (b.avg_logic_score !== a.avg_logic_score) {
+          return b.avg_logic_score - a.avg_logic_score;
+        }
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       })
       .slice(0, 5);
 
@@ -92,9 +72,8 @@ return {
       activeThreads,
     });
   } catch (e: any) {
-    console.error(e);
     return NextResponse.json(
-      { success: false, error: e?.message || "エラー" },
+      { success: false, error: e?.message || "error" },
       { status: 500 }
     );
   }
