@@ -17,6 +17,36 @@ function isAllowedFeedbackType(value: string): value is AllowedFeedbackType {
   return ALLOWED_FEEDBACK_TYPES.includes(value as AllowedFeedbackType);
 }
 
+
+function getExplanationColumn(
+  feedbackType: AllowedFeedbackType
+):
+  | {
+      textColumn:
+        | "ai_conclusion_explanation"
+        | "ai_counterargument_explanation";
+      timeColumn:
+        | "ai_conclusion_explained_at"
+        | "ai_counterargument_explained_at";
+    }
+  | null {
+  switch (feedbackType) {
+    case "conclusion_unknown":
+      return {
+        textColumn: "ai_conclusion_explanation",
+        timeColumn: "ai_conclusion_explained_at",
+      };
+    case "counterargument_unknown":
+      return {
+        textColumn: "ai_counterargument_explanation",
+        timeColumn: "ai_counterargument_explained_at",
+      };
+    default:
+      return null;
+  }
+}
+
+
 function buildInstruction(feedbackType: AllowedFeedbackType, content: string) {
   switch (feedbackType) {
     case "term_unknown":
@@ -188,35 +218,72 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data: postData, error: postError } = await supabase
-      .from("forum_posts")
-      .select("content")
-      .eq("id", postId)
-      .single();
 
-    if (postError) {
-      return NextResponse.json(
-        { success: false, error: postError.message },
-        { status: 500 }
-      );
-    }
+const explanationColumn = getExplanationColumn(feedbackType);
 
-    const content = String(postData?.content ?? "").trim();
+const selectColumns = explanationColumn
+  ? `content, ${explanationColumn.textColumn}`
+  : "content";
 
-    if (!content) {
-      return NextResponse.json(
-        { success: false, error: "post content not found" },
-        { status: 404 }
-      );
-    }
+const { data: postData, error: postError } = await supabase
+  .from("forum_posts")
+  .select(selectColumns)
+  .eq("id", postId)
+  .single();
 
-    const explanation = await generateExplanation(feedbackType, content);
+if (postError) {
+  return NextResponse.json(
+    { success: false, error: postError.message },
+    { status: 500 }
+  );
+}
 
+const content = String(postData?.content ?? "").trim();
+
+if (!content) {
+  return NextResponse.json(
+    { success: false, error: "post content not found" },
+    { status: 404 }
+  );
+}
+
+if (explanationColumn) {
+  const cachedExplanation = String(
+    postData?.[explanationColumn.textColumn] ?? ""
+  ).trim();
+
+  if (cachedExplanation) {
     return NextResponse.json({
       success: true,
       feedback: feedbackData ?? [],
-      explanation,
+      explanation: cachedExplanation,
+      cached: true,
     });
+  }
+}
+
+const explanation = await generateExplanation(feedbackType, content);
+
+if (explanationColumn) {
+  const { error: updateError } = await supabase
+    .from("forum_posts")
+    .update({
+      [explanationColumn.textColumn]: explanation,
+      [explanationColumn.timeColumn]: new Date().toISOString(),
+    })
+    .eq("id", postId);
+
+  if (updateError) {
+    console.error("[forum feedback cache save error]", updateError);
+  }
+}
+
+return NextResponse.json({
+  success: true,
+  feedback: feedbackData ?? [],
+  explanation,
+  cached: false,
+});
   } catch (e: any) {
     console.error("[forum feedback error]", e);
 

@@ -1140,9 +1140,9 @@ onClick={() => {
     fontWeight: 600,
     borderRadius: "10px",
     color: "#ddd",
-    background: selectedThreadId ? "#444" : "#3a3a3a",
-    opacity: selectedThreadId ? 0.85 : 0.6,
-    cursor: selectedThreadId ? "pointer" : "not-allowed",
+    background: selectedThreadId ? "#444" : "#2563eb",
+    opacity: selectedThreadId ? 0.5 : 1,
+cursor: selectedThreadId ? "not-allowed" : "pointer",
   }}
   onClick={async () => {
     if (selectedThreadId) return;

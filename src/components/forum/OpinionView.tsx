@@ -84,12 +84,6 @@ export default function OpinionView({
         color: "#111",
       }}
     >
-      {op.opinion.id.startsWith("virtual-") && (
-        <div style={{ fontSize: 12, color: "#999" }}>
-          ※AIによる仮の意見
-        </div>
-      )}
-
       <div
         style={{
           display: "flex",

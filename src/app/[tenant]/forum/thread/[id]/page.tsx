@@ -456,28 +456,12 @@ const groupedByOpinion = useMemo(() => {
 
     const hasOpinion = group.items.some((p) => p.post_role === "opinion");
 
-    if (!hasOpinion && group.issue) {
-      opinionGroups.push({
-        opinion: {
-          ...group.issue,
-          id: `virtual-${group.issue.id}`,
-          post_role: "opinion",
-          content: group.issue.content,
-          logic_score: 50,
-        },
-        children: group.items.filter(
-          (p) =>
-            p.post_role === "rebuttal" ||
-            p.post_role === "supplement" ||
-            p.post_role === "explanation"
-        ),
-      });
-
-      return {
-        issue: group.issue,
-        opinions: opinionGroups,
-      };
-    }
+if (!hasOpinion) {
+  return {
+    issue: group.issue,
+    opinions: [],
+  };
+}
 
     let currentOpinion:
       | {

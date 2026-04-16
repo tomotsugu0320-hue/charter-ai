@@ -345,25 +345,35 @@ export default function DiscussionTree({
           </div>
         </div>
 
-        <div
-          onClick={() =>
-            onSelectNode({
-              type: roleLabel(post.post_role),
-              text: post.content,
-            })
-          }
-          style={{
-            marginTop: 8,
-            fontSize: currentFont.base,
-            lineHeight: 1.7,
-            color: "#111",
-            whiteSpace: "pre-wrap",
-            cursor: "pointer",
-          }}
-          title="この内容について書く"
-        >
-          {cutText(post.content, 120)}
-        </div>
+<div
+  onClick={() =>
+    onSelectNode({
+      type: roleLabel(post.post_role),
+      text: post.content,
+    })
+  }
+  style={{
+    marginTop: 8,
+    fontSize: currentFont.base,
+    lineHeight: 1.7,
+    color: "#111",
+    whiteSpace: "pre-wrap",
+    cursor: "pointer",
+  }}
+  title="この内容について書く"
+>
+{cutText(
+  post.content
+    .split("\n")
+    .filter(
+      (line) =>
+        !line.trim().startsWith("前提:") &&
+        !line.trim().startsWith("根拠:")
+    )
+    .join("\n"),
+  120
+)}
+</div>
 
         {renderRelated(nodeId)}
       </div>

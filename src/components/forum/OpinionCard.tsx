@@ -183,28 +183,24 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
           <div>{claim}</div>
         </div>
 
-        {premises.length > 0 && (
-          <div style={{ marginBottom: 6 }}>
-            <b>前提</b>
-            <ul style={{ paddingLeft: 20 }}>
-              {premises.map((p: string, i: number) => (
-                <li key={i}>{p}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {reasons.length > 0 && (
-          <div>
-            <b>根拠</b>
-            <ul style={{ paddingLeft: 20 }}>
-              {reasons.map((r: string, i: number) => (
-                <li key={i}>{r}</li>
-              ))}
-            </ul>
-          </div>
-        )}
       </div>
+
+<PrimaryButton
+  variant="secondary"
+  onClick={() =>
+    window.open(
+      `https://www.google.com/search?q=${encodeURIComponent(claim || displayText)}`,
+      "_blank"
+    )
+  }
+  style={{
+    borderRadius: 999,
+    padding: "6px 10px",
+    fontSize: currentFont?.base,
+  }}
+>
+  Googleで検索
+</PrimaryButton>
 
       <div
         style={{
@@ -216,10 +212,7 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
         }}
       >
         {[
-  ["term_unknown", "AIで言葉を解説"],
-  ["premise_unknown", "AIで前提を解説"],
   ["conclusion_unknown", "AIで結論を解説"],
-  ["evidence_unknown", "AIで根拠を解説"],
   ["counterargument_unknown", "AIで反対意見を解説"],
 ].map(([type, label]) => (
           <PrimaryButton
