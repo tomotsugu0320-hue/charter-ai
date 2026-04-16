@@ -58,9 +58,7 @@ export default function OpinionView({
   }}
 >
 {group.issue
-  ? `問い: ${(group.issue.content || "")
-      .split("\n")[0]
-      .replace(/^主張:\s*/, "")}`
+  ? `問い: ${group.issue.content}`
   : `問い: ${thread?.title ?? "このスレのテーマ"}`}
 </summary>
             <div style={{ marginTop: 12 }}>
