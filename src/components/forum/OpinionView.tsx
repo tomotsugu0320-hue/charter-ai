@@ -49,19 +49,20 @@ export default function OpinionView({
           style={{ borderRadius: 14, color: "#111" }}
         >
           <details open style={{ marginBottom: 12 }}>
-            <summary
-              style={{
-                fontSize: currentFont.base,
-                fontWeight: 800,
-                color: "#0d47a1",
-                cursor: "pointer",
-              }}
-            >
-              {group.issue
-                ? `問い: ${group.issue.content}`
-                : `問い: ${thread?.title ?? "このスレのテーマ"}`}
-            </summary>
-
+<summary
+  style={{
+    cursor: "pointer",
+    fontWeight: 700,
+    color: "#0f4aa1",
+    fontSize: currentFont.base,
+  }}
+>
+  {group.issue
+    ? `問い: ${(group.issue.content || "")
+        .split("\n")[0]
+        .replace(/^主張:\s*/, "")}`
+    : `問い: ${thread?.title ?? "このスレのテーマ"}`}
+</summary>
             <div style={{ marginTop: 12 }}>
 {group.opinions.length === 0 ? (
   <div style={{ color: "#777", fontSize: currentFont.base }}>
