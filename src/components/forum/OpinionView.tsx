@@ -57,11 +57,11 @@ export default function OpinionView({
     fontSize: currentFont.base,
   }}
 >
-  {group.issue
-    ? `問い: ${(group.issue.content || "")
-        .split("\n")[0]
-        .replace(/^主張:\s*/, "")}`
-    : `問い: ${thread?.title ?? "このスレのテーマ"}`}
+{group.issue
+  ? `問い: ${(group.issue.content || "")
+      .split("\n")[0]
+      .replace(/^主張:\s*/, "")}`
+  : `問い: ${thread?.title ?? "このスレのテーマ"}`}
 </summary>
             <div style={{ marginTop: 12 }}>
 {group.opinions.length === 0 ? (
