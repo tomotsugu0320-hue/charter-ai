@@ -47,6 +47,13 @@ function getExplanationColumn(
 }
 
 
+type PostCacheRow = {
+  content: string | null;
+  ai_conclusion_explanation?: string | null;
+  ai_counterargument_explanation?: string | null;
+};
+
+
 function buildInstruction(feedbackType: AllowedFeedbackType, content: string) {
   switch (feedbackType) {
     case "term_unknown":
@@ -225,11 +232,13 @@ const selectColumns = explanationColumn
   ? `content, ${explanationColumn.textColumn}`
   : "content";
 
-const { data: postData, error: postError } = await supabase
+const { data: postDataRaw, error: postError } = await supabase
   .from("forum_posts")
   .select(selectColumns)
   .eq("id", postId)
   .single();
+
+const postData = postDataRaw as PostCacheRow | null;
 
 if (postError) {
   return NextResponse.json(
