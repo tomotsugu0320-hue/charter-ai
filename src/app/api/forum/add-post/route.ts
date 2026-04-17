@@ -443,6 +443,7 @@ const { data: postRows } = await supabase
   .from("forum_posts")
   .select("id, post_role, content, created_at, logic_score, logic_score_reason")
   .eq("thread_id", threadId)
+  .eq("is_deleted", false)
   .order("created_at", { ascending: true });
 
 // ③ 要約生成

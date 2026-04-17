@@ -1,6 +1,5 @@
-// src/app/[tenant]/forum/layout.tsx
-
 import type { Metadata } from "next";
+import { absoluteUrl, siteName } from "@/lib/seo";
 
 type LayoutProps = {
   children: React.ReactNode;
@@ -9,26 +8,30 @@ type LayoutProps = {
   }>;
 };
 
-export async function generateMetadata({ params }: LayoutProps): Promise<Metadata> {
-  const resolved = await params;
-  const tenant = resolved.tenant;
-
-  const title = "AI掲示板 | 論点・前提・根拠を見える化";
+export async function generateMetadata({
+  params,
+}: LayoutProps): Promise<Metadata> {
+  const { tenant } = await params;
+  const title = "AI掲示板";
   const description =
-    "意見を主張・前提・根拠に分解して、議論のズレを見える化するAI掲示板。関連する論点や反対意見もたどれます。";
+    "問い、意見、反論、補足をAIで整理し、議論の流れや関連スレッドを見つけられる掲示板です。";
+  const url = absoluteUrl(`/${tenant}/forum`);
 
   return {
     title,
     description,
+    alternates: {
+      canonical: url,
+    },
     openGraph: {
       title,
       description,
-      url: `/${tenant}/forum`,
-      siteName: "AI掲示板",
+      url,
+      siteName,
       type: "website",
     },
     twitter: {
-      card: "summary_large_image",
+      card: "summary",
       title,
       description,
     },

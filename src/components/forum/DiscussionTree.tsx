@@ -328,20 +328,31 @@ export default function DiscussionTree({
               )}
             </div>
 
-            <button
-              onClick={() => loadRelated(nodeId, post.content)}
+            <div
               style={{
-                border: "1px solid #ddd",
-                background: "#f7f7f7",
-                borderRadius: 999,
-                padding: "4px 10px",
-                fontSize: currentFont.base,
-                cursor: "pointer",
-                color: "#444",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flexWrap: "wrap",
               }}
             >
-              {hasLoaded && isOpen ? "閉じる" : "🔗 関連を見る"}
-            </button>
+              <button
+                type="button"
+                onClick={() => loadRelated(nodeId, post.content)}
+                style={{
+                  border: "1px solid #ddd",
+                  background: "#f7f7f7",
+                  borderRadius: 999,
+                  padding: "4px 10px",
+                  fontSize: currentFont.base,
+                  cursor: "pointer",
+                  color: "#444",
+                }}
+              >
+                {hasLoaded && isOpen ? "閉じる" : "🔗 関連を見る"}
+              </button>
+
+            </div>
           </div>
         </div>
 

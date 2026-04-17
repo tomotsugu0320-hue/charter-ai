@@ -73,9 +73,13 @@ if (!thread) {
   prediction_flag,
   prediction_target,
   prediction_deadline,
-  prediction_result
+  prediction_result,
+  is_deleted,
+  deleted_at,
+  delete_reason
 `)
       .eq("thread_id", threadId)
+      .eq("is_deleted", false)
       .order("created_at", { ascending: true });
 
     if (postsError) {

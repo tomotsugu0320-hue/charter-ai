@@ -1,4 +1,23 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { absoluteUrl, siteDescription, siteName } from "@/lib/seo";
+
+export const metadata: Metadata = {
+  title: siteName,
+  description: siteDescription,
+  openGraph: {
+    title: siteName,
+    description: siteDescription,
+    url: absoluteUrl("/"),
+    siteName,
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: siteName,
+    description: siteDescription,
+  },
+};
 
 export default function Home() {
   return (

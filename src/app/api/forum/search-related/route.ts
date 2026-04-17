@@ -51,6 +51,7 @@ export async function POST(req: Request) {
           category
         )
       `)
+      .eq("is_deleted", false)
       .order("created_at", { ascending: false })
       .limit(20);
 

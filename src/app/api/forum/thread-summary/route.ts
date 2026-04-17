@@ -295,6 +295,7 @@ export async function GET(req: NextRequest) {
       .from("forum_posts")
       .select("id, post_role, content, created_at")
       .eq("thread_id", threadId)
+      .eq("is_deleted", false)
       .order("created_at", { ascending: true });
 
     if (error) {

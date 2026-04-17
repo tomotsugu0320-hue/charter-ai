@@ -16,11 +16,13 @@ export async function GET() {
   try {
     const { data: threads } = await supabase
       .from("forum_threads")
-      .select("id, title, category, created_at");
+      .select("id, title, category, created_at")
+      .eq("is_deleted", false);
 
     const { data: posts } = await supabase
       .from("forum_posts")
-      .select("thread_id, content");
+      .select("thread_id, content")
+      .eq("is_deleted", false);
 
     const map = new Map<string, number>();
 

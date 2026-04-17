@@ -14,6 +14,7 @@ import OpinionView from "@/components/forum/OpinionView";
 import DiscussionTree from "@/components/forum/DiscussionTree";
 
 
+
 type ThreadRow = {
   id: string;
   title: string;
@@ -127,6 +128,16 @@ function formatDate(value?: string) {
   return d.toLocaleString("ja-JP");
 }
 
+function getCookieValue(name: string) {
+  if (typeof document === "undefined") return "";
+
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${name}=`));
+
+  return match ? decodeURIComponent(match.split("=").slice(1).join("=")) : "";
+}
+
 function roleColor(role: string) {
   switch (role) {
     case "issue_raise":
@@ -190,6 +201,7 @@ export default function ForumThreadPage({ params }: PageProps) {
 
   const [tenant, setTenant] = useState("");
   const [threadId, setThreadId] = useState("");
+  const [currentAuthorKey, setCurrentAuthorKey] = useState("");
 
 
   const [sortType, setSortType] = useState<"score" | "new">("score");
@@ -208,6 +220,8 @@ useEffect(() => {
   if (saved === "easy" || saved === "normal") {
     setMode(saved);
   }
+
+  setCurrentAuthorKey(getCookieValue("author_key"));
 }, []);
 
 
@@ -819,6 +833,7 @@ if (postRole === "rebuttal" && !replyToOpinionId) {
       setPredictionTarget("");
       setPredictionDeadline("");
       setSelectedGuide(null);
+      setCurrentAuthorKey(getCookieValue("author_key"));
       await loadThread();
     } catch (e: any) {
       console.error(e);
@@ -870,6 +885,29 @@ if (postRole === "rebuttal" && !replyToOpinionId) {
     }
   }
 
+  async function handleHidePost(postId: string) {
+    if (
+      !confirm(
+        "この投稿を非表示にしますか？\n※ 後から復元機能を追加予定です"
+      )
+    ) {
+      return;
+    }
+
+    const res = await fetch(`/api/forum/posts/${postId}/delete`, {
+      method: "PATCH",
+    });
+
+    const result = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      alert(result?.error || "投稿の非表示に失敗しました");
+      return;
+    }
+
+    await loadThread();
+  }
+
 function jumpToMainIssues() {
   const el = document.getElementById("main-issues");
   el?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -884,6 +922,23 @@ function jumpToMainIssues() {
         padding: "24px 16px 80px",
       }}
     >
+
+<a
+  href={`/${tenant}/forum/admin/delete`}
+  style={{
+    display: "inline-block",
+    marginBottom: 12,
+    color: "#0d47a1",
+    fontWeight: 700,
+    textDecoration: "none",
+  }}
+>
+  管理画面
+</a>
+
+
+
+
       <div style={{ marginBottom: 16 }}>
         <LinkButton href={`/${tenant}/forum`} variant="subtle">
           ← 掲示板トップに戻る
@@ -1448,6 +1503,8 @@ function jumpToMainIssues() {
   explanations={explanations}
   feedbackLoadingPostId={feedbackLoadingPostId}
   handleFeedback={handleFeedback}
+  onHidePost={handleHidePost}
+  currentAuthorKey={currentAuthorKey}
 />
 
 </div>
@@ -1591,13 +1648,23 @@ function jumpToMainIssues() {
                         >
                           <div
                             style={{
-                              fontSize: currentFont.base,
-                              fontWeight: 700,
-                              color: "#666",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-start",
+                              gap: 12,
                               marginBottom: 4,
                             }}
                           >
-                            {roleLabel(post.post_role)} / {formatDate(post.created_at)}
+                            <div
+                              style={{
+                                fontSize: currentFont.base,
+                                fontWeight: 700,
+                                color: "#666",
+                              }}
+                            >
+                              {roleLabel(post.post_role)} / {formatDate(post.created_at)}
+                            </div>
+
                           </div>
                           <div style={{ fontSize: currentFont.base, lineHeight: 1.6 }}>
                             <div
@@ -1613,30 +1680,6 @@ function jumpToMainIssues() {
                             {post.content}
                           </div>
 
-<button
-  onClick={async () => {
-    if (!confirm("削除しますか？")) return;
-
-    await fetch("/api/forum/delete-post", {
-      method: "POST",
-      body: JSON.stringify({ postId: post.id }),
-      headers: { "Content-Type": "application/json" },
-    });
-
-    location.reload();
-  }}
-  style={{
-    marginTop: 8,
-    fontSize: 12,
-    color: "#b71c1c",
-    background: "transparent",
-    border: "none",
-    cursor: "pointer",
-    padding: 0,
-  }}
->
-  🗑 削除
-</button>
                         </PostCard>
                       ))}
 

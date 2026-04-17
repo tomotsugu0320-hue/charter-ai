@@ -76,8 +76,15 @@ export default function OpinionCard({
   explanations,
   feedbackLoadingPostId,
   handleFeedback,
+  onHidePost,
+  currentAuthorKey,
 }: any) {
   const score = op.opinion.logic_score ?? 0;
+  const canHideOpinion =
+    !!onHidePost &&
+    !!currentAuthorKey &&
+    !String(op.opinion.id).startsWith("virtual-") &&
+    op.opinion.author_key === currentAuthorKey;
 
 const displayText = op.opinion.is_sensitive
   ? "（非公開）プライバシー保護のため一部内容を表示していません"
@@ -106,15 +113,44 @@ const { claim, premises, reasons } = splitContent(displayText);
     >
       <div
         style={{
-          fontWeight: 700,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 12,
           marginBottom: 6,
-          color: roleColor(op.opinion.post_role),
         }}
       >
-        💬 {roleLabel(op.opinion.post_role)}
-        <span style={{ marginLeft: 8, color: scoreColor(score) }}>
-          {score || "未評価"}
-        </span>
+        <div
+          style={{
+            fontWeight: 700,
+            color: roleColor(op.opinion.post_role),
+          }}
+        >
+          💬 {roleLabel(op.opinion.post_role)}
+          <span style={{ marginLeft: 8, color: scoreColor(score) }}>
+            {score || "未評価"}
+          </span>
+        </div>
+
+        {canHideOpinion && (
+          <button
+            type="button"
+            onClick={() => onHidePost(op.opinion.id)}
+            style={{
+              flexShrink: 0,
+              fontSize: 12,
+              color: "#6b7280",
+              border: "1px solid #d1d5db",
+              borderRadius: 999,
+              background: "transparent",
+              cursor: "pointer",
+              padding: "4px 8px",
+              lineHeight: 1.2,
+            }}
+          >
+            非表示
+          </button>
+        )}
       </div>
 
 {op.opinion.is_sensitive && (
@@ -269,7 +305,12 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
 </SectionCard>
       )}
 
-      <ReplyGroup op={op} hideLowScore={hideLowScore} />
+      <ReplyGroup
+        op={op}
+        hideLowScore={hideLowScore}
+        onHidePost={onHidePost}
+        currentAuthorKey={currentAuthorKey}
+      />
     </PostCard>
   );
 }

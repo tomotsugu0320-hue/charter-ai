@@ -37,6 +37,8 @@ export default function OpinionView({
   explanations,
   feedbackLoadingPostId,
   handleFeedback,
+  onHidePost,
+  currentAuthorKey,
 }: any) {
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
 
@@ -139,27 +141,38 @@ export default function OpinionView({
           )}
         </div>
 
-        {!isBest && (
-          <button
-            onClick={() =>
-              setExpandedMap((prev) => ({
-                ...prev,
-                [op.opinion.id]: !prev[op.opinion.id],
-              }))
-            }
-            style={{
-              border: "none",
-              background: "transparent",
-              cursor: "pointer",
-              color: "#0d47a1",
-              fontSize: currentFont.base * 0.9,
-              fontWeight: 700,
-              padding: 0,
-            }}
-          >
-            {isExpanded ? "閉じる" : "開く"}
-          </button>
-        )}
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            flexShrink: 0,
+          }}
+        >
+          {!isBest && (
+            <button
+              type="button"
+              onClick={() =>
+                setExpandedMap((prev) => ({
+                  ...prev,
+                  [op.opinion.id]: !prev[op.opinion.id],
+                }))
+              }
+              style={{
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                color: "#0d47a1",
+                fontSize: currentFont.base * 0.9,
+                fontWeight: 700,
+                padding: "4px 0",
+              }}
+            >
+              {isExpanded ? "閉じる" : "開く"}
+            </button>
+          )}
+
+        </div>
       </div>
 
       {isExpanded ? (
@@ -174,6 +187,8 @@ export default function OpinionView({
             explanations={explanations}
             feedbackLoadingPostId={feedbackLoadingPostId}
             handleFeedback={handleFeedback}
+            onHidePost={onHidePost}
+            currentAuthorKey={currentAuthorKey}
           />
         </div>
       ) : (

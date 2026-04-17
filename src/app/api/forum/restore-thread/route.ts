@@ -1,5 +1,3 @@
-// src/app/api/forum/delete-post/route.ts
-
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -10,31 +8,34 @@ const supabase = createClient(
 
 export async function POST(req: Request) {
   try {
-    const { postId } = await req.json();
+    const { threadId } = await req.json();
 
-    if (!postId) {
+    if (!threadId) {
       return NextResponse.json(
-        { error: "postIdが必要" },
+        { error: "threadId is required" },
         { status: 400 }
       );
     }
 
     const { error } = await supabase
-      .from("forum_posts")
-      .delete()
-      .eq("id", postId); // ←ここが絶対これ
+      .from("forum_threads")
+      .update({
+        is_deleted: false,
+        deleted_at: null,
+      })
+      .eq("id", threadId);
 
     if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
-  } catch (e: any) {
+  } catch (error) {
     return NextResponse.json(
-      { error: e?.message || "削除失敗" },
+      {
+        error:
+          error instanceof Error ? error.message : "failed to restore thread",
+      },
       { status: 500 }
     );
   }

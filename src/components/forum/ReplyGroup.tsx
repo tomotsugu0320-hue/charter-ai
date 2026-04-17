@@ -57,6 +57,8 @@ function scoreColor(score?: number) {
 export default function ReplyGroup({
   op,
   hideLowScore,
+  onHidePost,
+  currentAuthorKey,
 }: any) {
   if (!op.children?.length) return null;
 
@@ -84,6 +86,10 @@ export default function ReplyGroup({
         {op.children.map((child: any) => {
           const childScore = child.logic_score ?? 0;
           const split = splitContent(child.content);
+          const canHideChild =
+            !!onHidePost &&
+            !!currentAuthorKey &&
+            child.author_key === currentAuthorKey;
 
           const childOpacity =
             hideLowScore && childScore > 0 && childScore < 60
@@ -108,16 +114,45 @@ export default function ReplyGroup({
             >
               <div
                 style={{
-                  fontWeight: 700,
-                  color: roleColor(child.post_role),
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: 12,
                   marginBottom: 6,
                 }}
               >
-                {roleLabel(child.post_role)}（
-                <span style={{ color: scoreColor(childScore) }}>
-                  {childScore || "未評価"}
-                </span>
-                ）
+                <div
+                  style={{
+                    fontWeight: 700,
+                    color: roleColor(child.post_role),
+                  }}
+                >
+                  {roleLabel(child.post_role)}（
+                  <span style={{ color: scoreColor(childScore) }}>
+                    {childScore || "未評価"}
+                  </span>
+                  ）
+                </div>
+
+                {canHideChild && (
+                  <button
+                    type="button"
+                    onClick={() => onHidePost(child.id)}
+                    style={{
+                      flexShrink: 0,
+                      fontSize: 12,
+                      color: "#6b7280",
+                      background: "transparent",
+                      border: "1px solid #d1d5db",
+                      borderRadius: 999,
+                      cursor: "pointer",
+                      padding: "4px 8px",
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    非表示
+                  </button>
+                )}
               </div>
 
               <div style={{ marginBottom: 6 }}>
@@ -146,6 +181,7 @@ export default function ReplyGroup({
                   </ul>
                 </div>
               )}
+
             </PostCard>
           );
         })}

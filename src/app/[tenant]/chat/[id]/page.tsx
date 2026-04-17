@@ -1004,11 +1004,11 @@ const postTypeCounts = useMemo(() => {
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: 24 }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
-        AI掲示板
+        AI記録チャット
       </h1>
 
       <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 20 }}>
-        テーマを整理し、投稿を関連づけ、AIが検証履歴を残す掲示板
+        トレーニングや食事の記録を残し、AIが振り返りをサポートします
       </div>
 
 
@@ -1021,7 +1021,7 @@ const postTypeCounts = useMemo(() => {
             marginBottom: 6,
           }}
         >
-          投稿フィルタ
+          記録フィルタ
         </div>
       </div>
 
@@ -1031,19 +1031,19 @@ const postTypeCounts = useMemo(() => {
 </button>
 
 <button onClick={() => setSelectedPostType("opinion")} style={filterButtonStyle("opinion")}>
-  ✍ 意見（{postTypeCounts.opinion}）
+  ✍ 記録（{postTypeCounts.opinion}）
 </button>
 
 <button onClick={() => setSelectedPostType("counter")} style={filterButtonStyle("counter")}>
-  ⚔ 反論（{postTypeCounts.counter}）
+  ⚔ 修正（{postTypeCounts.counter}）
 </button>
 
 <button onClick={() => setSelectedPostType("data")} style={filterButtonStyle("data")}>
-  📊 補足（{postTypeCounts.data}）
+  📊 データ（{postTypeCounts.data}）
 </button>
 
 <button onClick={() => setSelectedPostType("simple")} style={filterButtonStyle("simple")}>
-  🧠 解説（{postTypeCounts.simple}）
+  🧠 メモ（{postTypeCounts.simple}）
 </button>
 
 
@@ -1058,7 +1058,7 @@ const postTypeCounts = useMemo(() => {
             marginBottom: 6,
           }}
         >
-          📝 投稿入力
+          📝 記録入力
         </div>
       </div>
 
@@ -1076,7 +1076,7 @@ const postTypeCounts = useMemo(() => {
     cursor: "pointer",
   }}
 >
-  ✍ 意見
+  ✍ 記録
 </button>
 <button
   onClick={() => setPostType("counter")}
@@ -1089,7 +1089,7 @@ const postTypeCounts = useMemo(() => {
     cursor: "pointer",
   }}
 >
-  ⚔ 反論
+  ⚔ 修正
 </button>
 
 <button
@@ -1103,7 +1103,7 @@ const postTypeCounts = useMemo(() => {
     cursor: "pointer",
   }}
 >
-  📊 補足
+  📊 データ
 </button>
 
 <button
@@ -1117,7 +1117,7 @@ const postTypeCounts = useMemo(() => {
     cursor: "pointer",
   }}
 >
-  🧠 解説
+  🧠 メモ
 </button>
 </div>
 
@@ -1131,7 +1131,7 @@ const postTypeCounts = useMemo(() => {
 
 
       <div style={{ marginBottom: 8, fontSize: 13, color: "#6b7280" }}>
-        例：日本経済はインフレなのか？／消費税は必要か？
+        例：ベンチプレスを3セット行った／夕食は少なめにした
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
@@ -1174,7 +1174,7 @@ placeholder={
             border: "none",
           }}
         >
-          {loading ? "送信中..." : "👉 投稿"}
+          {loading ? "送信中..." : "👉 記録する"}
         </button>
       </div>
 
@@ -1186,7 +1186,7 @@ placeholder={
             marginBottom: 8,
           }}
         >
-          🔥 よく議論されているテーマ
+          🔥 よく記録されているテーマ
         </div>
 
         {issueRanking.map((issue, index) => (
@@ -1210,7 +1210,7 @@ placeholder={
             marginBottom: 8,
           }}
         >
-          🔥 判定がよく変わるテーマ
+          🔥 変化が大きいテーマ
         </div>
 
         {issueVolatilityRanking.map((issue, index) => (
@@ -1229,7 +1229,7 @@ placeholder={
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        <h3 style={{ marginTop: 24 }}>このスレのテーマ</h3>
+        <h3 style={{ marginTop: 24 }}>この記録のテーマ</h3>
 
         {verifyError && (
           <div
@@ -1261,7 +1261,7 @@ placeholder={
             </div>
 
             <div style={{ fontSize: 13, color: "#6b7280" }}>
-              このテーマに関連する投稿を表示中
+              このテーマに関連する記録を表示中
             </div>
           </div>
         )}
@@ -1500,7 +1500,7 @@ placeholder={
             marginBottom: 8,
           }}
         >
-          📚 投稿一覧
+          📚 記録一覧
         </div>
 
 <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 4 }}>
@@ -1588,7 +1588,7 @@ placeholder={
 <input
   value={searchText}
   onChange={(e) => setSearchText(e.target.value)}
-  placeholder="検索（必要なときだけ使う）（例：消費税・円安・賃金）"
+  placeholder="検索（必要なときだけ使う）（例：胸トレ・夕食・睡眠）"
   style={{
     width: "100%",
     padding: 8,
@@ -1667,10 +1667,10 @@ const mainIssue = mainSuggested ?? relatedIssues[0];
       color: "#374151",
     }}
   >
-    {entry.category === "opinion" && "✍ 意見"}
-    {entry.category === "counter" && "⚔ 反論"}
-    {entry.category === "data" && "📊 補足"}
-    {entry.category === "simple" && "🧠 解説"}
+    {entry.category === "opinion" && "✍ 記録"}
+    {entry.category === "counter" && "⚔ 修正"}
+    {entry.category === "data" && "📊 データ"}
+    {entry.category === "simple" && "🧠 メモ"}
   </div>
 )}
 
@@ -1693,7 +1693,7 @@ const mainIssue = mainSuggested ?? relatedIssues[0];
   >
     <div style={{ fontWeight: 700, marginBottom: 4 }}>🧠 やさしい解説</div>
     <div style={{ color: "#4b5563" }}>
-      ここに「難しい内容をかみ砕いた説明」を表示する予定
+      ここに記録の振り返りや補足説明を表示する予定
     </div>
   </div>
 )}
