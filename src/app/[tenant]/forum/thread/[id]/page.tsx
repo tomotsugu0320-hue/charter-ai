@@ -55,6 +55,19 @@ type PostRow = {
   };
 };
 
+type SourceItem = {
+  text: string;
+  source_type: "extracted" | "inferred";
+  quality_score: number;
+};
+
+type ConflictItem = {
+  opinion: string;
+  rebuttal: string;
+  source_type?: "extracted" | "inferred";
+  quality_score?: number;
+};
+
 type ThreadSummary = {
   counts: {
     total: number;
@@ -72,6 +85,9 @@ type ThreadSummary = {
     rebuttals: string[];
     supplements: string[];
     explanations: string[];
+    premises?: SourceItem[];
+    reasons?: SourceItem[];
+    counterpoints?: SourceItem[];
   };
 };
 
@@ -118,6 +134,147 @@ function splitContent(content: string) {
     claim,
     premises,
     reasons,
+  };
+}
+
+function normalizeSourceItems(values?: (string | SourceItem)[] | null): SourceItem[] {
+  if (!Array.isArray(values)) return [];
+
+  return values
+    .map((value) => {
+      if (typeof value === "string") {
+        return {
+          text: value,
+          source_type: "extracted" as const,
+          quality_score: 60,
+        };
+      }
+
+      const sourceType =
+        value?.source_type === "inferred" ? "inferred" as const : "extracted" as const;
+      const qualityScore =
+        typeof value?.quality_score === "number" && Number.isFinite(value.quality_score)
+          ? Math.max(0, Math.min(100, Math.round(value.quality_score)))
+          : sourceType === "extracted"
+          ? 60
+          : 45;
+
+      return {
+        text: String(value?.text ?? ""),
+        source_type: sourceType,
+        quality_score: qualityScore,
+      };
+    })
+    .filter((item) => item.text.trim())
+    .slice(0, 3);
+}
+
+function splitByQuality(items: SourceItem[]) {
+  return {
+    strong: items.filter((item) => item.quality_score >= 60).slice(0, 3),
+    mid: items
+      .filter((item) => item.quality_score >= 40 && item.quality_score < 60)
+      .slice(0, 2),
+    hide: items.filter((item) => item.quality_score < 40),
+  };
+}
+
+function getSectionDisplay(
+  items: SourceItem[],
+  labels: { strong: string; mid: string },
+  messages: string[]
+) {
+  const grouped = splitByQuality(items);
+
+  if (grouped.strong.length > 0) {
+    return {
+      mode: "strong" as const,
+      title: labels.strong,
+      items: grouped.strong,
+      messages: [] as string[],
+    };
+  }
+
+  if (grouped.mid.length > 0) {
+    return {
+      mode: "mid" as const,
+      title: labels.mid,
+      items: grouped.mid,
+      messages: [] as string[],
+    };
+  }
+
+  return {
+    mode: "empty" as const,
+    title: labels.mid,
+    items: [] as SourceItem[],
+    messages,
+  };
+}
+
+function normalizeConflictItems(values?: ConflictItem[] | null): ConflictItem[] {
+  if (!Array.isArray(values)) return [];
+
+  return values
+    .map((value) => {
+      const sourceType =
+        value?.source_type === "inferred" ? "inferred" as const : "extracted" as const;
+      const qualityScore =
+        typeof value?.quality_score === "number" && Number.isFinite(value.quality_score)
+          ? Math.max(0, Math.min(100, Math.round(value.quality_score)))
+          : sourceType === "extracted"
+          ? 60
+          : 45;
+
+      return {
+        opinion: String(value?.opinion ?? ""),
+        rebuttal: String(value?.rebuttal ?? ""),
+        source_type: sourceType,
+        quality_score: qualityScore,
+      };
+    })
+    .filter((item) => item.opinion.trim() || item.rebuttal.trim())
+    .slice(0, 3);
+}
+
+function getConflictDisplay(items: ConflictItem[]) {
+  const normalized = normalizeConflictItems(items);
+  const strong = normalized
+    .filter((item) => (item.quality_score ?? 0) >= 60)
+    .slice(0, 3);
+  const mid = normalized
+    .filter(
+      (item) =>
+        (item.quality_score ?? 0) >= 40 && (item.quality_score ?? 0) < 60
+    )
+    .slice(0, 2);
+
+  if (strong.length > 0) {
+    return {
+      mode: "strong" as const,
+      title: "主な対立",
+      items: strong,
+      messages: [] as string[],
+    };
+  }
+
+  if (mid.length > 0) {
+    return {
+      mode: "mid" as const,
+      title: "想定される対立（参考）",
+      items: mid,
+      messages: [] as string[],
+    };
+  }
+
+  return {
+    mode: "empty" as const,
+    title: "想定される対立（参考）",
+    items: [] as ConflictItem[],
+    messages: [
+      "対立はまだ十分に特定できません",
+      "別の見方や反対意見があるかを書くと議論が深まります",
+    ],
   };
 }
 
@@ -192,7 +349,7 @@ function trustBonus(label?: string) {
 
 export default function ForumThreadPage({ params }: PageProps) {
   const [conflicts, setConflicts] = useState<
-    { opinion: string; rebuttal: string }[]
+    ConflictItem[]
   >([]);
 
   const [fontSize, setFontSize] = useState<"small" | "medium" | "large">(
@@ -329,6 +486,10 @@ const [treeVariant, setTreeVariant] = useState<"A" | "C">("A");
   }, [threadId]);
 
 
+
+
+
+
 useEffect(() => {
   const handler = () => {
     setTimeout(() => {
@@ -378,8 +539,6 @@ useEffect(() => {
     });
   }, [posts, searchText]);
 
-
-
 const handleGenerateSummary = async () => {
   try {
     setSummaryLoading(true);
@@ -397,13 +556,23 @@ const handleGenerateSummary = async () => {
       throw new Error(data?.error || "AIまとめ生成失敗");
     }
 
-setSummary(data?.summary || null);
+    setSummary(data?.summary || null);
   } catch (e) {
     console.error(e);
+    setSummary(null);
   } finally {
     setSummaryLoading(false);
   }
 };
+
+
+const treeSourcePosts = useMemo(() => {
+  return [...visiblePosts].sort((a, b) => {
+    const at = new Date(a.created_at ?? "").getTime();
+    const bt = new Date(b.created_at ?? "").getTime();
+    return at - bt;
+  });
+}, [visiblePosts]);
 
 
   const sortedVisiblePosts = useMemo(() => {
@@ -428,97 +597,98 @@ setSummary(data?.summary || null);
     });
   }, [visiblePosts, sortType]);
 
-  const groupedByIssue = useMemo(() => {
-    const groups: {
-      issue: PostRow | null;
-      items: PostRow[];
-    }[] = [];
 
-    let currentGroup: { issue: PostRow | null; items: PostRow[] } | null = null;
+const groupedByIssue = useMemo(() => {
+  const groups: {
+    issue: PostRow | null;
+    items: PostRow[];
+  }[] = [];
 
-    for (const post of sortedVisiblePosts) {
-      if (post.post_role === "issue_raise") {
-        currentGroup = {
-          issue: post,
-          items: [],
-        };
-        groups.push(currentGroup);
-        continue;
-      }
+  let currentGroup: { issue: PostRow | null; items: PostRow[] } | null = null;
 
-      if (!currentGroup) {
-        currentGroup = {
-          issue: null,
-          items: [],
-        };
-        groups.push(currentGroup);
-      }
-
-      currentGroup.items.push(post);
+  for (const post of treeSourcePosts) {
+    if (post.post_role === "issue_raise") {
+      currentGroup = {
+        issue: post,
+        items: [],
+      };
+      groups.push(currentGroup);
+      continue;
     }
 
-    return groups;
-  }, [sortedVisiblePosts]);
+    if (!currentGroup) {
+      currentGroup = {
+        issue: null,
+        items: [],
+      };
+      groups.push(currentGroup);
+    }
+
+    currentGroup.items.push(post);
+  }
+
+  return groups;
+}, [treeSourcePosts]);
 
 
 const groupedByOpinion = useMemo(() => {
   return groupedByIssue.map((group) => {
+    const opinionPosts = group.items.filter((p) => p.post_role === "opinion");
+    const childPosts = group.items.filter(
+      (p) =>
+        p.post_role === "rebuttal" ||
+        p.post_role === "supplement" ||
+        p.post_role === "explanation"
+    );
+
     const opinionGroups: {
       opinion: PostRow;
       children: PostRow[];
     }[] = [];
 
-    const hasOpinion = group.items.some((p) => p.post_role === "opinion");
+    if (opinionPosts.length === 0 && group.issue) {
+      opinionGroups.push({
+        opinion: {
+          ...group.issue,
+          id: `virtual-${group.issue.id}`,
+          post_role: "opinion",
+          content: group.issue.content,
+          logic_score: 50,
+        },
+        children: childPosts,
+      });
 
+      return {
+        issue: group.issue,
+        opinions: opinionGroups,
+      };
+    }
 
-if (!hasOpinion && group.issue) {
-  opinionGroups.push({
-    opinion: {
-      ...group.issue,
-      id: `virtual-${group.issue.id}`,
-      post_role: "opinion",
-      content: group.issue.content,
-      logic_score: 50,
-    },
-    children: group.items.filter(
-      (p) =>
-        p.post_role === "rebuttal" ||
-        p.post_role === "supplement" ||
-        p.post_role === "explanation"
-    ),
-  });
+    const opinionMap = new Map<
+      string,
+      {
+        opinion: PostRow;
+        children: PostRow[];
+      }
+    >();
 
-  return {
-    issue: group.issue,
-    opinions: opinionGroups,
-  };
-}
+    for (const opinion of opinionPosts) {
+      const groupItem = {
+        opinion,
+        children: [] as PostRow[],
+      };
+      opinionGroups.push(groupItem);
+      opinionMap.set(opinion.id, groupItem);
+    }
 
-    let currentOpinion:
-      | {
-          opinion: PostRow;
-          children: PostRow[];
-        }
-      | null = null;
-
-    for (const post of group.items) {
-      if (post.post_role === "opinion") {
-        currentOpinion = {
-          opinion: post,
-          children: [],
-        };
-        opinionGroups.push(currentOpinion);
+    for (const child of childPosts) {
+      if (child.parent_opinion_id && opinionMap.has(child.parent_opinion_id)) {
+        opinionMap.get(child.parent_opinion_id)!.children.push(child);
         continue;
       }
 
-      if (
-        post.post_role === "rebuttal" ||
-        post.post_role === "supplement" ||
-        post.post_role === "explanation"
-      ) {
-        if (currentOpinion) {
-          currentOpinion.children.push(post);
-        }
+      if (opinionGroups.length > 0) {
+        opinionGroups[opinionGroups.length - 1].children.push(child);
       }
     }
 
@@ -635,24 +805,138 @@ if (!hasOpinion && group.issue) {
 
 
 
-const displayPremises =
-  summary?.key_points?.opinions?.length
-    ? summary.key_points.opinions
-    : thread?.ai_premises ?? [];
 
-const displayReasons =
-  summary?.key_points?.explanations?.length
-    ? summary.key_points.explanations
-    : thread?.ai_reasons ?? [];
 
-const displayConflicts =
+{summary && (
+  <div style={{ marginTop: 16, padding: 12, background: "#111", borderRadius: 8 }}>
+    <div style={{ fontWeight: 700, marginBottom: 8 }}>AI要約</div>
+    <div>{summary.easy_summary_text}</div>
+  </div>
+)}
+
+
+
+
+
+
+
+
+
+
+const displayPremiseItemsBase = normalizeSourceItems(
+  summary?.key_points?.premises?.length
+    ? summary.key_points.premises
+    : thread?.ai_premises ?? []
+);
+const displayPremiseItems =
+  displayPremiseItemsBase.length > 0
+    ? displayPremiseItemsBase
+    : [
+        {
+          text: `${thread?.title || "この主張"}が成り立つための前提を確認する`,
+          source_type: "inferred" as const,
+          quality_score: 45,
+        },
+      ];
+const displayPremises = displayPremiseItems.map((item) => item.text);
+
+const displayReasonItemsBase = normalizeSourceItems(
+  summary?.key_points?.reasons?.length
+    ? summary.key_points.reasons
+    : thread?.ai_reasons ?? []
+);
+const displayReasonItems =
+  displayReasonItemsBase.length > 0
+    ? displayReasonItemsBase
+    : [
+        {
+          text: `${thread?.title || "この主張"}を支える根拠を確認する`,
+          source_type: "inferred" as const,
+          quality_score: 45,
+        },
+      ];
+const displayReasons = displayReasonItems.map((item) => item.text);
+
+const displayConflictBase: ConflictItem[] =
   conflicts.length > 0
     ? conflicts
-    : thread?.ai_conflicts ?? [];
+    : summary?.key_points?.counterpoints?.length
+    ? summary.key_points.counterpoints.map((item) => ({
+        opinion: thread?.title || "この主張",
+        rebuttal: item.text,
+        source_type: item.source_type,
+        quality_score: item.quality_score,
+      }))
+    : (thread?.ai_conflicts ?? []).map((conflict) => ({
+        ...conflict,
+        source_type: "extracted" as const,
+        quality_score: 60,
+      }));
+const displayConflicts: ConflictItem[] =
+  displayConflictBase.length > 0
+    ? displayConflictBase
+    : [
+        {
+          opinion: thread?.title || "この主張",
+          rebuttal: "別の見方や反対意見もあり得る",
+          source_type: "inferred" as const,
+          quality_score: 45,
+        },
+      ];
 
+const premiseQualityDisplay = getSectionDisplay(
+  displayPremiseItems,
+  {
+    strong: "主な前提",
+    mid: "考えられる前提（仮説）",
+  },
+  [
+    "前提は入力が抽象的なため特定できません",
+    "前提を1つ追加すると整理しやすくなります",
+  ]
+);
+const reasonQualityDisplay = getSectionDisplay(
+  displayReasonItems,
+  {
+    strong: "主な根拠",
+    mid: "考えられる根拠（仮説）",
+  },
+  [
+    "根拠は具体的な理由が不足しています",
+    "なぜそう思うかを1つ追加すると表示しやすくなります",
+  ]
+);
+const conflictQualityDisplay = getConflictDisplay(displayConflicts);
 
+const premiseSectionTitle = premiseQualityDisplay.title;
+const reasonSectionTitle = reasonQualityDisplay.title;
+const conflictSectionTitle = conflictQualityDisplay.title;
+const visiblePremises =
+  premiseQualityDisplay.mode === "empty"
+    ? []
+    : premiseQualityDisplay.items.map((item) => item.text);
+const visibleReasons =
+  reasonQualityDisplay.mode === "empty"
+    ? []
+    : reasonQualityDisplay.items.map((item) => item.text);
+const visibleConflicts =
+  conflictQualityDisplay.mode === "empty"
+    ? []
+    : conflictQualityDisplay.items;
 
-
+/*
+const oldPremiseSectionTitle = hasInferred(displayPremiseItems)
+  ? "考えられる前提"
+  : "主な前提";
+const reasonSectionTitle = hasInferred(displayReasonItems)
+  ? "考えられる根拠"
+  : "主な根拠";
+const conflictSectionTitle = displayConflicts.some(
+  (conflict) => conflict.source_type === "inferred"
+)
+  ? "想定される対立"
+  : "主な対立";
+*/
 
   async function handleShare() {
     const url = window.location.href;
@@ -720,9 +1004,12 @@ setTimeout(() => {
     }
   }
 
+
+
   async function loadThread() {
     setLoading(true);
     setError(null);
+
 
     try {
       const res = await fetch(`/api/forum/thread-detail?threadId=${threadId}`, {
@@ -751,7 +1038,6 @@ setTimeout(() => {
       setConflicts(summaryResult.conflict_pairs || []);
       setThread(result.thread ?? null);
       setPosts(result.posts ?? []);
-      setSummary(null);
       setSummary(summaryResult.summary ?? null);
     } catch (e: any) {
       console.error(e);
@@ -924,9 +1210,9 @@ function jumpToMainIssues() {
     >
 
 <a
-  href={`/${tenant}/forum/admin/delete`}
+  href="#"
   style={{
-    display: "inline-block",
+    display: "none",
     marginBottom: 12,
     color: "#0d47a1",
     fontWeight: 700,
@@ -1317,8 +1603,11 @@ function jumpToMainIssues() {
     </div>
 
     <div style={{ display: "grid", gap: 10 }}>
-{displayPremises.length ? (
-  displayPremises.map((item, index) => (
+      <div style={{ color: "#666", fontSize: currentFont.base * 0.9 }}>
+        {premiseSectionTitle}
+      </div>
+{visiblePremises.length ? (
+  visiblePremises.map((item, index) => (
           <SelectableCardButton
             key={`premise-${item}-${index}`}
             title={item}
@@ -1326,6 +1615,20 @@ function jumpToMainIssues() {
             style={{ fontSize: currentFont.base }}
           />
         ))
+      ) : premiseQualityDisplay.mode === "empty" ? (
+        <div style={{ display: "grid", gap: 8 }}>
+          {premiseQualityDisplay.messages.map((msg, i) => (
+            <div
+              key={i}
+              style={{
+                color: "#666",
+                fontSize: currentFont.base * 0.95,
+              }}
+            >
+              {msg}
+            </div>
+          ))}
+        </div>
       ) : (
         <div style={{ color: "#666" }}>まだ前提は整理されていない。</div>
       )}
@@ -1351,8 +1654,11 @@ function jumpToMainIssues() {
     </div>
 
     <div style={{ display: "grid", gap: 10 }}>
-{displayReasons.length ? (
-  displayReasons.map((item, index) => (
+      <div style={{ color: "#666", fontSize: currentFont.base * 0.9 }}>
+        {reasonSectionTitle}
+      </div>
+{visibleReasons.length ? (
+  visibleReasons.map((item, index) => (
           <SelectableCardButton
             key={`reason-${item}-${index}`}
             title={item}
@@ -1360,6 +1666,20 @@ function jumpToMainIssues() {
             style={{ fontSize: currentFont.base }}
           />
         ))
+      ) : reasonQualityDisplay.mode === "empty" ? (
+        <div style={{ display: "grid", gap: 8 }}>
+          {reasonQualityDisplay.messages.map((msg, i) => (
+            <div
+              key={i}
+              style={{
+                color: "#666",
+                fontSize: currentFont.base * 0.95,
+              }}
+            >
+              {msg}
+            </div>
+          ))}
+        </div>
       ) : (
         <div style={{ color: "#666" }}>まだ根拠は整理されていない。</div>
       )}
@@ -1383,9 +1703,26 @@ function jumpToMainIssues() {
     >
       主な対立
     </div>
-{displayConflicts.length > 0 ? (
+<div style={{ color: "#666", fontSize: currentFont.base * 0.9, marginBottom: 10 }}>
+  {conflictSectionTitle}
+</div>
+{conflictQualityDisplay.mode === "empty" ? (
+  <div style={{ display: "grid", gap: 8 }}>
+    {conflictQualityDisplay.messages.map((msg, i) => (
+      <div
+        key={i}
+        style={{
+          color: "#666",
+          fontSize: currentFont.base * 0.95,
+        }}
+      >
+        {msg}
+      </div>
+    ))}
+  </div>
+) : visibleConflicts.length > 0 ? (
   <div style={{ display: "grid", gap: 10 }}>
-    {displayConflicts.map((c, i) => (
+    {visibleConflicts.map((c, i) => (
           <SectionCard
             key={i}
             variant="soft"
@@ -1484,7 +1821,9 @@ function jumpToMainIssues() {
               </PrimaryButton>
             </div>
 
-            {sortedVisiblePosts.length === 0 ? (
+
+
+            {visiblePosts.length === 0 ? (
               <div style={{ color: "#666" }}>まだ投稿がない。</div>
             ) : (
               <div style={{ display: "grid", gap: 14 }}>

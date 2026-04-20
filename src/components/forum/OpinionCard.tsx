@@ -58,8 +58,9 @@ function roleColor(role: string) {
   }
 }
 
+
 function scoreColor(score?: number) {
-  if (!score) return "#777";
+  if (score === null || score === undefined) return "#777";
   if (score >= 80) return "#2e7d32";
   if (score >= 60) return "#1565c0";
   if (score >= 40) return "#ef6c00";
@@ -79,7 +80,7 @@ export default function OpinionCard({
   onHidePost,
   currentAuthorKey,
 }: any) {
-  const score = op.opinion.logic_score ?? 0;
+const score = op.opinion.logic_score;
   const canHideOpinion =
     !!onHidePost &&
     !!currentAuthorKey &&
@@ -127,9 +128,9 @@ const { claim, premises, reasons } = splitContent(displayText);
           }}
         >
           💬 {roleLabel(op.opinion.post_role)}
-          <span style={{ marginLeft: 8, color: scoreColor(score) }}>
-            {score || "未評価"}
-          </span>
+<span style={{ marginLeft: 8, color: scoreColor(score) }}>
+  {score === null || score === undefined ? "未評価" : score}
+</span>
         </div>
 
         {canHideOpinion && (

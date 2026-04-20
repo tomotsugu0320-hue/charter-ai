@@ -6,7 +6,11 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-export async function GET() {
+export async function GET(req: Request) {
+  if (req.headers.get("x-admin-key") !== process.env.ADMIN_KEY) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
   const { data, error } = await supabase
     .from("forum_posts")
     .select(`

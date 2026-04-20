@@ -1,138 +1,201 @@
 // src/app/api/forum/create-thread-from-draft/route.ts
 
-import { NextResponse } from "next/server";
+
+
+
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { checkPrivacyRisk } from "@/lib/privacy";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+function makeSlug(input: string) {
+  const base = input
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 
-export async function POST(req: Request) {
+  const fallback = "thread";
+  const random = Math.random().toString(36).slice(2, 8);
+
+  return `${base || fallback}-${random}`;
+}
+
+type Conflict = {
+  opinion?: string;
+  rebuttal?: string;
+};
+
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-const {
-  tenantSlug,
-  title,
-  claim,
-  premises,
-  reasons,
-  conflicts,
-} = body;
-    if (!tenantSlug || !title || !claim) {
+    const title = String(body?.title || "").trim();
+    const claim = String(body?.claim || "").trim();
+    const premises = Array.isArray(body?.premises) ? body.premises : [];
+    const reasons = Array.isArray(body?.reasons) ? body.reasons : [];
+    const conflicts: Conflict[] = Array.isArray(body?.conflicts) ? body.conflicts : [];
+    const postType = body?.postType === "auto" ? "auto" : "human";
+
+    if (!title || !claim) {
       return NextResponse.json(
-        { error: "tenantSlug, title and claim are required" },
+        { success: false, error: "title and claim are required" },
         { status: 400 }
       );
     }
 
-    const { data: tenant, error: tenantError } = await supabase
-      .from("tenants")
-      .select("id")
-      .eq("slug", tenantSlug)
-      .single();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    if (tenantError || !tenant) {
-      console.error("tenant error:", tenantError);
+    if (!supabaseUrl || !supabaseAnonKey) {
       return NextResponse.json(
-        { error: "tenant not found" },
-        { status: 404 }
-      );
-    }
-
-
-let category = "政治・経済";
-
-if (title.includes("売上") || title.includes("経営") || title.includes("集客")) {
-  category = "ビジネス";
-} else if (title.includes("恋愛") || title.includes("彼女") || title.includes("彼氏")) {
-  category = "恋愛";
-} else if (title.includes("健康") || title.includes("筋トレ") || title.includes("ダイエット")) {
-  category = "健康";
-} else if (title.includes("雑談")) {
-  category = "雑談";
-}
-
-    const content =
-     Array.isArray(premises) && Array.isArray(reasons)
-        ? [
-            `主張: ${claim}`,
-            ...premises.map((p: string) => `前提: ${p}`),
-            ...reasons.map((r: string) => `根拠: ${r}`),
-          ].join("\n")
-        : claim;
-
-
-const privacy = checkPrivacyRisk(content);
-
-    const { data: thread, error: threadError } = await supabase
-      .from("forum_threads")
-.insert({
-  title,
-  slug: `${title}-${Date.now()}`,
-  original_post: privacy.maskedText,
-  visibility: "public",
-  category: category,
-  ai_premises: Array.isArray(premises) ? premises : [],
-  ai_reasons: Array.isArray(reasons) ? reasons : [],
-  ai_conflicts: Array.isArray(conflicts) ? conflicts : [],
-})
-      .select("id")
-      .single();
-
-    if (threadError || !thread) {
-      console.error("thread create error:", threadError);
-      return NextResponse.json(
-        {
-          error:
-            threadError?.message ||
-            threadError?.details ||
-            JSON.stringify(threadError) ||
-            "failed to create thread",
-        },
+        { success: false, error: "Supabase env is missing" },
         { status: 500 }
       );
     }
 
-const { error: postError } = await supabase
-  .from("forum_posts")
-  .insert({
-    thread_id: thread.id,
-    source_type: "human",
-    post_role: "issue_raise",
-    content,
-    raw_text: content,
-    sanitized_text: privacy.maskedText,
-    is_sensitive: privacy.isSensitive,
-    privacy_flags: privacy.flags,
-    privacy_score: privacy.score,
-  });
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+    const slug = makeSlug(title);
+
+    const { data: existing } = await supabase
+      .from("forum_threads")
+      .select("id")
+      .eq("title", title)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) {
+      return NextResponse.json({
+        success: true,
+        threadId: existing.id,
+      });
+    }
+
+    const { data: thread, error: threadError } = await supabase
+      .from("forum_threads")
+      .insert({
+        title,
+        slug,
+        original_post: claim,
+        category: null,
+        ai_summary: null,
+        is_deleted: false,
+      })
+      .select("id")
+      .single();
+
+    if (threadError || !thread) {
+      return NextResponse.json(
+        { success: false, error: threadError?.message || "thread insert failed" },
+        { status: 500 }
+      );
+    }
+
+    const threadId = thread.id;
+
+    const seedPosts: {
+      thread_id: string;
+      content: string;
+      source_type: string;
+      post_role: string;
+      trust_status: string;
+      logic_score: number;
+      author_key: string;
+    }[] = [
+    {
+      thread_id: threadId,
+      content: claim,
+      source_type: postType === "auto" ? "ai" : "human",
+      post_role: "issue_raise",
+      trust_status: "trusted",
+      logic_score: 70,
+      author_key: "system",
+    },
+    ];
+
+    for (const premise of premises) {
+      const text = String(premise || "").trim();
+      if (!text) continue;
+
+      seedPosts.push({
+        thread_id: threadId,
+        content: text,
+        source_type: "ai",
+        post_role: "supplement",
+        trust_status: "trusted",
+        logic_score: 85,
+        author_key: "system",
+      });
+    }
+
+    for (const reason of reasons) {
+      const text = String(reason || "").trim();
+      if (!text) continue;
+      seedPosts.push({
+        thread_id: threadId,
+        content: `根拠: ${reason}`,
+        source_type: "ai",
+        post_role: "explanation",
+        trust_status: "trusted",
+        logic_score: 90,
+        author_key: "system",
+      });
+    }
+
+
+    for (const conflict of conflicts) {
+      const opinion = String(conflict?.opinion || "").trim();
+      const rebuttal = String(conflict?.rebuttal || "").trim();
+
+      if (opinion) {
+        seedPosts.push({
+          thread_id: threadId,
+          content: opinion,
+          source_type: "ai",
+          post_role: "opinion",
+          trust_status: "trusted",
+          logic_score: 75,
+          author_key: "system",
+        });
+      }
+
+      if (rebuttal) {
+        seedPosts.push({
+          thread_id: threadId,
+          content: rebuttal,
+          source_type: "ai",
+          post_role: "rebuttal",
+          trust_status: "trusted",
+          logic_score: 95,
+          author_key: "system",
+        });
+      }
+    }
+
+    const { error: postError } = await supabase
+      .from("forum_posts")
+      .insert(seedPosts);
 
     if (postError) {
-      console.error("post create error:", postError);
       return NextResponse.json(
-        {
-          error:
-            postError?.message ||
-            postError?.details ||
-            JSON.stringify(postError) ||
-            "failed to create post",
-        },
+        { success: false, error: postError.message },
         { status: 500 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      threadId: thread.id,
+      threadId,
     });
-  } catch (error) {
-    console.error("create-thread-from-draft error:", error);
+  } catch (e: any) {
+    console.error("[create-thread-from-draft error]", e);
+
     return NextResponse.json(
-      { error: "unexpected error" },
+      {
+        success: false,
+        error: e?.message || "unexpected error",
+      },
       { status: 500 }
     );
   }

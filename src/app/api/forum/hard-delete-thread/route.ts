@@ -8,11 +8,8 @@ const supabase = createClient(
 
 export async function POST(req: Request) {
   try {
-    const adminKey = process.env.ADMIN_KEY;
-    const requestAdminKey = req.headers.get("x-admin-key");
-
-    if (!adminKey || requestAdminKey !== adminKey) {
-      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    if (req.headers.get("x-admin-key") !== process.env.ADMIN_KEY) {
+      return new Response("Unauthorized", { status: 401 });
     }
 
     const { threadId } = await req.json();

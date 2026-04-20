@@ -7,6 +7,10 @@ const supabase = createClient(
 );
 
 export async function GET(req: Request) {
+  if (req.headers.get("x-admin-key") !== process.env.ADMIN_KEY) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const mode = searchParams.get("mode") ?? "visible";
 

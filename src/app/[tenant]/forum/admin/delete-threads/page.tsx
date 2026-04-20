@@ -23,9 +23,12 @@ export default function DeleteThreadsPage() {
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [mode, setMode] = useState<Mode>("visible");
   const [adminKey, setAdminKey] = useState("");
+  const requestAdminKey = adminKey || process.env.NEXT_PUBLIC_ADMIN_KEY || "";
 
   async function load() {
-    const res = await fetch(`/api/forum/admin-threads?mode=${mode}`);
+    const res = await fetch(`/api/forum/admin-threads?mode=${mode}`, {
+      headers: { "x-admin-key": requestAdminKey },
+    });
     const json = await res.json().catch(() => ({}));
 
     if (!res.ok) {
@@ -41,7 +44,10 @@ export default function DeleteThreadsPage() {
 
     const res = await fetch("/api/forum/delete-thread", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-key": requestAdminKey,
+      },
       body: JSON.stringify({ threadId: id }),
     });
 
@@ -70,7 +76,10 @@ export default function DeleteThreadsPage() {
   async function restore(id: string) {
     const res = await fetch("/api/forum/restore-thread", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-key": requestAdminKey,
+      },
       body: JSON.stringify({ threadId: id }),
     });
 
@@ -105,7 +114,7 @@ export default function DeleteThreadsPage() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-admin-key": adminKey,
+        "x-admin-key": requestAdminKey,
       },
       body: JSON.stringify({ threadId: id }),
     });

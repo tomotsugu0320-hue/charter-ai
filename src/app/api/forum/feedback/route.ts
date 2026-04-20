@@ -144,20 +144,23 @@ async function generateExplanation(
     }),
   });
 
+
+
 const result = await response.json();
-console.log("OpenAI raw:", result);
 
 if (!response.ok) {
   throw new Error(result?.error?.message || "OpenAI explanation generation failed");
 }
 
-
 let explanation = "";
+
 
 const contentArr = result?.output?.[0]?.content;
 
 if (Array.isArray(contentArr)) {
-  const textItem = contentArr.find((c: any) => c.type === "output_text");
+  const textItem = contentArr.find(
+    (c: { type?: string; text?: string }) => c.type === "output_text"
+  );
 
   if (textItem?.text) {
     explanation = textItem.text;
@@ -293,13 +296,16 @@ return NextResponse.json({
   explanation,
   cached: false,
 });
-  } catch (e: any) {
-    console.error("[forum feedback error]", e);
+} catch (e: unknown) {
+  console.error("[forum feedback error]", e);
 
-    return NextResponse.json(
-      { success: false, error: e?.message || "Unexpected error" },
-      { status: 500 }
-    );
-  }
+  const message =
+    e instanceof Error ? e.message : "Unexpected error";
+
+  return NextResponse.json(
+    { success: false, error: message },
+    { status: 500 }
+  );
+}
 }
 
