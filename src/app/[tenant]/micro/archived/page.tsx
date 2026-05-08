@@ -1,29 +1,21 @@
 "use client";
 
-import {
-  CSSProperties,
-  FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import MicroButton from "@/components/micro/MicroButton";
 import MicroSectionCard from "@/components/micro/MicroSectionCard";
 import MicroSectionTitle from "@/components/micro/MicroSectionTitle";
-import MicroSourceDataCard from "@/components/micro/MicroSourceDataCard";
-import MicroTextArea from "@/components/micro/MicroTextArea";
 
-type SourceData = {
+type ArchivedSourceData = {
   id: string;
   raw_content: string;
+  archived_at: string | null;
 };
 
 type SourceDataResponse = {
   success?: boolean;
   error?: string;
-  sourceData?: SourceData[];
+  sourceData?: ArchivedSourceData[];
 };
 
 function getTenantSlug(params: ReturnType<typeof useParams>) {
@@ -34,6 +26,15 @@ function getTenantSlug(params: ReturnType<typeof useParams>) {
   }
 
   return typeof value === "string" ? value : "";
+}
+
+function formatDate(value: string | null) {
+  if (!value) return "日時なし";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "日時なし";
+
+  return date.toLocaleString("ja-JP");
 }
 
 const pageStyle: CSSProperties = {
@@ -50,13 +51,6 @@ const shellStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 20,
-};
-
-const formStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 12,
-  marginTop: 16,
 };
 
 const mutedTextStyle: CSSProperties = {
@@ -80,18 +74,43 @@ const listStyle: CSSProperties = {
   marginTop: 16,
 };
 
-export default function MicroPage() {
+const archivedCardStyle: CSSProperties = {
+  background: "#0f172a",
+  color: "#f8fafc",
+  border: "1px solid #334155",
+  borderRadius: 8,
+  padding: 14,
+  lineHeight: 1.7,
+};
+
+const contentStyle: CSSProperties = {
+  color: "#f8fafc",
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere",
+};
+
+const metaStyle: CSSProperties = {
+  marginTop: 12,
+  color: "#cbd5e1",
+  fontSize: 13,
+};
+
+const actionStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  marginTop: 12,
+};
+
+export default function ArchivedMicroPage() {
   const params = useParams();
   const tenantSlug = useMemo(() => getTenantSlug(params), [params]);
 
-  const [items, setItems] = useState<SourceData[]>([]);
-  const [rawContent, setRawContent] = useState("");
+  const [items, setItems] = useState<ArchivedSourceData[]>([]);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [archivingId, setArchivingId] = useState<string | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
-  const loadSourceData = useCallback(async () => {
+  const loadArchivedSourceData = useCallback(async () => {
     if (!tenantSlug) return;
 
     setLoading(true);
@@ -99,7 +118,9 @@ export default function MicroPage() {
 
     try {
       const res = await fetch(
-        `/api/micro/source-data?tenant_slug=${encodeURIComponent(tenantSlug)}`,
+        `/api/micro/source-data?tenant_slug=${encodeURIComponent(
+          tenantSlug
+        )}&status=archived`,
         { cache: "no-store" }
       );
       const data = (await res.json()) as SourceDataResponse;
@@ -119,46 +140,11 @@ export default function MicroPage() {
   }, [tenantSlug]);
 
   useEffect(() => {
-    void loadSourceData();
-  }, [loadSourceData]);
+    void loadArchivedSourceData();
+  }, [loadArchivedSourceData]);
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    const text = rawContent.trim();
-    if (!text || !tenantSlug) return;
-
-    setSaving(true);
-    setMessage("");
-
-    try {
-      const res = await fetch("/api/micro/source-data", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          tenant_slug: tenantSlug,
-          raw_content: text,
-        }),
-      });
-      const data = (await res.json()) as SourceDataResponse;
-
-      if (!res.ok || data.success === false) {
-        throw new Error(data.error || "保存に失敗しました");
-      }
-
-      setRawContent("");
-      await loadSourceData();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "保存に失敗しました");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleArchive = async (id: string) => {
-    setArchivingId(id);
+  const handleRestore = async (id: string) => {
+    setRestoringId(id);
     setMessage("");
 
     try {
@@ -169,20 +155,20 @@ export default function MicroPage() {
         },
         body: JSON.stringify({
           id,
-          action: "archive",
+          action: "restore",
         }),
       });
       const data = (await res.json()) as SourceDataResponse;
 
       if (!res.ok || data.success === false) {
-        throw new Error(data.error || "保管に失敗しました");
+        throw new Error(data.error || "復元に失敗しました");
       }
 
-      await loadSourceData();
+      await loadArchivedSourceData();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "保管に失敗しました");
+      setMessage(error instanceof Error ? error.message : "復元に失敗しました");
     } finally {
-      setArchivingId(null);
+      setRestoringId(null);
     }
   };
 
@@ -190,24 +176,7 @@ export default function MicroPage() {
     <main style={pageStyle}>
       <div style={shellStyle}>
         <MicroSectionCard>
-          <MicroSectionTitle level={1}>Micro</MicroSectionTitle>
-
-          <form onSubmit={handleSubmit} style={formStyle}>
-            <MicroTextArea
-              value={rawContent}
-              onChange={(event) => setRawContent(event.target.value)}
-              placeholder="思考ログを書く"
-              rows={5}
-            />
-
-            <MicroButton
-              type="submit"
-              disabled={saving || rawContent.trim().length === 0}
-            >
-              {saving ? "保存中" : "保存"}
-            </MicroButton>
-          </form>
-
+          <MicroSectionTitle level={1}>保管済み</MicroSectionTitle>
           {message && <p style={messageStyle}>{message}</p>}
         </MicroSectionCard>
 
@@ -217,16 +186,25 @@ export default function MicroPage() {
           {loading ? (
             <p style={mutedTextStyle}>読み込み中</p>
           ) : items.length === 0 ? (
-            <p style={mutedTextStyle}>まだ保存されたログはありません。</p>
+            <p style={mutedTextStyle}>保管済みのログはありません。</p>
           ) : (
             <div style={listStyle}>
               {items.map((item) => (
-                <MicroSourceDataCard
-                  key={item.id}
-                  archiveDisabled={archivingId === item.id}
-                  content={item.raw_content}
-                  onArchive={() => void handleArchive(item.id)}
-                />
+                <article key={item.id} style={archivedCardStyle}>
+                  <div style={contentStyle}>{item.raw_content}</div>
+                  <div style={metaStyle}>
+                    保管日時: {formatDate(item.archived_at)}
+                  </div>
+                  <div style={actionStyle}>
+                    <MicroButton
+                      type="button"
+                      disabled={restoringId === item.id}
+                      onClick={() => void handleRestore(item.id)}
+                    >
+                      {restoringId === item.id ? "復元中" : "復元"}
+                    </MicroButton>
+                  </div>
+                </article>
               ))}
             </div>
           )}

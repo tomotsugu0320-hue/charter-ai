@@ -64,6 +64,7 @@ export async function GET(req: NextRequest) {
     searchParams.get("tenant_slug")?.trim() ||
     searchParams.get("tenantSlug")?.trim() ||
     "";
+  const status = searchParams.get("status")?.trim() || "";
 
   if (!tenantSlug) {
     return NextResponse.json(
@@ -72,12 +73,19 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("micro_source_data")
     .select(SOURCE_DATA_COLUMNS)
     .eq("tenant_slug", tenantSlug)
-    .neq("status", "archived")
     .order("updated_at", { ascending: false });
+
+  if (status === "archived") {
+    query = query.eq("status", "archived");
+  } else {
+    query = query.neq("status", "archived");
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     return NextResponse.json(
@@ -173,4 +181,70 @@ export async function POST(req: NextRequest) {
     },
     { status: 201 }
   );
+}
+
+export async function PATCH(req: NextRequest) {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    return NextResponse.json(
+      { success: false, error: "Supabase env is missing" },
+      { status: 500 }
+    );
+  }
+
+  let body: Record<string, unknown>;
+
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "Invalid JSON body" },
+      { status: 400 }
+    );
+  }
+
+  const id = readString(body.id);
+  const action = readString(body.action);
+
+  if (!id) {
+    return NextResponse.json(
+      { success: false, error: "id is required" },
+      { status: 400 }
+    );
+  }
+
+  if (action !== "archive" && action !== "restore") {
+    return NextResponse.json(
+      { success: false, error: "action is invalid" },
+      { status: 400 }
+    );
+  }
+
+  const values =
+    action === "archive"
+      ? {
+          status: "archived",
+          archived_at: new Date().toISOString(),
+        }
+      : {
+          status: "active",
+          archived_at: null,
+        };
+
+  const { error } = await supabase
+    .from("micro_source_data")
+    .update(values)
+    .eq("id", id);
+
+  if (error) {
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({
+    success: true,
+  });
 }
