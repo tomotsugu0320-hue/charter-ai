@@ -1,0 +1,14 @@
+@baseUrl = http://localhost:3000
+
+### POST /api/micro/source-data
+POST {{baseUrl}}/api/micro/source-data
+Content-Type: application/json
+
+{
+  "tenant_slug": "dev",
+  "raw_content": "テスト投稿",
+  "source_type": "manual"
+}
+
+### GET /api/micro/source-data
+GET {{baseUrl}}/api/micro/source-data?tenant_slug=dev
