@@ -20,6 +20,7 @@ type SourceData = {
   title: string | null;
   raw_content: string;
   source_type: string;
+  pinned: boolean;
 };
 
 type SourceDataResponse = {
@@ -140,6 +141,7 @@ export default function MicroPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [archivingId, setArchivingId] = useState<string | null>(null);
+  const [pinningId, setPinningId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
   const loadSourceData = useCallback(async () => {
@@ -240,6 +242,37 @@ export default function MicroPage() {
     }
   };
 
+  const handleTogglePin = async (item: SourceData) => {
+    setPinningId(item.id);
+    setMessage("");
+
+    try {
+      const res = await fetch("/api/micro/source-data", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: item.id,
+          action: item.pinned ? "unpin" : "pin",
+        }),
+      });
+      const data = (await res.json()) as SourceDataResponse;
+
+      if (!res.ok || data.success === false) {
+        throw new Error(data.error || "ピンの更新に失敗しました");
+      }
+
+      await loadSourceData();
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "ピンの更新に失敗しました"
+      );
+    } finally {
+      setPinningId(null);
+    }
+  };
+
   return (
     <main style={pageStyle}>
       <div style={shellStyle}>
@@ -304,9 +337,12 @@ export default function MicroPage() {
                   key={item.id}
                   archiveDisabled={archivingId === item.id}
                   content={item.raw_content}
+                  pinned={item.pinned}
+                  pinDisabled={pinningId === item.id}
                   sourceType={item.source_type}
                   title={item.title}
                   onArchive={() => void handleArchive(item.id)}
+                  onTogglePin={() => void handleTogglePin(item)}
                 />
               ))}
             </div>

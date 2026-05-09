@@ -77,6 +77,7 @@ export async function GET(req: NextRequest) {
     .from("micro_source_data")
     .select(SOURCE_DATA_COLUMNS)
     .eq("tenant_slug", tenantSlug)
+    .order("pinned", { ascending: false })
     .order("updated_at", { ascending: false });
 
   if (status === "archived") {
@@ -214,23 +215,29 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  if (action !== "archive" && action !== "restore") {
+  if (
+    action !== "archive" &&
+    action !== "restore" &&
+    action !== "pin" &&
+    action !== "unpin"
+  ) {
     return NextResponse.json(
       { success: false, error: "action is invalid" },
       { status: 400 }
     );
   }
 
-  const values =
-    action === "archive"
-      ? {
-          status: "archived",
-          archived_at: new Date().toISOString(),
-        }
-      : {
-          status: "active",
-          archived_at: null,
-        };
+  const values: Record<string, boolean | string | null> = {};
+
+  if (action === "archive") {
+    values.status = "archived";
+    values.archived_at = new Date().toISOString();
+  } else if (action === "restore") {
+    values.status = "active";
+    values.archived_at = null;
+  } else {
+    values.pinned = action === "pin";
+  }
 
   const { error } = await supabase
     .from("micro_source_data")

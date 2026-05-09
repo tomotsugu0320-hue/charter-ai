@@ -2,8 +2,11 @@ type MicroSourceDataCardProps = {
   content: string;
   sourceType: string;
   title: string | null;
+  pinned: boolean;
   archiveDisabled?: boolean;
+  pinDisabled?: boolean;
   onArchive: () => void;
+  onTogglePin: () => void;
 };
 
 const sourceTypeLabels: Record<string, string> = {
@@ -21,9 +24,12 @@ const sourceTypeLabels: Record<string, string> = {
 export default function MicroSourceDataCard({
   archiveDisabled = false,
   content,
+  pinned,
+  pinDisabled = false,
   sourceType,
   title,
   onArchive,
+  onTogglePin,
 }: MicroSourceDataCardProps) {
   const sourceTypeLabel = sourceTypeLabels[sourceType] ?? sourceType;
   const displayTitle = title?.trim() || "無題";
@@ -55,6 +61,8 @@ export default function MicroSourceDataCard({
         style={{
           display: "flex",
           justifyContent: "flex-start",
+          flexWrap: "wrap",
+          gap: 8,
           marginBottom: 10,
         }}
       >
@@ -72,6 +80,22 @@ export default function MicroSourceDataCard({
         >
           {sourceTypeLabel}
         </span>
+        {pinned && (
+          <span
+            style={{
+              background: "#78350f",
+              color: "#fef3c7",
+              border: "1px solid #92400e",
+              borderRadius: 999,
+              padding: "3px 9px",
+              fontSize: 12,
+              fontWeight: 700,
+              lineHeight: 1.5,
+            }}
+          >
+            ピン留め中
+          </span>
+        )}
       </div>
 
       <div
@@ -88,9 +112,27 @@ export default function MicroSourceDataCard({
         style={{
           display: "flex",
           justifyContent: "flex-end",
+          gap: 8,
           marginTop: 12,
         }}
       >
+        <button
+          type="button"
+          onClick={onTogglePin}
+          disabled={pinDisabled}
+          style={{
+            border: pinDisabled ? "1px solid #4b5563" : "1px solid #92400e",
+            borderRadius: 8,
+            background: pinDisabled ? "#374151" : "#78350f",
+            color: pinDisabled ? "#d1d5db" : "#fef3c7",
+            cursor: pinDisabled ? "not-allowed" : "pointer",
+            padding: "7px 12px",
+            fontSize: 14,
+            fontWeight: 700,
+          }}
+        >
+          {pinDisabled ? "更新中" : pinned ? "ピン解除" : "ピン"}
+        </button>
         <button
           type="button"
           onClick={onArchive}
