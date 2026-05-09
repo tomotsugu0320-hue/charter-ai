@@ -1,6 +1,7 @@
 type MicroSourceDataCardProps = {
   content: string;
   sourceType: string;
+  title: string | null;
   archiveDisabled?: boolean;
   onArchive: () => void;
 };
@@ -21,9 +22,11 @@ export default function MicroSourceDataCard({
   archiveDisabled = false,
   content,
   sourceType,
+  title,
   onArchive,
 }: MicroSourceDataCardProps) {
   const sourceTypeLabel = sourceTypeLabels[sourceType] ?? sourceType;
+  const displayTitle = title?.trim() || "無題";
 
   return (
     <article
@@ -36,6 +39,18 @@ export default function MicroSourceDataCard({
         lineHeight: 1.7,
       }}
     >
+      <h3
+        style={{
+          margin: "0 0 10px",
+          color: "#ffffff",
+          fontSize: 17,
+          lineHeight: 1.4,
+          overflowWrap: "anywhere",
+        }}
+      >
+        {displayTitle}
+      </h3>
+
       <div
         style={{
           display: "flex",

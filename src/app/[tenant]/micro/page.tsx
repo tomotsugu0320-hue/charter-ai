@@ -17,6 +17,7 @@ import MicroTextArea from "@/components/micro/MicroTextArea";
 
 type SourceData = {
   id: string;
+  title: string | null;
   raw_content: string;
   source_type: string;
 };
@@ -83,6 +84,18 @@ const selectStyle: CSSProperties = {
   outline: "none",
 };
 
+const inputStyle: CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  borderRadius: 8,
+  border: "1px solid #4b5563",
+  background: "#0f172a",
+  color: "#f8fafc",
+  padding: "10px 12px",
+  fontSize: 15,
+  outline: "none",
+};
+
 const mutedTextStyle: CSSProperties = {
   margin: "16px 0 0",
   color: "#d1d5db",
@@ -121,6 +134,7 @@ export default function MicroPage() {
   const tenantSlug = useMemo(() => getTenantSlug(params), [params]);
 
   const [items, setItems] = useState<SourceData[]>([]);
+  const [title, setTitle] = useState("");
   const [rawContent, setRawContent] = useState("");
   const [sourceType, setSourceType] = useState("free_log");
   const [loading, setLoading] = useState(false);
@@ -176,6 +190,7 @@ export default function MicroPage() {
         },
         body: JSON.stringify({
           tenant_slug: tenantSlug,
+          title: title.trim() || null,
           raw_content: text,
           source_type: sourceType,
         }),
@@ -186,6 +201,7 @@ export default function MicroPage() {
         throw new Error(data.error || "保存に失敗しました");
       }
 
+      setTitle("");
       setRawContent("");
       await loadSourceData();
     } catch (error) {
@@ -231,6 +247,16 @@ export default function MicroPage() {
           <MicroSectionTitle level={1}>Micro</MicroSectionTitle>
 
           <form onSubmit={handleSubmit} style={formStyle}>
+            <label style={fieldStyle}>
+              <span style={labelStyle}>タイトル</span>
+              <input
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="タイトルを書く"
+                style={inputStyle}
+              />
+            </label>
+
             <label style={fieldStyle}>
               <span style={labelStyle}>種類</span>
               <select
@@ -279,6 +305,7 @@ export default function MicroPage() {
                   archiveDisabled={archivingId === item.id}
                   content={item.raw_content}
                   sourceType={item.source_type}
+                  title={item.title}
                   onArchive={() => void handleArchive(item.id)}
                 />
               ))}
