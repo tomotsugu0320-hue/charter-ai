@@ -1,14 +1,30 @@
 type MicroSourceDataCardProps = {
   content: string;
+  sourceType: string;
   archiveDisabled?: boolean;
   onArchive: () => void;
+};
+
+const sourceTypeLabels: Record<string, string> = {
+  free_log: "フリーログ",
+  smart_note: "スマートノート",
+  chat_log: "チャットログ",
+  imported_text: "取り込みテキスト",
+  manual: "手入力",
+  voice: "音声メモ",
+  chatgpt_share: "ChatGPT共有",
+  line: "LINE",
+  web_clip: "Webクリップ",
 };
 
 export default function MicroSourceDataCard({
   archiveDisabled = false,
   content,
+  sourceType,
   onArchive,
 }: MicroSourceDataCardProps) {
+  const sourceTypeLabel = sourceTypeLabels[sourceType] ?? sourceType;
+
   return (
     <article
       style={{
@@ -20,6 +36,29 @@ export default function MicroSourceDataCard({
         lineHeight: 1.7,
       }}
     >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-start",
+          marginBottom: 10,
+        }}
+      >
+        <span
+          style={{
+            background: "#1e293b",
+            color: "#e0f2fe",
+            border: "1px solid #334155",
+            borderRadius: 999,
+            padding: "3px 9px",
+            fontSize: 12,
+            fontWeight: 700,
+            lineHeight: 1.5,
+          }}
+        >
+          {sourceTypeLabel}
+        </span>
+      </div>
+
       <div
         style={{
           color: "#f8fafc",

@@ -18,6 +18,7 @@ import MicroTextArea from "@/components/micro/MicroTextArea";
 type SourceData = {
   id: string;
   raw_content: string;
+  source_type: string;
 };
 
 type SourceDataResponse = {
@@ -59,6 +60,29 @@ const formStyle: CSSProperties = {
   marginTop: 16,
 };
 
+const fieldStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 6,
+};
+
+const labelStyle: CSSProperties = {
+  color: "#e5e7eb",
+  fontSize: 14,
+  fontWeight: 700,
+};
+
+const selectStyle: CSSProperties = {
+  width: "100%",
+  borderRadius: 8,
+  border: "1px solid #4b5563",
+  background: "#0f172a",
+  color: "#f8fafc",
+  padding: "10px 12px",
+  fontSize: 15,
+  outline: "none",
+};
+
 const mutedTextStyle: CSSProperties = {
   margin: "16px 0 0",
   color: "#d1d5db",
@@ -80,12 +104,25 @@ const listStyle: CSSProperties = {
   marginTop: 16,
 };
 
+const sourceTypeOptions = [
+  { value: "free_log", label: "フリーログ" },
+  { value: "smart_note", label: "スマートノート" },
+  { value: "chat_log", label: "チャットログ" },
+  { value: "imported_text", label: "取り込みテキスト" },
+  { value: "manual", label: "手入力" },
+  { value: "voice", label: "音声メモ" },
+  { value: "chatgpt_share", label: "ChatGPT共有" },
+  { value: "line", label: "LINE" },
+  { value: "web_clip", label: "Webクリップ" },
+];
+
 export default function MicroPage() {
   const params = useParams();
   const tenantSlug = useMemo(() => getTenantSlug(params), [params]);
 
   const [items, setItems] = useState<SourceData[]>([]);
   const [rawContent, setRawContent] = useState("");
+  const [sourceType, setSourceType] = useState("free_log");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [archivingId, setArchivingId] = useState<string | null>(null);
@@ -140,6 +177,7 @@ export default function MicroPage() {
         body: JSON.stringify({
           tenant_slug: tenantSlug,
           raw_content: text,
+          source_type: sourceType,
         }),
       });
       const data = (await res.json()) as SourceDataResponse;
@@ -193,6 +231,21 @@ export default function MicroPage() {
           <MicroSectionTitle level={1}>Micro</MicroSectionTitle>
 
           <form onSubmit={handleSubmit} style={formStyle}>
+            <label style={fieldStyle}>
+              <span style={labelStyle}>種類</span>
+              <select
+                value={sourceType}
+                onChange={(event) => setSourceType(event.target.value)}
+                style={selectStyle}
+              >
+                {sourceTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
             <MicroTextArea
               value={rawContent}
               onChange={(event) => setRawContent(event.target.value)}
@@ -225,6 +278,7 @@ export default function MicroPage() {
                   key={item.id}
                   archiveDisabled={archivingId === item.id}
                   content={item.raw_content}
+                  sourceType={item.source_type}
                   onArchive={() => void handleArchive(item.id)}
                 />
               ))}
