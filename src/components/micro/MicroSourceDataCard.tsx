@@ -1,11 +1,15 @@
 type MicroSourceDataCardProps = {
   content: string;
+  lastUsedAt: string | null;
   sourceType: string;
   title: string | null;
   pinned: boolean;
   archiveDisabled?: boolean;
   pinDisabled?: boolean;
+  touchDisabled?: boolean;
+  usageCount: number;
   onArchive: () => void;
+  onTouch: () => void;
   onTogglePin: () => void;
 };
 
@@ -21,14 +25,27 @@ const sourceTypeLabels: Record<string, string> = {
   web_clip: "Webクリップ",
 };
 
+function formatLastUsedAt(value: string | null) {
+  if (!value) return "未使用";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "未使用";
+
+  return date.toLocaleString("ja-JP");
+}
+
 export default function MicroSourceDataCard({
   archiveDisabled = false,
   content,
+  lastUsedAt,
   pinned,
   pinDisabled = false,
   sourceType,
   title,
+  touchDisabled = false,
+  usageCount,
   onArchive,
+  onTouch,
   onTogglePin,
 }: MicroSourceDataCardProps) {
   const sourceTypeLabel = sourceTypeLabels[sourceType] ?? sourceType;
@@ -36,6 +53,7 @@ export default function MicroSourceDataCard({
 
   return (
     <article
+      onClick={touchDisabled ? undefined : onTouch}
       style={{
         background: "#0f172a",
         color: "#f8fafc",
@@ -43,6 +61,7 @@ export default function MicroSourceDataCard({
         borderRadius: 8,
         padding: 14,
         lineHeight: 1.7,
+        cursor: touchDisabled ? "progress" : "pointer",
       }}
     >
       <h3
@@ -110,6 +129,17 @@ export default function MicroSourceDataCard({
 
       <div
         style={{
+          marginTop: 12,
+          color: "#cbd5e1",
+          fontSize: 13,
+          lineHeight: 1.6,
+        }}
+      >
+        利用回数: {usageCount ?? 0} / 最終利用: {formatLastUsedAt(lastUsedAt)}
+      </div>
+
+      <div
+        style={{
           display: "flex",
           justifyContent: "flex-end",
           gap: 8,
@@ -118,7 +148,10 @@ export default function MicroSourceDataCard({
       >
         <button
           type="button"
-          onClick={onTogglePin}
+          onClick={(event) => {
+            event.stopPropagation();
+            onTogglePin();
+          }}
           disabled={pinDisabled}
           style={{
             border: pinDisabled ? "1px solid #4b5563" : "1px solid #92400e",
@@ -135,7 +168,10 @@ export default function MicroSourceDataCard({
         </button>
         <button
           type="button"
-          onClick={onArchive}
+          onClick={(event) => {
+            event.stopPropagation();
+            onArchive();
+          }}
           disabled={archiveDisabled}
           style={{
             border: archiveDisabled ? "1px solid #4b5563" : "1px solid #64748b",

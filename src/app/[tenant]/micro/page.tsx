@@ -21,6 +21,8 @@ type SourceData = {
   raw_content: string;
   source_type: string;
   pinned: boolean;
+  usage_count: number;
+  last_used_at: string | null;
 };
 
 type SourceDataResponse = {
@@ -142,6 +144,7 @@ export default function MicroPage() {
   const [saving, setSaving] = useState(false);
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [pinningId, setPinningId] = useState<string | null>(null);
+  const [touchingId, setTouchingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
   const loadSourceData = useCallback(async () => {
@@ -273,6 +276,37 @@ export default function MicroPage() {
     }
   };
 
+  const handleTouch = async (id: string) => {
+    setTouchingId(id);
+    setMessage("");
+
+    try {
+      const res = await fetch("/api/micro/source-data", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id,
+          action: "touch",
+        }),
+      });
+      const data = (await res.json()) as SourceDataResponse;
+
+      if (!res.ok || data.success === false) {
+        throw new Error(data.error || "利用記録の更新に失敗しました");
+      }
+
+      await loadSourceData();
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "利用記録の更新に失敗しました"
+      );
+    } finally {
+      setTouchingId(null);
+    }
+  };
+
   return (
     <main style={pageStyle}>
       <div style={shellStyle}>
@@ -337,11 +371,15 @@ export default function MicroPage() {
                   key={item.id}
                   archiveDisabled={archivingId === item.id}
                   content={item.raw_content}
+                  lastUsedAt={item.last_used_at}
                   pinned={item.pinned}
                   pinDisabled={pinningId === item.id}
                   sourceType={item.source_type}
                   title={item.title}
+                  touchDisabled={touchingId === item.id}
+                  usageCount={item.usage_count}
                   onArchive={() => void handleArchive(item.id)}
+                  onTouch={() => void handleTouch(item.id)}
                   onTogglePin={() => void handleTogglePin(item)}
                 />
               ))}

@@ -78,6 +78,7 @@ export async function GET(req: NextRequest) {
     .select(SOURCE_DATA_COLUMNS)
     .eq("tenant_slug", tenantSlug)
     .order("pinned", { ascending: false })
+    .order("last_used_at", { ascending: false, nullsFirst: false })
     .order("updated_at", { ascending: false });
 
   if (status === "archived") {
@@ -219,7 +220,8 @@ export async function PATCH(req: NextRequest) {
     action !== "archive" &&
     action !== "restore" &&
     action !== "pin" &&
-    action !== "unpin"
+    action !== "unpin" &&
+    action !== "touch"
   ) {
     return NextResponse.json(
       { success: false, error: "action is invalid" },
@@ -227,7 +229,7 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  const values: Record<string, boolean | string | null> = {};
+  const values: Record<string, boolean | number | string | null> = {};
 
   if (action === "archive") {
     values.status = "archived";
@@ -235,14 +237,51 @@ export async function PATCH(req: NextRequest) {
   } else if (action === "restore") {
     values.status = "active";
     values.archived_at = null;
-  } else {
+  } else if (action === "pin" || action === "unpin") {
     values.pinned = action === "pin";
+  } else {
+    const { data: current, error: currentError } = await supabase
+      .from("micro_source_data")
+      .select("usage_count, status")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (currentError) {
+      return NextResponse.json(
+        { success: false, error: currentError.message },
+        { status: 500 }
+      );
+    }
+
+    if (!current) {
+      return NextResponse.json(
+        { success: false, error: "source data not found" },
+        { status: 404 }
+      );
+    }
+
+    if (current.status === "archived") {
+      return NextResponse.json({
+        success: true,
+      });
+    }
+
+    const usageCount = Number(current.usage_count ?? 0);
+
+    values.usage_count = Number.isFinite(usageCount) ? usageCount + 1 : 1;
+    values.last_used_at = new Date().toISOString();
   }
 
-  const { error } = await supabase
+  let updateQuery = supabase
     .from("micro_source_data")
     .update(values)
     .eq("id", id);
+
+  if (action === "touch") {
+    updateQuery = updateQuery.neq("status", "archived");
+  }
+
+  const { error } = await updateQuery;
 
   if (error) {
     return NextResponse.json(
