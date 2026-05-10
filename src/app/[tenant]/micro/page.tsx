@@ -32,6 +32,19 @@ type SourceDataResponse = {
   sourceData?: SourceData[];
 };
 
+type MicroGroup = {
+  id: string;
+  title: string;
+  description: string | null;
+  updated_at: string | null;
+};
+
+type GroupsResponse = {
+  success?: boolean;
+  error?: string;
+  groups?: MicroGroup[];
+};
+
 type SummaryResponse = {
   success?: boolean;
   error?: string;
@@ -45,6 +58,15 @@ function getTenantSlug(params: ReturnType<typeof useParams>) {
   }
 
   return typeof value === "string" ? value : "";
+}
+
+function formatTimestamp(value: string | null | undefined) {
+  if (!value) return "日時なし";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "日時なし";
+
+  return date.toLocaleString("ja-JP");
 }
 
 const pageStyle: CSSProperties = {
@@ -126,6 +148,49 @@ const listStyle: CSSProperties = {
   marginTop: 16,
 };
 
+const groupListStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+  marginTop: 16,
+};
+
+const groupCardStyle: CSSProperties = {
+  width: "100%",
+  background: "#0f172a",
+  color: "#f8fafc",
+  border: "1px solid #334155",
+  borderRadius: 8,
+  padding: 12,
+  textAlign: "left",
+  cursor: "pointer",
+  font: "inherit",
+};
+
+const groupTitleStyle: CSSProperties = {
+  margin: 0,
+  color: "#ffffff",
+  fontSize: 16,
+  lineHeight: 1.45,
+  fontWeight: 700,
+  overflowWrap: "anywhere",
+};
+
+const groupDescriptionStyle: CSSProperties = {
+  margin: "8px 0 0",
+  color: "#d1d5db",
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere",
+  lineHeight: 1.6,
+};
+
+const groupMetaStyle: CSSProperties = {
+  marginTop: 8,
+  color: "#93c5fd",
+  fontSize: 12,
+  lineHeight: 1.5,
+};
+
 const sourceTypeOptions = [
   { value: "free_log", label: "フリーログ" },
   { value: "smart_note", label: "スマートノート" },
@@ -144,16 +209,20 @@ export default function MicroPage() {
   const tenantSlug = useMemo(() => getTenantSlug(params), [params]);
 
   const [items, setItems] = useState<SourceData[]>([]);
+  const [groups, setGroups] = useState<MicroGroup[]>([]);
   const [title, setTitle] = useState("");
   const [rawContent, setRawContent] = useState("");
   const [sourceType, setSourceType] = useState("free_log");
   const [loading, setLoading] = useState(false);
+  const [groupsLoading, setGroupsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [pinningId, setPinningId] = useState<string | null>(null);
   const [summarizingId, setSummarizingId] = useState<string | null>(null);
+  const [openingGroupId, setOpeningGroupId] = useState<string | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [groupsMessage, setGroupsMessage] = useState("");
 
   const loadSourceData = useCallback(async () => {
     if (!tenantSlug) return;
@@ -182,9 +251,40 @@ export default function MicroPage() {
     }
   }, [tenantSlug]);
 
+  const loadGroups = useCallback(async () => {
+    if (!tenantSlug) return;
+
+    setGroupsLoading(true);
+    setGroupsMessage("");
+
+    try {
+      const res = await fetch(
+        `/api/micro/groups?tenant_slug=${encodeURIComponent(tenantSlug)}`,
+        { cache: "no-store" }
+      );
+      const data = (await res.json()) as GroupsResponse;
+
+      if (!res.ok || data.success === false) {
+        throw new Error(data.error || "グループの読み込みに失敗しました");
+      }
+
+      setGroups(data.groups ?? []);
+    } catch (error) {
+      setGroupsMessage(
+        error instanceof Error
+          ? error.message
+          : "グループの読み込みに失敗しました"
+      );
+    } finally {
+      setGroupsLoading(false);
+    }
+  }, [tenantSlug]);
+
   useEffect(() => {
     void loadSourceData();
-  }, [loadSourceData]);
+    void loadGroups();
+  }, [loadGroups, loadSourceData]);
+
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -311,6 +411,15 @@ export default function MicroPage() {
     }
   };
 
+  const handleOpenGroup = (id: string) => {
+    if (!tenantSlug) return;
+
+    setOpeningGroupId(id);
+    router.push(
+      `/${encodeURIComponent(tenantSlug)}/micro/group/${encodeURIComponent(id)}`
+    );
+  };
+
   const handleSummarize = async (item: SourceData) => {
     setSummarizingId(item.id);
     setMessage("");
@@ -389,6 +498,44 @@ export default function MicroPage() {
           </form>
 
           {message && <p style={messageStyle}>{message}</p>}
+        </MicroSectionCard>
+
+        <MicroSectionCard>
+          <MicroSectionTitle>グループ一覧</MicroSectionTitle>
+
+          {groupsLoading ? (
+            <p style={mutedTextStyle}>読み込み中</p>
+          ) : groupsMessage ? (
+            <p style={messageStyle}>{groupsMessage}</p>
+          ) : groups.length === 0 ? (
+            <p style={mutedTextStyle}>まだグループはありません。</p>
+          ) : (
+            <div style={groupListStyle}>
+              {groups.map((group) => (
+                <button
+                  key={group.id}
+                  type="button"
+                  disabled={openingGroupId === group.id}
+                  onClick={() => handleOpenGroup(group.id)}
+                  style={{
+                    ...groupCardStyle,
+                    cursor:
+                      openingGroupId === group.id ? "progress" : "pointer",
+                  }}
+                >
+                  <h3 style={groupTitleStyle}>{group.title}</h3>
+                  {group.description && (
+                    <div style={groupDescriptionStyle}>
+                      {group.description}
+                    </div>
+                  )}
+                  <div style={groupMetaStyle}>
+                    更新日: {formatTimestamp(group.updated_at)}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
         </MicroSectionCard>
 
         <MicroSectionCard>
