@@ -15,6 +15,20 @@ const SUMMARY_COLUMNS = `
   updated_at
 `;
 
+const VERSION_COLUMNS = `
+  id,
+  tenant_slug,
+  target_type,
+  target_id,
+  version_type,
+  input_snapshot,
+  output_snapshot,
+  created_by,
+  created_at
+`;
+
+const ORGANIZE_PROMPT = "内容を評価せず、読みやすく3行程度で整理してください。";
+
 function getSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey =
@@ -34,7 +48,102 @@ function readString(value: unknown) {
 
 type ExistingSummaryRow = {
   id: string;
+  content: string;
 };
+
+type SummaryRow = {
+  id: string;
+  version_id: string | null;
+};
+
+type VersionRow = {
+  created_at: string;
+};
+
+export async function GET(req: NextRequest) {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    return NextResponse.json(
+      { success: false, error: "Supabase env is missing" },
+      { status: 500 }
+    );
+  }
+
+  const { searchParams } = new URL(req.url);
+  const tenantSlug =
+    searchParams.get("tenant_slug")?.trim() ||
+    searchParams.get("tenantSlug")?.trim() ||
+    "";
+  const sourceDataId =
+    searchParams.get("sourceDataId")?.trim() ||
+    searchParams.get("source_data_id")?.trim() ||
+    "";
+
+  if (!tenantSlug) {
+    return NextResponse.json(
+      { success: false, error: "tenant_slug is required" },
+      { status: 400 }
+    );
+  }
+
+  if (!sourceDataId) {
+    return NextResponse.json(
+      { success: false, error: "sourceDataId is required" },
+      { status: 400 }
+    );
+  }
+
+  const { data: summary, error: summaryError } = await supabase
+    .from("micro_summaries")
+    .select("id")
+    .eq("tenant_slug", tenantSlug)
+    .eq("target_type", "source_data")
+    .eq("target_id", sourceDataId)
+    .eq("summary_type", "short")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (summaryError) {
+    return NextResponse.json(
+      { success: false, error: summaryError.message },
+      { status: 500 }
+    );
+  }
+
+  const summaryId = (summary as SummaryRow | null)?.id;
+
+  if (!summaryId) {
+    return NextResponse.json({
+      success: true,
+      versions: [],
+    });
+  }
+
+  const { data: versions, error: versionsError } = await supabase
+    .from("micro_versions")
+    .select(VERSION_COLUMNS)
+    .eq("tenant_slug", tenantSlug)
+    .eq("target_type", "summary")
+    .eq("target_id", summaryId)
+    .order("created_at", { ascending: false });
+
+  if (versionsError) {
+    return NextResponse.json(
+      { success: false, error: versionsError.message },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({
+    success: true,
+    versions: ((versions ?? []) as VersionRow[]).map((version) => ({
+      ...version,
+      updated_at: version.created_at,
+    })),
+  });
+}
 
 export async function POST(req: NextRequest) {
   const supabase = getSupabaseClient();
@@ -95,7 +204,7 @@ export async function POST(req: NextRequest) {
     const client = new OpenAI({ apiKey });
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
-      input: `内容を評価せず、読みやすく3行程度で整理してください。\n\n${rawContent}`,
+      input: `${ORGANIZE_PROMPT}\n\n${rawContent}`,
     });
 
     const summaryText = response.output_text?.trim();
@@ -110,7 +219,7 @@ export async function POST(req: NextRequest) {
     const { data: existingSummary, error: existingSummaryError } =
       await supabase
         .from("micro_summaries")
-        .select("id")
+        .select("id, content")
         .eq("tenant_slug", tenantSlug)
         .eq("target_type", "source_data")
         .eq("target_id", sourceDataId)
@@ -172,10 +281,68 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const summaryRow = summary as SummaryRow | null;
+
+    if (!summaryRow?.id) {
+      return NextResponse.json(
+        { success: false, error: "summary was not found after save" },
+        { status: 500 }
+      );
+    }
+
+    const { data: version, error: versionError } = await supabase
+      .from("micro_versions")
+      .insert({
+        tenant_slug: tenantSlug,
+        target_type: "summary",
+        target_id: summaryRow.id,
+        version_type: "ai_generated",
+        input_snapshot: {
+          source_data_id: sourceDataId,
+          summary_type: "short",
+          raw_content: rawContent,
+          previous_summary:
+            (existingSummary as ExistingSummaryRow | null)?.content ?? null,
+          prompt: ORGANIZE_PROMPT,
+        },
+        output_snapshot: {
+          summary: summaryText,
+          summary_type: "short",
+        },
+        prompt_name: "micro_summary_short_organize",
+        model_name: "gpt-4.1-mini",
+        created_by: "ai",
+      })
+      .select("id")
+      .maybeSingle();
+
+    if (versionError) {
+      return NextResponse.json(
+        { success: false, error: versionError.message },
+        { status: 500 }
+      );
+    }
+
+    const versionId = (version as { id?: string } | null)?.id;
+
+    if (versionId) {
+      const { error: versionLinkError } = await supabase
+        .from("micro_summaries")
+        .update({ version_id: versionId })
+        .eq("id", summaryRow.id);
+
+      if (versionLinkError) {
+        return NextResponse.json(
+          { success: false, error: versionLinkError.message },
+          { status: 500 }
+        );
+      }
+    }
+
     return NextResponse.json(
       {
         success: true,
-        summary,
+        summary: versionId ? { ...summaryRow, version_id: versionId } : summary,
       },
       { status: existingSummaryId ? 200 : 201 }
     );

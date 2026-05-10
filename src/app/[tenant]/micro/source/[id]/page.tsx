@@ -24,6 +24,22 @@ type SourceDataResponse = {
   sourceData?: SourceDataDetail;
 };
 
+type SummaryVersion = {
+  id: string;
+  version_type: string;
+  input_snapshot: unknown;
+  output_snapshot: unknown;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type SummaryVersionsResponse = {
+  success?: boolean;
+  error?: string;
+  versions?: SummaryVersion[];
+};
+
 function getParam(params: ReturnType<typeof useParams>, key: string) {
   const value = params?.[key];
 
@@ -52,6 +68,13 @@ const statusLabels: Record<string, string> = {
   archived: "保管済み",
 };
 
+const versionTypeLabels: Record<string, string> = {
+  ai_generated: "AI整理",
+  user_edit: "ユーザー修正",
+  status_change: "状態変更",
+  archive_restore: "保管・復元",
+};
+
 function formatDate(value: string | null) {
   if (!value) return "未使用";
 
@@ -59,6 +82,22 @@ function formatDate(value: string | null) {
   if (Number.isNaN(date.getTime())) return "未使用";
 
   return date.toLocaleString("ja-JP");
+}
+
+function formatTimestamp(value: string | null | undefined) {
+  if (!value) return "日時なし";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "日時なし";
+
+  return date.toLocaleString("ja-JP");
+}
+
+function readSummaryFromSnapshot(value: unknown) {
+  if (!value || typeof value !== "object") return "";
+
+  const summary = (value as Record<string, unknown>).summary;
+  return typeof summary === "string" ? summary : "";
 }
 
 const pageStyle: CSSProperties = {
@@ -195,14 +234,46 @@ const metaLabelStyle: CSSProperties = {
   marginBottom: 4,
 };
 
+const historyListStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+  marginTop: 16,
+};
+
+const historyCardStyle: CSSProperties = {
+  background: "#0f172a",
+  color: "#f8fafc",
+  border: "1px solid #334155",
+  borderRadius: 8,
+  padding: 12,
+};
+
+const historyMetaStyle: CSSProperties = {
+  color: "#cbd5e1",
+  fontSize: 12,
+  lineHeight: 1.6,
+  marginBottom: 8,
+};
+
+const historyContentStyle: CSSProperties = {
+  color: "#f8fafc",
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere",
+  lineHeight: 1.7,
+};
+
 export default function MicroSourceDetailPage() {
   const params = useParams();
   const tenantSlug = useMemo(() => getParam(params, "tenant"), [params]);
   const id = useMemo(() => getParam(params, "id"), [params]);
 
   const [item, setItem] = useState<SourceDataDetail | null>(null);
+  const [versions, setVersions] = useState<SummaryVersion[]>([]);
   const [loading, setLoading] = useState(false);
+  const [versionsLoading, setVersionsLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [versionsMessage, setVersionsMessage] = useState("");
 
   const loadSourceData = useCallback(async () => {
     if (!tenantSlug || !id) return;
@@ -233,9 +304,41 @@ export default function MicroSourceDetailPage() {
     }
   }, [id, tenantSlug]);
 
+  const loadSummaryVersions = useCallback(async () => {
+    if (!tenantSlug || !id) return;
+
+    setVersionsLoading(true);
+    setVersionsMessage("");
+
+    try {
+      const res = await fetch(
+        `/api/micro/summaries?tenant_slug=${encodeURIComponent(
+          tenantSlug
+        )}&sourceDataId=${encodeURIComponent(id)}`,
+        { cache: "no-store" }
+      );
+      const data = (await res.json()) as SummaryVersionsResponse;
+
+      if (!res.ok || data.success === false) {
+        throw new Error(data.error || "整理履歴の読み込みに失敗しました");
+      }
+
+      setVersions(data.versions ?? []);
+    } catch (error) {
+      setVersionsMessage(
+        error instanceof Error
+          ? error.message
+          : "整理履歴の読み込みに失敗しました"
+      );
+    } finally {
+      setVersionsLoading(false);
+    }
+  }, [id, tenantSlug]);
+
   useEffect(() => {
     void loadSourceData();
-  }, [loadSourceData]);
+    void loadSummaryVersions();
+  }, [loadSourceData, loadSummaryVersions]);
 
   const displayTitle = item?.title?.trim() || "無題";
   const sourceTypeLabel = item
@@ -285,6 +388,39 @@ export default function MicroSourceDetailPage() {
                 <div style={summaryStyle}>{item.summary}</div>
               ) : (
                 <p style={mutedTextStyle}>整理はまだありません。</p>
+              )}
+            </MicroSectionCard>
+
+            <MicroSectionCard>
+              <MicroSectionTitle>整理履歴</MicroSectionTitle>
+              {versionsLoading ? (
+                <p style={mutedTextStyle}>読み込み中</p>
+              ) : versionsMessage ? (
+                <p style={messageStyle}>{versionsMessage}</p>
+              ) : versions.length === 0 ? (
+                <p style={mutedTextStyle}>整理履歴はまだありません。</p>
+              ) : (
+                <div style={historyListStyle}>
+                  {versions.map((version) => {
+                    const summaryText =
+                      readSummaryFromSnapshot(version.output_snapshot) ||
+                      "整理内容がありません。";
+                    const versionTypeLabel =
+                      versionTypeLabels[version.version_type] ??
+                      version.version_type;
+
+                    return (
+                      <article key={version.id} style={historyCardStyle}>
+                        <div style={historyMetaStyle}>
+                          {versionTypeLabel} /{" "}
+                          {formatTimestamp(version.updated_at)} /{" "}
+                          {version.created_by}
+                        </div>
+                        <div style={historyContentStyle}>{summaryText}</div>
+                      </article>
+                    );
+                  })}
+                </div>
               )}
             </MicroSectionCard>
 
