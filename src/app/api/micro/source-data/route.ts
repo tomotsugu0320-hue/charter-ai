@@ -32,6 +32,15 @@ const SOURCE_TYPES = new Set([
 
 const SOURCE_STATUSES = new Set(["draft", "active", "archived"]);
 
+type SourceDataRow = {
+  id: string;
+};
+
+type SummaryRow = {
+  target_id: string;
+  content: string;
+};
+
 function getSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey =
@@ -96,9 +105,40 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  const sourceData = (data ?? []) as SourceDataRow[];
+  const sourceDataIds = sourceData.map((item) => item.id);
+  const summaryBySourceDataId = new Map<string, string>();
+
+  if (sourceDataIds.length > 0) {
+    const { data: summaries, error: summariesError } = await supabase
+      .from("micro_summaries")
+      .select("target_id, content, updated_at")
+      .eq("tenant_slug", tenantSlug)
+      .eq("target_type", "source_data")
+      .eq("summary_type", "short")
+      .in("target_id", sourceDataIds)
+      .order("updated_at", { ascending: false });
+
+    if (summariesError) {
+      return NextResponse.json(
+        { success: false, error: summariesError.message },
+        { status: 500 }
+      );
+    }
+
+    ((summaries ?? []) as SummaryRow[]).forEach((summary) => {
+      if (!summaryBySourceDataId.has(summary.target_id)) {
+        summaryBySourceDataId.set(summary.target_id, summary.content);
+      }
+    });
+  }
+
   return NextResponse.json({
     success: true,
-    sourceData: data ?? [],
+    sourceData: sourceData.map((item) => ({
+      ...item,
+      summary: summaryBySourceDataId.get(item.id) ?? null,
+    })),
   });
 }
 

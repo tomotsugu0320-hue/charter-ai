@@ -23,12 +23,18 @@ type SourceData = {
   pinned: boolean;
   usage_count: number;
   last_used_at: string | null;
+  summary: string | null;
 };
 
 type SourceDataResponse = {
   success?: boolean;
   error?: string;
   sourceData?: SourceData[];
+};
+
+type SummaryResponse = {
+  success?: boolean;
+  error?: string;
 };
 
 function getTenantSlug(params: ReturnType<typeof useParams>) {
@@ -144,6 +150,7 @@ export default function MicroPage() {
   const [saving, setSaving] = useState(false);
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [pinningId, setPinningId] = useState<string | null>(null);
+  const [summarizingId, setSummarizingId] = useState<string | null>(null);
   const [touchingId, setTouchingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
@@ -307,6 +314,36 @@ export default function MicroPage() {
     }
   };
 
+  const handleSummarize = async (item: SourceData) => {
+    setSummarizingId(item.id);
+    setMessage("");
+
+    try {
+      const res = await fetch("/api/micro/summaries", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          tenantSlug,
+          sourceDataId: item.id,
+          rawContent: item.raw_content,
+        }),
+      });
+      const data = (await res.json()) as SummaryResponse;
+
+      if (!res.ok || data.success === false) {
+        throw new Error(data.error || "整理に失敗しました");
+      }
+
+      await loadSourceData();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "整理に失敗しました");
+    } finally {
+      setSummarizingId(null);
+    }
+  };
+
   return (
     <main style={pageStyle}>
       <div style={shellStyle}>
@@ -375,10 +412,13 @@ export default function MicroPage() {
                   pinned={item.pinned}
                   pinDisabled={pinningId === item.id}
                   sourceType={item.source_type}
+                  summary={item.summary}
+                  summarizeDisabled={summarizingId === item.id}
                   title={item.title}
                   touchDisabled={touchingId === item.id}
                   usageCount={item.usage_count}
                   onArchive={() => void handleArchive(item.id)}
+                  onSummarize={() => void handleSummarize(item)}
                   onTouch={() => void handleTouch(item.id)}
                   onTogglePin={() => void handleTogglePin(item)}
                 />
