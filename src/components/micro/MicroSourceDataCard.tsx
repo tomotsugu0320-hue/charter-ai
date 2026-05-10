@@ -5,11 +5,14 @@ type MicroSourceDataCardProps = {
   title: string | null;
   pinned: boolean;
   archiveDisabled?: boolean;
+  openDisabled?: boolean;
   pinDisabled?: boolean;
-  touchDisabled?: boolean;
+  summarizeDisabled?: boolean;
+  summary: string | null;
   usageCount: number;
   onArchive: () => void;
-  onTouch: () => void;
+  onOpen: () => void;
+  onSummarize: () => void;
   onTogglePin: () => void;
 };
 
@@ -38,14 +41,17 @@ export default function MicroSourceDataCard({
   archiveDisabled = false,
   content,
   lastUsedAt,
+  openDisabled = false,
   pinned,
   pinDisabled = false,
   sourceType,
+  summarizeDisabled = false,
+  summary,
   title,
-  touchDisabled = false,
   usageCount,
   onArchive,
-  onTouch,
+  onOpen,
+  onSummarize,
   onTogglePin,
 }: MicroSourceDataCardProps) {
   const sourceTypeLabel = sourceTypeLabels[sourceType] ?? sourceType;
@@ -53,7 +59,7 @@ export default function MicroSourceDataCard({
 
   return (
     <article
-      onClick={touchDisabled ? undefined : onTouch}
+      onClick={openDisabled ? undefined : onOpen}
       style={{
         background: "#0f172a",
         color: "#f8fafc",
@@ -61,7 +67,7 @@ export default function MicroSourceDataCard({
         borderRadius: 8,
         padding: 14,
         lineHeight: 1.7,
-        cursor: touchDisabled ? "progress" : "pointer",
+        cursor: openDisabled ? "progress" : "pointer",
       }}
     >
       <h3
@@ -99,6 +105,7 @@ export default function MicroSourceDataCard({
         >
           {sourceTypeLabel}
         </span>
+
         {pinned && (
           <span
             style={{
@@ -127,6 +134,24 @@ export default function MicroSourceDataCard({
         {content}
       </div>
 
+      {summary && (
+        <div
+          style={{
+            marginTop: 12,
+            background: "#172554",
+            color: "#dbeafe",
+            border: "1px solid #1d4ed8",
+            borderRadius: 8,
+            padding: "10px 12px",
+            whiteSpace: "pre-wrap",
+            overflowWrap: "anywhere",
+            lineHeight: 1.6,
+          }}
+        >
+          {summary}
+        </div>
+      )}
+
       <div
         style={{
           marginTop: 12,
@@ -135,17 +160,40 @@ export default function MicroSourceDataCard({
           lineHeight: 1.6,
         }}
       >
-        利用回数: {usageCount ?? 0} / 最終利用: {formatLastUsedAt(lastUsedAt)}
+        利用回数: {usageCount ?? 0} / 最終利用:{" "}
+        {formatLastUsedAt(lastUsedAt)}
       </div>
 
       <div
         style={{
           display: "flex",
           justifyContent: "flex-end",
+          flexWrap: "wrap",
           gap: 8,
           marginTop: 12,
         }}
       >
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onSummarize();
+          }}
+          disabled={summarizeDisabled}
+          style={{
+            border: summarizeDisabled ? "1px solid #4b5563" : "1px solid #1d4ed8",
+            borderRadius: 8,
+            background: summarizeDisabled ? "#374151" : "#172554",
+            color: summarizeDisabled ? "#d1d5db" : "#dbeafe",
+            cursor: summarizeDisabled ? "not-allowed" : "pointer",
+            padding: "7px 12px",
+            fontSize: 14,
+            fontWeight: 700,
+          }}
+        >
+          {summarizeDisabled ? "整理中" : summary ? "再整理" : "整理"}
+        </button>
+
         <button
           type="button"
           onClick={(event) => {
@@ -166,6 +214,7 @@ export default function MicroSourceDataCard({
         >
           {pinDisabled ? "更新中" : pinned ? "ピン解除" : "ピン"}
         </button>
+
         <button
           type="button"
           onClick={(event) => {

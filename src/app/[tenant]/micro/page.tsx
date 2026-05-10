@@ -8,7 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import MicroButton from "@/components/micro/MicroButton";
 import MicroSectionCard from "@/components/micro/MicroSectionCard";
 import MicroSectionTitle from "@/components/micro/MicroSectionTitle";
@@ -140,6 +140,7 @@ const sourceTypeOptions = [
 
 export default function MicroPage() {
   const params = useParams();
+  const router = useRouter();
   const tenantSlug = useMemo(() => getTenantSlug(params), [params]);
 
   const [items, setItems] = useState<SourceData[]>([]);
@@ -151,7 +152,7 @@ export default function MicroPage() {
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [pinningId, setPinningId] = useState<string | null>(null);
   const [summarizingId, setSummarizingId] = useState<string | null>(null);
-  const [touchingId, setTouchingId] = useState<string | null>(null);
+  const [openingId, setOpeningId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
   const loadSourceData = useCallback(async () => {
@@ -283,12 +284,14 @@ export default function MicroPage() {
     }
   };
 
-  const handleTouch = async (id: string) => {
-    setTouchingId(id);
+  const handleOpenSourceData = async (id: string) => {
+    if (!tenantSlug) return;
+
+    setOpeningId(id);
     setMessage("");
 
     try {
-      const res = await fetch("/api/micro/source-data", {
+      await fetch("/api/micro/source-data", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -298,19 +301,13 @@ export default function MicroPage() {
           action: "touch",
         }),
       });
-      const data = (await res.json()) as SourceDataResponse;
-
-      if (!res.ok || data.success === false) {
-        throw new Error(data.error || "利用記録の更新に失敗しました");
-      }
-
-      await loadSourceData();
-    } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "利用記録の更新に失敗しました"
-      );
     } finally {
-      setTouchingId(null);
+      setOpeningId(null);
+      router.push(
+        `/${encodeURIComponent(tenantSlug)}/micro/source/${encodeURIComponent(
+          id
+        )}`
+      );
     }
   };
 
@@ -409,17 +406,17 @@ export default function MicroPage() {
                   archiveDisabled={archivingId === item.id}
                   content={item.raw_content}
                   lastUsedAt={item.last_used_at}
+                  openDisabled={openingId === item.id}
                   pinned={item.pinned}
                   pinDisabled={pinningId === item.id}
                   sourceType={item.source_type}
                   summary={item.summary}
                   summarizeDisabled={summarizingId === item.id}
                   title={item.title}
-                  touchDisabled={touchingId === item.id}
                   usageCount={item.usage_count}
                   onArchive={() => void handleArchive(item.id)}
+                  onOpen={() => void handleOpenSourceData(item.id)}
                   onSummarize={() => void handleSummarize(item)}
-                  onTouch={() => void handleTouch(item.id)}
                   onTogglePin={() => void handleTogglePin(item)}
                 />
               ))}

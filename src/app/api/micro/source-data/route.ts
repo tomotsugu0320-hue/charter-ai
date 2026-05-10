@@ -73,6 +73,7 @@ export async function GET(req: NextRequest) {
     searchParams.get("tenant_slug")?.trim() ||
     searchParams.get("tenantSlug")?.trim() ||
     "";
+  const id = searchParams.get("id")?.trim() || "";
   const status = searchParams.get("status")?.trim() || "";
 
   if (!tenantSlug) {
@@ -80,6 +81,55 @@ export async function GET(req: NextRequest) {
       { success: false, error: "tenant_slug is required" },
       { status: 400 }
     );
+  }
+
+  if (id) {
+    const { data, error } = await supabase
+      .from("micro_source_data")
+      .select(SOURCE_DATA_COLUMNS)
+      .eq("tenant_slug", tenantSlug)
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 500 }
+      );
+    }
+
+    if (!data) {
+      return NextResponse.json(
+        { success: false, error: "source data not found" },
+        { status: 404 }
+      );
+    }
+
+    const { data: summary, error: summaryError } = await supabase
+      .from("micro_summaries")
+      .select("content, updated_at")
+      .eq("tenant_slug", tenantSlug)
+      .eq("target_type", "source_data")
+      .eq("target_id", id)
+      .eq("summary_type", "short")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (summaryError) {
+      return NextResponse.json(
+        { success: false, error: summaryError.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      sourceData: {
+        ...data,
+        summary: summary?.content ?? null,
+      },
+    });
   }
 
   let query = supabase
