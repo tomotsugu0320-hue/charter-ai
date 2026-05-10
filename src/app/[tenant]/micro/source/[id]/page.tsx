@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import MicroSectionCard from "@/components/micro/MicroSectionCard";
 import MicroSectionTitle from "@/components/micro/MicroSectionTitle";
 
@@ -22,6 +22,15 @@ type SourceDataResponse = {
   success?: boolean;
   error?: string;
   sourceData?: SourceDataDetail;
+  relatedSources?: RelatedSource[];
+};
+
+type RelatedSource = {
+  id: string;
+  title: string | null;
+  source_type: string;
+  summary: string | null;
+  updated_at: string | null;
 };
 
 type SummaryVersion = {
@@ -263,14 +272,66 @@ const historyContentStyle: CSSProperties = {
   lineHeight: 1.7,
 };
 
+const relatedListStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+  marginTop: 16,
+};
+
+const relatedCardStyle: CSSProperties = {
+  width: "100%",
+  border: "1px solid #334155",
+  borderRadius: 8,
+  background: "#0f172a",
+  color: "#f8fafc",
+  padding: 12,
+  textAlign: "left",
+  cursor: "pointer",
+  font: "inherit",
+};
+
+const relatedTitleStyle: CSSProperties = {
+  margin: 0,
+  color: "#ffffff",
+  fontSize: 16,
+  lineHeight: 1.45,
+  overflowWrap: "anywhere",
+};
+
+const relatedMetaStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 8,
+  marginTop: 8,
+  color: "#cbd5e1",
+  fontSize: 12,
+  lineHeight: 1.5,
+};
+
+const relatedSummaryStyle: CSSProperties = {
+  marginTop: 10,
+  color: "#dbeafe",
+  background: "#172554",
+  border: "1px solid #1d4ed8",
+  borderRadius: 8,
+  padding: "8px 10px",
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere",
+  lineHeight: 1.6,
+};
+
 export default function MicroSourceDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const tenantSlug = useMemo(() => getParam(params, "tenant"), [params]);
   const id = useMemo(() => getParam(params, "id"), [params]);
 
   const [item, setItem] = useState<SourceDataDetail | null>(null);
+  const [relatedSources, setRelatedSources] = useState<RelatedSource[]>([]);
   const [versions, setVersions] = useState<SummaryVersion[]>([]);
   const [loading, setLoading] = useState(false);
+  const [openingRelatedId, setOpeningRelatedId] = useState<string | null>(null);
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [versionsMessage, setVersionsMessage] = useState("");
@@ -295,7 +356,9 @@ export default function MicroSourceDetailPage() {
       }
 
       setItem(data.sourceData);
+      setRelatedSources(data.relatedSources ?? []);
     } catch (error) {
+      setRelatedSources([]);
       setMessage(
         error instanceof Error ? error.message : "読み込みに失敗しました"
       );
@@ -339,6 +402,32 @@ export default function MicroSourceDetailPage() {
     void loadSourceData();
     void loadSummaryVersions();
   }, [loadSourceData, loadSummaryVersions]);
+
+  const handleOpenRelatedSource = async (relatedId: string) => {
+    if (!tenantSlug) return;
+
+    setOpeningRelatedId(relatedId);
+
+    try {
+      await fetch("/api/micro/source-data", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: relatedId,
+          action: "touch",
+        }),
+      });
+    } finally {
+      setOpeningRelatedId(null);
+      router.push(
+        `/${encodeURIComponent(
+          tenantSlug
+        )}/micro/source/${encodeURIComponent(relatedId)}`
+      );
+    }
+  };
 
   const displayTitle = item?.title?.trim() || "無題";
   const sourceTypeLabel = item
@@ -388,6 +477,52 @@ export default function MicroSourceDetailPage() {
                 <div style={summaryStyle}>{item.summary}</div>
               ) : (
                 <p style={mutedTextStyle}>整理はまだありません。</p>
+              )}
+            </MicroSectionCard>
+
+            <MicroSectionCard>
+              <MicroSectionTitle>関連ログ</MicroSectionTitle>
+              {relatedSources.length === 0 ? (
+                <p style={mutedTextStyle}>関連ログはまだありません。</p>
+              ) : (
+                <div style={relatedListStyle}>
+                  {relatedSources.map((relatedSource) => {
+                    const relatedTitle =
+                      relatedSource.title?.trim() || "無題";
+                    const relatedSourceTypeLabel =
+                      sourceTypeLabels[relatedSource.source_type] ??
+                      relatedSource.source_type;
+
+                    return (
+                      <button
+                        key={relatedSource.id}
+                        type="button"
+                        onClick={() =>
+                          void handleOpenRelatedSource(relatedSource.id)
+                        }
+                        disabled={openingRelatedId === relatedSource.id}
+                        style={{
+                          ...relatedCardStyle,
+                          cursor:
+                            openingRelatedId === relatedSource.id
+                              ? "progress"
+                              : "pointer",
+                        }}
+                      >
+                        <h3 style={relatedTitleStyle}>{relatedTitle}</h3>
+                        <div style={relatedMetaStyle}>
+                          <span>{relatedSourceTypeLabel}</span>
+                          <span>{formatTimestamp(relatedSource.updated_at)}</span>
+                        </div>
+                        {relatedSource.summary && (
+                          <div style={relatedSummaryStyle}>
+                            {relatedSource.summary}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </MicroSectionCard>
 

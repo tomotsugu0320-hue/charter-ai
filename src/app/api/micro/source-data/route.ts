@@ -34,6 +34,10 @@ const SOURCE_STATUSES = new Set(["draft", "active", "archived"]);
 
 type SourceDataRow = {
   id: string;
+  source_type?: string | null;
+  title?: string | null;
+  raw_content?: string | null;
+  updated_at?: string | null;
 };
 
 type SummaryRow = {
@@ -56,6 +60,40 @@ function getSupabaseClient() {
 
 function readString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeText(value: string | null | undefined) {
+  return (value ?? "").trim().toLocaleLowerCase("ja-JP");
+}
+
+function getRelatedTerms(sourceData: SourceDataRow) {
+  const candidates = [
+    normalizeText(sourceData.title),
+    ...normalizeText(sourceData.raw_content)
+      .split(/[\s、。,.!?！？\n\r]+/)
+      .map((value) => value.trim()),
+  ];
+
+  return Array.from(
+    new Set(
+      candidates.filter((value) => value.length >= 2 && value.length <= 40)
+    )
+  ).slice(0, 20);
+}
+
+function hasPartialMatch(sourceData: SourceDataRow, terms: string[]) {
+  const target = `${normalizeText(sourceData.title)} ${normalizeText(
+    sourceData.raw_content
+  )}`;
+
+  return terms.some((term) => target.includes(term));
+}
+
+function compareUpdatedAtDesc(a: SourceDataRow, b: SourceDataRow) {
+  const aTime = new Date(a.updated_at ?? "").getTime();
+  const bTime = new Date(b.updated_at ?? "").getTime();
+
+  return (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime);
 }
 
 export async function GET(req: NextRequest) {
@@ -123,12 +161,83 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const sourceData = data as SourceDataRow;
+    const relatedTerms = getRelatedTerms(sourceData);
+    let relatedSources: SourceDataRow[] = [];
+
+    if (relatedTerms.length > 0) {
+      const { data: relatedCandidates, error: relatedError } = await supabase
+        .from("micro_source_data")
+        .select(SOURCE_DATA_COLUMNS)
+        .eq("tenant_slug", tenantSlug)
+        .neq("id", id)
+        .neq("status", "archived")
+        .order("updated_at", { ascending: false })
+        .limit(100);
+
+      if (relatedError) {
+        return NextResponse.json(
+          { success: false, error: relatedError.message },
+          { status: 500 }
+        );
+      }
+
+      relatedSources = ((relatedCandidates ?? []) as SourceDataRow[])
+        .filter((candidate) => hasPartialMatch(candidate, relatedTerms))
+        .sort((a, b) => {
+          const aSameSourceType = a.source_type === sourceData.source_type;
+          const bSameSourceType = b.source_type === sourceData.source_type;
+
+          if (aSameSourceType !== bSameSourceType) {
+            return aSameSourceType ? -1 : 1;
+          }
+
+          return compareUpdatedAtDesc(a, b);
+        })
+        .slice(0, 5);
+    }
+
+    const relatedSourceIds = relatedSources.map((item) => item.id);
+    const relatedSummaryBySourceDataId = new Map<string, string>();
+
+    if (relatedSourceIds.length > 0) {
+      const { data: relatedSummaries, error: relatedSummariesError } =
+        await supabase
+          .from("micro_summaries")
+          .select("target_id, content, updated_at")
+          .eq("tenant_slug", tenantSlug)
+          .eq("target_type", "source_data")
+          .eq("summary_type", "short")
+          .in("target_id", relatedSourceIds)
+          .order("updated_at", { ascending: false });
+
+      if (relatedSummariesError) {
+        return NextResponse.json(
+          { success: false, error: relatedSummariesError.message },
+          { status: 500 }
+        );
+      }
+
+      ((relatedSummaries ?? []) as SummaryRow[]).forEach((relatedSummary) => {
+        if (!relatedSummaryBySourceDataId.has(relatedSummary.target_id)) {
+          relatedSummaryBySourceDataId.set(
+            relatedSummary.target_id,
+            relatedSummary.content
+          );
+        }
+      });
+    }
+
     return NextResponse.json({
       success: true,
       sourceData: {
         ...data,
         summary: summary?.content ?? null,
       },
+      relatedSources: relatedSources.map((relatedSource) => ({
+        ...relatedSource,
+        summary: relatedSummaryBySourceDataId.get(relatedSource.id) ?? null,
+      })),
     });
   }
 
