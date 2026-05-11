@@ -148,6 +148,23 @@ const listStyle: CSSProperties = {
   marginTop: 16,
 };
 
+const actionRowStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 8,
+};
+
+const currentSearchStyle: CSSProperties = {
+  margin: "12px 0 0",
+  color: "#bfdbfe",
+  background: "#172554",
+  border: "1px solid #1d4ed8",
+  borderRadius: 8,
+  padding: "8px 10px",
+  fontSize: 13,
+  overflowWrap: "anywhere",
+};
+
 const groupListStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -212,6 +229,8 @@ export default function MicroPage() {
   const [groups, setGroups] = useState<MicroGroup[]>([]);
   const [title, setTitle] = useState("");
   const [rawContent, setRawContent] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [sourceType, setSourceType] = useState("free_log");
   const [loading, setLoading] = useState(false);
   const [groupsLoading, setGroupsLoading] = useState(false);
@@ -231,8 +250,14 @@ export default function MicroPage() {
     setMessage("");
 
     try {
+      const queryParams = new URLSearchParams({ tenant_slug: tenantSlug });
+
+      if (searchQuery) {
+        queryParams.set("q", searchQuery);
+      }
+
       const res = await fetch(
-        `/api/micro/source-data?tenant_slug=${encodeURIComponent(tenantSlug)}`,
+        `/api/micro/source-data?${queryParams.toString()}`,
         { cache: "no-store" }
       );
       const data = (await res.json()) as SourceDataResponse;
@@ -249,7 +274,7 @@ export default function MicroPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenantSlug]);
+  }, [searchQuery, tenantSlug]);
 
   const loadGroups = useCallback(async () => {
     if (!tenantSlug) return;
@@ -285,6 +310,15 @@ export default function MicroPage() {
     void loadGroups();
   }, [loadGroups, loadSourceData]);
 
+  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSearchQuery(searchInput.trim());
+  };
+
+  const handleClearSearch = () => {
+    setSearchInput("");
+    setSearchQuery("");
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -501,6 +535,44 @@ export default function MicroPage() {
         </MicroSectionCard>
 
         <MicroSectionCard>
+          <MicroSectionTitle>検索</MicroSectionTitle>
+
+          <form onSubmit={handleSearchSubmit} style={formStyle}>
+            <label style={fieldStyle}>
+              <span style={labelStyle}>キーワード</span>
+              <input
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                placeholder="タイトル・本文・整理を検索"
+                style={inputStyle}
+              />
+            </label>
+
+            <div style={actionRowStyle}>
+              <MicroButton type="submit">検索</MicroButton>
+              <MicroButton
+                type="button"
+                disabled={!searchInput && !searchQuery}
+                onClick={handleClearSearch}
+                style={{
+                  background: !searchInput && !searchQuery ? "#374151" : "#1e293b",
+                  border:
+                    !searchInput && !searchQuery
+                      ? "1px solid #4b5563"
+                      : "1px solid #64748b",
+                }}
+              >
+                クリア
+              </MicroButton>
+            </div>
+          </form>
+
+          {searchQuery && (
+            <div style={currentSearchStyle}>検索中: {searchQuery}</div>
+          )}
+        </MicroSectionCard>
+
+        <MicroSectionCard>
           <MicroSectionTitle>グループ一覧</MicroSectionTitle>
 
           {groupsLoading ? (
@@ -544,7 +616,11 @@ export default function MicroPage() {
           {loading ? (
             <p style={mutedTextStyle}>読み込み中</p>
           ) : items.length === 0 ? (
-            <p style={mutedTextStyle}>まだ保存されたログはありません。</p>
+            <p style={mutedTextStyle}>
+              {searchQuery
+                ? "条件に合うログはありません。"
+                : "まだ保存されたログはありません。"}
+            </p>
           ) : (
             <div style={listStyle}>
               {items.map((item) => (

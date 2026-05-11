@@ -34,9 +34,11 @@ const SOURCE_STATUSES = new Set(["draft", "active", "archived"]);
 
 type SourceDataRow = {
   id: string;
+  pinned?: boolean | null;
   source_type?: string | null;
   title?: string | null;
   raw_content?: string | null;
+  last_used_at?: string | null;
   updated_at?: string | null;
 };
 
@@ -96,6 +98,24 @@ function compareUpdatedAtDesc(a: SourceDataRow, b: SourceDataRow) {
   return (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime);
 }
 
+function getOrderTime(value: string | null | undefined) {
+  if (!value) return Number.NEGATIVE_INFINITY;
+
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
+}
+
+function compareSourceDataOrder(a: SourceDataRow, b: SourceDataRow) {
+  const pinnedDiff = Number(Boolean(b.pinned)) - Number(Boolean(a.pinned));
+  if (pinnedDiff !== 0) return pinnedDiff;
+
+  const lastUsedDiff =
+    getOrderTime(b.last_used_at) - getOrderTime(a.last_used_at);
+  if (lastUsedDiff !== 0) return lastUsedDiff;
+
+  return getOrderTime(b.updated_at) - getOrderTime(a.updated_at);
+}
+
 export async function GET(req: NextRequest) {
   const supabase = getSupabaseClient();
 
@@ -113,6 +133,7 @@ export async function GET(req: NextRequest) {
     "";
   const id = searchParams.get("id")?.trim() || "";
   const status = searchParams.get("status")?.trim() || "";
+  const searchQuery = searchParams.get("q")?.trim() || "";
 
   if (!tenantSlug) {
     return NextResponse.json(
@@ -241,30 +262,148 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  let query = supabase
-    .from("micro_source_data")
-    .select(SOURCE_DATA_COLUMNS)
-    .eq("tenant_slug", tenantSlug)
-    .order("pinned", { ascending: false })
-    .order("last_used_at", { ascending: false, nullsFirst: false })
-    .order("updated_at", { ascending: false });
+  let sourceData: SourceDataRow[] = [];
 
-  if (status === "archived") {
-    query = query.eq("status", "archived");
-  } else {
-    query = query.neq("status", "archived");
-  }
+  if (searchQuery) {
+    const searchPattern = `%${searchQuery}%`;
+    const sourceDataById = new Map<string, SourceDataRow>();
 
-  const { data, error } = await query;
+    const sourceMatchQueries = ["title", "raw_content"].map((column) => {
+      let query = supabase
+        .from("micro_source_data")
+        .select(SOURCE_DATA_COLUMNS)
+        .eq("tenant_slug", tenantSlug)
+        .ilike(column, searchPattern)
+        .order("pinned", { ascending: false })
+        .order("last_used_at", { ascending: false, nullsFirst: false })
+        .order("updated_at", { ascending: false });
 
-  if (error) {
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
+      if (status === "archived") {
+        query = query.eq("status", "archived");
+      } else {
+        query = query.neq("status", "archived");
+      }
+
+      return query;
+    });
+
+    const [titleResult, rawContentResult] = await Promise.all(
+      sourceMatchQueries
     );
+
+    if (titleResult.error) {
+      return NextResponse.json(
+        { success: false, error: titleResult.error.message },
+        { status: 500 }
+      );
+    }
+
+    if (rawContentResult.error) {
+      return NextResponse.json(
+        { success: false, error: rawContentResult.error.message },
+        { status: 500 }
+      );
+    }
+
+    [
+      ...((titleResult.data ?? []) as SourceDataRow[]),
+      ...((rawContentResult.data ?? []) as SourceDataRow[]),
+    ].forEach((item) => {
+      sourceDataById.set(item.id, item);
+    });
+
+    const { data: matchedSummaries, error: matchedSummariesError } =
+      await supabase
+        .from("micro_summaries")
+        .select("target_id, content, updated_at")
+        .eq("tenant_slug", tenantSlug)
+        .eq("target_type", "source_data")
+        .eq("summary_type", "short")
+        .ilike("content", searchPattern)
+        .order("updated_at", { ascending: false });
+
+    if (matchedSummariesError) {
+      return NextResponse.json(
+        { success: false, error: matchedSummariesError.message },
+        { status: 500 }
+      );
+    }
+
+    const summaryMatchedSourceDataIds = Array.from(
+      new Set(
+        ((matchedSummaries ?? []) as SummaryRow[]).map(
+          (summary) => summary.target_id
+        )
+      )
+    );
+
+    if (summaryMatchedSourceDataIds.length > 0) {
+      let summaryMatchedSourceDataQuery = supabase
+        .from("micro_source_data")
+        .select(SOURCE_DATA_COLUMNS)
+        .eq("tenant_slug", tenantSlug)
+        .in("id", summaryMatchedSourceDataIds)
+        .order("pinned", { ascending: false })
+        .order("last_used_at", { ascending: false, nullsFirst: false })
+        .order("updated_at", { ascending: false });
+
+      if (status === "archived") {
+        summaryMatchedSourceDataQuery = summaryMatchedSourceDataQuery.eq(
+          "status",
+          "archived"
+        );
+      } else {
+        summaryMatchedSourceDataQuery = summaryMatchedSourceDataQuery.neq(
+          "status",
+          "archived"
+        );
+      }
+
+      const { data: summaryMatchedSourceData, error: summarySourceDataError } =
+        await summaryMatchedSourceDataQuery;
+
+      if (summarySourceDataError) {
+        return NextResponse.json(
+          { success: false, error: summarySourceDataError.message },
+          { status: 500 }
+        );
+      }
+
+      ((summaryMatchedSourceData ?? []) as SourceDataRow[]).forEach((item) => {
+        sourceDataById.set(item.id, item);
+      });
+    }
+
+    sourceData = Array.from(sourceDataById.values()).sort(
+      compareSourceDataOrder
+    );
+  } else {
+    let query = supabase
+      .from("micro_source_data")
+      .select(SOURCE_DATA_COLUMNS)
+      .eq("tenant_slug", tenantSlug)
+      .order("pinned", { ascending: false })
+      .order("last_used_at", { ascending: false, nullsFirst: false })
+      .order("updated_at", { ascending: false });
+
+    if (status === "archived") {
+      query = query.eq("status", "archived");
+    } else {
+      query = query.neq("status", "archived");
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 500 }
+      );
+    }
+
+    sourceData = (data ?? []) as SourceDataRow[];
   }
 
-  const sourceData = (data ?? []) as SourceDataRow[];
   const sourceDataIds = sourceData.map((item) => item.id);
   const summaryBySourceDataId = new Map<string, string>();
 
@@ -420,7 +559,8 @@ export async function PATCH(req: NextRequest) {
     action !== "restore" &&
     action !== "pin" &&
     action !== "unpin" &&
-    action !== "touch"
+    action !== "touch" &&
+    action !== "update"
   ) {
     return NextResponse.json(
       { success: false, error: "action is invalid" },
@@ -438,6 +578,28 @@ export async function PATCH(req: NextRequest) {
     values.archived_at = null;
   } else if (action === "pin" || action === "unpin") {
     values.pinned = action === "pin";
+  } else if (action === "update") {
+    const title = readString(body.title) || null;
+    const rawContent = readString(body.raw_content || body.rawContent);
+    const sourceType = readString(body.source_type || body.sourceType);
+
+    if (!rawContent) {
+      return NextResponse.json(
+        { success: false, error: "raw_content is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!SOURCE_TYPES.has(sourceType)) {
+      return NextResponse.json(
+        { success: false, error: "source_type is invalid" },
+        { status: 400 }
+      );
+    }
+
+    values.title = title;
+    values.raw_content = rawContent;
+    values.source_type = sourceType;
   } else {
     const { data: current, error: currentError } = await supabase
       .from("micro_source_data")
