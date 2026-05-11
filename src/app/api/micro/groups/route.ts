@@ -59,6 +59,33 @@ function readString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeGroupTitle(value: string) {
+  return value.trim().toLocaleLowerCase("ja-JP");
+}
+
+async function findExistingGroupByTitle(
+  supabase: SupabaseClient,
+  tenantSlug: string,
+  title: string
+) {
+  const normalizedTitle = normalizeGroupTitle(title);
+  const { data, error } = await supabase
+    .from("micro_groups")
+    .select(GROUP_COLUMNS)
+    .eq("tenant_slug", tenantSlug);
+
+  if (error) {
+    return { data: null, error };
+  }
+
+  const existingGroup =
+    ((data ?? []) as GroupRow[]).find(
+      (group) => normalizeGroupTitle(group.title) === normalizedTitle
+    ) ?? null;
+
+  return { data: existingGroup, error: null };
+}
+
 async function addSourceToGroup(
   supabase: SupabaseClient,
   tenantSlug: string,
@@ -368,6 +395,48 @@ export async function POST(req: NextRequest) {
       { success: false, error: "status is invalid" },
       { status: 400 }
     );
+  }
+
+  const { data: existingGroup, error: existingGroupError } =
+    await findExistingGroupByTitle(supabase, tenantSlug, title);
+
+  if (existingGroupError) {
+    return NextResponse.json(
+      { success: false, error: existingGroupError.message },
+      { status: 500 }
+    );
+  }
+
+  if (existingGroup?.id) {
+    let groupItem: GroupItemRow | null = null;
+    let alreadyExists = false;
+
+    if (sourceDataId) {
+      const addResult = await addSourceToGroup(
+        supabase,
+        tenantSlug,
+        existingGroup.id,
+        sourceDataId
+      );
+
+      if (addResult.error) {
+        return NextResponse.json(
+          { success: false, error: addResult.error.message },
+          { status: 500 }
+        );
+      }
+
+      groupItem = addResult.data;
+      alreadyExists = addResult.alreadyExists;
+    }
+
+    return NextResponse.json({
+      success: true,
+      group: existingGroup,
+      groupItem,
+      alreadyExists,
+      groupAlreadyExists: true,
+    });
   }
 
   const insertWithCreatedBy = {
