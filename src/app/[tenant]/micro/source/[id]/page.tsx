@@ -30,6 +30,7 @@ type SourceDataResponse = {
   error?: string;
   sourceData?: SourceDataDetail;
   relatedSources?: RelatedSource[];
+  sourceVersions?: SourceEditVersion[];
 };
 
 type RelatedSource = {
@@ -65,6 +66,15 @@ type TagsResponse = {
   tags?: MicroTag[];
   tag?: MicroTag;
   alreadyExists?: boolean;
+};
+
+type SourceEditVersion = {
+  id: string;
+  input_snapshot: unknown;
+  output_snapshot: unknown;
+  diff_summary: string | null;
+  created_by: string;
+  created_at: string;
 };
 
 type SummaryVersion = {
@@ -153,6 +163,13 @@ function readSummaryFromSnapshot(value: unknown) {
 
   const summary = (value as Record<string, unknown>).summary;
   return typeof summary === "string" ? summary : "";
+}
+
+function readTitleFromSnapshot(value: unknown) {
+  if (!value || typeof value !== "object") return "無題";
+
+  const title = (value as Record<string, unknown>).title;
+  return typeof title === "string" && title.trim() ? title : "無題";
 }
 
 const pageStyle: CSSProperties = {
@@ -488,6 +505,7 @@ export default function MicroSourceDetailPage() {
   const [groups, setGroups] = useState<MicroGroup[]>([]);
   const [sourceGroups, setSourceGroups] = useState<MicroGroup[]>([]);
   const [tags, setTags] = useState<MicroTag[]>([]);
+  const [sourceVersions, setSourceVersions] = useState<SourceEditVersion[]>([]);
   const [versions, setVersions] = useState<SummaryVersion[]>([]);
   const [loading, setLoading] = useState(false);
   const [openingRelatedId, setOpeningRelatedId] = useState<string | null>(null);
@@ -535,8 +553,10 @@ export default function MicroSourceDetailPage() {
       setEditRawContent(data.sourceData.raw_content);
       setEditSourceType(data.sourceData.source_type);
       setRelatedSources(data.relatedSources ?? []);
+      setSourceVersions(data.sourceVersions ?? []);
     } catch (error) {
       setRelatedSources([]);
+      setSourceVersions([]);
       setMessage(
         error instanceof Error ? error.message : "読み込みに失敗しました"
       );
@@ -1150,6 +1170,31 @@ export default function MicroSourceDetailPage() {
                       </button>
                     );
                   })}
+                </div>
+              )}
+            </MicroSectionCard>
+
+            <MicroSectionCard>
+              <MicroSectionTitle>編集履歴</MicroSectionTitle>
+              {sourceVersions.length === 0 ? (
+                <p style={mutedTextStyle}>編集履歴はまだありません。</p>
+              ) : (
+                <div style={historyListStyle}>
+                  {sourceVersions.map((version) => (
+                    <article key={version.id} style={historyCardStyle}>
+                      <div style={historyMetaStyle}>
+                        {formatTimestamp(version.created_at)} /{" "}
+                        {version.created_by}
+                      </div>
+                      <div style={historyContentStyle}>
+                        変更前タイトル:{" "}
+                        {readTitleFromSnapshot(version.input_snapshot)}
+                        {"\n"}
+                        変更後タイトル:{" "}
+                        {readTitleFromSnapshot(version.output_snapshot)}
+                      </div>
+                    </article>
+                  ))}
                 </div>
               )}
             </MicroSectionCard>

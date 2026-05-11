@@ -34,6 +34,7 @@ const SOURCE_STATUSES = new Set(["draft", "active", "archived"]);
 
 type SourceDataRow = {
   id: string;
+  tenant_slug?: string | null;
   pinned?: boolean | null;
   source_type?: string | null;
   title?: string | null;
@@ -45,6 +46,18 @@ type SourceDataRow = {
 type SummaryRow = {
   target_id: string;
   content: string;
+};
+
+type SourceVersionRow = {
+  id: string;
+  target_type: string;
+  target_id: string;
+  version_type: string;
+  input_snapshot: unknown;
+  output_snapshot: unknown;
+  diff_summary: string | null;
+  created_by: string;
+  created_at: string;
 };
 
 function getSupabaseClient() {
@@ -182,6 +195,24 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const { data: sourceVersions, error: sourceVersionsError } = await supabase
+      .from("micro_versions")
+      .select(
+        "id, target_type, target_id, version_type, input_snapshot, output_snapshot, diff_summary, created_by, created_at"
+      )
+      .eq("tenant_slug", tenantSlug)
+      .eq("target_type", "source_data")
+      .eq("target_id", id)
+      .eq("version_type", "user_edit")
+      .order("created_at", { ascending: false });
+
+    if (sourceVersionsError) {
+      return NextResponse.json(
+        { success: false, error: sourceVersionsError.message },
+        { status: 500 }
+      );
+    }
+
     const sourceData = data as SourceDataRow;
     const relatedTerms = getRelatedTerms(sourceData);
     let relatedSources: SourceDataRow[] = [];
@@ -255,6 +286,7 @@ export async function GET(req: NextRequest) {
         ...data,
         summary: summary?.content ?? null,
       },
+      sourceVersions: (sourceVersions ?? []) as SourceVersionRow[],
       relatedSources: relatedSources.map((relatedSource) => ({
         ...relatedSource,
         summary: relatedSummaryBySourceDataId.get(relatedSource.id) ?? null,
@@ -569,6 +601,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const values: Record<string, boolean | number | string | null> = {};
+  let currentForVersion: SourceDataRow | null = null;
 
   if (action === "archive") {
     values.status = "archived";
@@ -596,6 +629,28 @@ export async function PATCH(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    const { data: current, error: currentError } = await supabase
+      .from("micro_source_data")
+      .select("id, tenant_slug, title, raw_content, source_type")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (currentError) {
+      return NextResponse.json(
+        { success: false, error: currentError.message },
+        { status: 500 }
+      );
+    }
+
+    if (!current) {
+      return NextResponse.json(
+        { success: false, error: "source data not found" },
+        { status: 404 }
+      );
+    }
+
+    currentForVersion = current as SourceDataRow;
 
     values.title = title;
     values.raw_content = rawContent;
@@ -649,6 +704,36 @@ export async function PATCH(req: NextRequest) {
       { success: false, error: error.message },
       { status: 500 }
     );
+  }
+
+  if (action === "update" && currentForVersion) {
+    const { error: versionError } = await supabase
+      .from("micro_versions")
+      .insert({
+        tenant_slug: currentForVersion.tenant_slug,
+        target_type: "source_data",
+        target_id: id,
+        version_type: "user_edit",
+        input_snapshot: {
+          title: currentForVersion.title ?? null,
+          raw_content: currentForVersion.raw_content ?? "",
+          source_type: currentForVersion.source_type ?? "",
+        },
+        output_snapshot: {
+          title: values.title ?? null,
+          raw_content: values.raw_content ?? "",
+          source_type: values.source_type ?? "",
+        },
+        diff_summary: "source_data edited",
+        created_by: "user",
+      });
+
+    if (versionError) {
+      return NextResponse.json(
+        { success: false, error: versionError.message },
+        { status: 500 }
+      );
+    }
   }
 
   return NextResponse.json({
