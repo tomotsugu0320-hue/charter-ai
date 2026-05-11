@@ -23,6 +23,11 @@ type TodoCandidate = {
   description?: unknown;
 };
 
+type TodoRow = {
+  todo_state?: string | null;
+  created_at?: string | null;
+};
+
 function getSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey =
@@ -38,6 +43,25 @@ function getSupabaseClient() {
 
 function readString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function getTime(value: string | null | undefined) {
+  if (!value) return 0;
+
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function compareTodos(a: TodoRow, b: TodoRow) {
+  const statePriority = (value: string | null | undefined) =>
+    value === "open" ? 0 : 1;
+  const stateDiff = statePriority(a.todo_state) - statePriority(b.todo_state);
+
+  if (stateDiff !== 0) {
+    return stateDiff;
+  }
+
+  return getTime(b.created_at) - getTime(a.created_at);
 }
 
 function stripJsonFence(value: string) {
@@ -102,9 +126,9 @@ export async function GET(req: NextRequest) {
     searchParams.get("source_data_id")?.trim() ||
     "";
 
-  if (!sourceDataId) {
+  if (!tenantSlug && !sourceDataId) {
     return NextResponse.json(
-      { success: false, error: "sourceDataId is required" },
+      { success: false, error: "tenant_slug or sourceDataId is required" },
       { status: 400 }
     );
   }
@@ -112,12 +136,15 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from("micro_todos")
     .select(TODO_COLUMNS)
-    .eq("source_data_id", sourceDataId)
     .neq("status", "archived")
-    .order("updated_at", { ascending: false });
+    .order("created_at", { ascending: false });
 
   if (tenantSlug) {
     query = query.eq("tenant_slug", tenantSlug);
+  }
+
+  if (sourceDataId) {
+    query = query.eq("source_data_id", sourceDataId);
   }
 
   const { data, error } = await query;
@@ -131,7 +158,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    todos: data ?? [],
+    todos: ((data ?? []) as TodoRow[]).sort(compareTodos),
   });
 }
 
@@ -258,4 +285,71 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function PATCH(req: NextRequest) {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    return NextResponse.json(
+      { success: false, error: "Supabase env is missing" },
+      { status: 500 }
+    );
+  }
+
+  let body: Record<string, unknown>;
+
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "Invalid JSON body" },
+      { status: 400 }
+    );
+  }
+
+  const id = readString(body.id);
+  const action = readString(body.action);
+
+  if (!id) {
+    return NextResponse.json(
+      { success: false, error: "id is required" },
+      { status: 400 }
+    );
+  }
+
+  if (action !== "done" && action !== "reopen") {
+    return NextResponse.json(
+      { success: false, error: "action is invalid" },
+      { status: 400 }
+    );
+  }
+
+  const { data, error } = await supabase
+    .from("micro_todos")
+    .update({
+      todo_state: action === "done" ? "done" : "open",
+    })
+    .eq("id", id)
+    .select(TODO_COLUMNS)
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
+  }
+
+  if (!data) {
+    return NextResponse.json(
+      { success: false, error: "todo not found" },
+      { status: 404 }
+    );
+  }
+
+  return NextResponse.json({
+    success: true,
+    todo: data,
+  });
 }
