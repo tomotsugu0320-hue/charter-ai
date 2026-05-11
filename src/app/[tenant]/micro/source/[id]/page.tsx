@@ -54,6 +54,19 @@ type GroupsResponse = {
   sourceGroups?: MicroGroup[];
 };
 
+type MicroTag = {
+  id: string;
+  name: string;
+};
+
+type TagsResponse = {
+  success?: boolean;
+  error?: string;
+  tags?: MicroTag[];
+  tag?: MicroTag;
+  alreadyExists?: boolean;
+};
+
 type SummaryVersion = {
   id: string;
   version_type: string;
@@ -419,6 +432,25 @@ const groupItemStyle: CSSProperties = {
   overflowWrap: "anywhere",
 };
 
+const tagListStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 8,
+  marginTop: 16,
+};
+
+const tagPillStyle: CSSProperties = {
+  background: "#1e293b",
+  color: "#e0f2fe",
+  border: "1px solid #334155",
+  borderRadius: 999,
+  padding: "5px 10px",
+  fontSize: 13,
+  fontWeight: 700,
+  lineHeight: 1.5,
+  overflowWrap: "anywhere",
+};
+
 const actionRowStyle: CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
@@ -455,23 +487,28 @@ export default function MicroSourceDetailPage() {
   const [relatedSources, setRelatedSources] = useState<RelatedSource[]>([]);
   const [groups, setGroups] = useState<MicroGroup[]>([]);
   const [sourceGroups, setSourceGroups] = useState<MicroGroup[]>([]);
+  const [tags, setTags] = useState<MicroTag[]>([]);
   const [versions, setVersions] = useState<SummaryVersion[]>([]);
   const [loading, setLoading] = useState(false);
   const [openingRelatedId, setOpeningRelatedId] = useState<string | null>(null);
   const [groupsLoading, setGroupsLoading] = useState(false);
+  const [tagsLoading, setTagsLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [savingTag, setSavingTag] = useState(false);
   const [savingGroup, setSavingGroup] = useState(false);
   const [addingGroup, setAddingGroup] = useState(false);
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editRawContent, setEditRawContent] = useState("");
   const [editSourceType, setEditSourceType] = useState("free_log");
+  const [tagName, setTagName] = useState("");
   const [groupTitle, setGroupTitle] = useState("");
   const [groupDescription, setGroupDescription] = useState("");
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [message, setMessage] = useState("");
   const [groupMessage, setGroupMessage] = useState("");
+  const [tagMessage, setTagMessage] = useState("");
   const [versionsMessage, setVersionsMessage] = useState("");
 
   const loadSourceData = useCallback(async () => {
@@ -542,6 +579,36 @@ export default function MicroSourceDetailPage() {
     }
   }, [id, tenantSlug]);
 
+  const loadTags = useCallback(async () => {
+    if (!tenantSlug || !id) return;
+
+    setTagsLoading(true);
+    setTagMessage("");
+
+    try {
+      const res = await fetch(
+        `/api/micro/tags?tenant_slug=${encodeURIComponent(
+          tenantSlug
+        )}&sourceDataId=${encodeURIComponent(id)}`,
+        { cache: "no-store" }
+      );
+      const data = (await res.json()) as TagsResponse;
+
+      if (!res.ok || data.success === false) {
+        throw new Error(data.error || "タグの読み込みに失敗しました");
+      }
+
+      setTags(data.tags ?? []);
+    } catch (error) {
+      setTags([]);
+      setTagMessage(
+        error instanceof Error ? error.message : "タグの読み込みに失敗しました"
+      );
+    } finally {
+      setTagsLoading(false);
+    }
+  }, [id, tenantSlug]);
+
   const loadSummaryVersions = useCallback(async () => {
     if (!tenantSlug || !id) return;
 
@@ -576,8 +643,9 @@ export default function MicroSourceDetailPage() {
   useEffect(() => {
     void loadSourceData();
     void loadGroups();
+    void loadTags();
     void loadSummaryVersions();
-  }, [loadGroups, loadSourceData, loadSummaryVersions]);
+  }, [loadGroups, loadSourceData, loadSummaryVersions, loadTags]);
 
   const handleOpenRelatedSource = async (relatedId: string) => {
     if (!tenantSlug) return;
@@ -661,6 +729,44 @@ export default function MicroSourceDetailPage() {
       setMessage(error instanceof Error ? error.message : "保存に失敗しました");
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const handleAddTag = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const name = tagName.trim();
+    if (!tenantSlug || !id || !name) return;
+
+    setSavingTag(true);
+    setTagMessage("");
+
+    try {
+      const res = await fetch("/api/micro/tags", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          tenant_slug: tenantSlug,
+          sourceDataId: id,
+          name,
+        }),
+      });
+      const data = (await res.json()) as TagsResponse;
+
+      if (!res.ok || data.success === false) {
+        throw new Error(data.error || "タグ追加に失敗しました");
+      }
+
+      setTagName("");
+      await loadTags();
+    } catch (error) {
+      setTagMessage(
+        error instanceof Error ? error.message : "タグ追加に失敗しました"
+      );
+    } finally {
+      setSavingTag(false);
     }
   };
 
@@ -859,6 +965,50 @@ export default function MicroSourceDetailPage() {
               ) : (
                 <p style={mutedTextStyle}>整理はまだありません。</p>
               )}
+            </MicroSectionCard>
+
+            <MicroSectionCard>
+              <MicroSectionTitle>タグ</MicroSectionTitle>
+
+              {tagsLoading ? (
+                <p style={mutedTextStyle}>読み込み中</p>
+              ) : tagMessage ? (
+                <p style={messageStyle}>{tagMessage}</p>
+              ) : tags.length === 0 ? (
+                <p style={mutedTextStyle}>タグはまだありません。</p>
+              ) : (
+                <div style={tagListStyle}>
+                  {tags.map((tag) => (
+                    <span key={tag.id} style={tagPillStyle}>
+                      {tag.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <form onSubmit={handleAddTag} style={formStyle}>
+                <label style={fieldStyle}>
+                  <span style={labelStyle}>タグ名</span>
+                  <input
+                    value={tagName}
+                    onChange={(event) => setTagName(event.target.value)}
+                    placeholder="タグ名を書く"
+                    style={inputStyle}
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={savingTag || tagName.trim().length === 0}
+                  style={
+                    savingTag || tagName.trim().length === 0
+                      ? disabledButtonStyle
+                      : buttonStyle
+                  }
+                >
+                  {savingTag ? "追加中" : "タグ追加"}
+                </button>
+              </form>
             </MicroSectionCard>
 
             <MicroSectionCard>
