@@ -81,6 +81,7 @@ type TodosResponse = {
   success?: boolean;
   error?: string;
   todos?: MicroTodo[];
+  todo?: MicroTodo;
 };
 
 type SourceEditVersion = {
@@ -535,6 +536,13 @@ const todoStateStyle: CSSProperties = {
   marginTop: 10,
 };
 
+const todoDoneStateStyle: CSSProperties = {
+  ...todoStateStyle,
+  background: "#1e3a8a",
+  color: "#dbeafe",
+  border: "1px solid #2563eb",
+};
+
 const actionRowStyle: CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
@@ -559,6 +567,13 @@ const disabledButtonStyle: CSSProperties = {
   background: "#374151",
   color: "#d1d5db",
   cursor: "not-allowed",
+};
+
+const toggleButtonStyle: CSSProperties = {
+  ...buttonStyle,
+  border: "1px solid #334155",
+  background: "#1e293b",
+  color: "#e0f2fe",
 };
 
 export default function MicroSourceDetailPage() {
@@ -586,6 +601,9 @@ export default function MicroSourceDetailPage() {
   const [savingGroup, setSavingGroup] = useState(false);
   const [addingGroup, setAddingGroup] = useState(false);
   const [extractingTodos, setExtractingTodos] = useState(false);
+  const [updatingTodoId, setUpdatingTodoId] = useState<string | null>(null);
+  const [summaryHistoryOpen, setSummaryHistoryOpen] = useState(false);
+  const [editHistoryOpen, setEditHistoryOpen] = useState(false);
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editRawContent, setEditRawContent] = useState("");
@@ -890,6 +908,40 @@ export default function MicroSourceDetailPage() {
     }
   };
 
+  const handleUpdateTodoState = async (
+    todoId: string,
+    action: "done" | "reopen"
+  ) => {
+    setUpdatingTodoId(todoId);
+    setTodoMessage("");
+
+    try {
+      const res = await fetch("/api/micro/todos", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: todoId,
+          action,
+        }),
+      });
+      const data = (await res.json()) as TodosResponse;
+
+      if (!res.ok || data.success === false) {
+        throw new Error(data.error || "ToDo状態の更新に失敗しました");
+      }
+
+      await loadTodos();
+    } catch (error) {
+      setTodoMessage(
+        error instanceof Error ? error.message : "ToDo状態の更新に失敗しました"
+      );
+    } finally {
+      setUpdatingTodoId(null);
+    }
+  };
+
   const handleAddTag = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -1022,7 +1074,7 @@ export default function MicroSourceDetailPage() {
         </Link>
 
         <MicroSectionCard>
-          <MicroSectionTitle level={1}>思考ログ詳細</MicroSectionTitle>
+          <MicroSectionTitle level={1}>基本情報</MicroSectionTitle>
 
           {loading ? (
             <p style={mutedTextStyle}>読み込み中</p>
@@ -1151,17 +1203,41 @@ export default function MicroSourceDetailPage() {
                 <p style={mutedTextStyle}>ToDo候補はまだありません。</p>
               ) : (
                 <div style={todoListStyle}>
-                  {todos.map((todo) => (
-                    <article key={todo.id} style={todoCardStyle}>
-                      <h3 style={todoTitleStyle}>{todo.title}</h3>
-                      {todo.description && (
-                        <p style={todoDescriptionStyle}>{todo.description}</p>
-                      )}
-                      <span style={todoStateStyle}>
-                        {todoStateLabels[todo.todo_state] ?? todo.todo_state}
-                      </span>
-                    </article>
-                  ))}
+                  {todos.map((todo) => {
+                    const isDone = todo.todo_state === "done";
+                    const action = isDone ? "reopen" : "done";
+                    const isUpdating = updatingTodoId === todo.id;
+
+                    return (
+                      <article key={todo.id} style={todoCardStyle}>
+                        <h3 style={todoTitleStyle}>{todo.title}</h3>
+                        {todo.description && (
+                          <p style={todoDescriptionStyle}>{todo.description}</p>
+                        )}
+                        <span
+                          style={isDone ? todoDoneStateStyle : todoStateStyle}
+                        >
+                          {todoStateLabels[todo.todo_state] ?? todo.todo_state}
+                        </span>
+                        <div style={{ ...actionRowStyle, marginTop: 12 }}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleUpdateTodoState(todo.id, action)
+                            }
+                            disabled={isUpdating}
+                            style={isUpdating ? disabledButtonStyle : buttonStyle}
+                          >
+                            {isUpdating
+                              ? "更新中"
+                              : isDone
+                                ? "未完了に戻す"
+                                : "完了"}
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </MicroSectionCard>
@@ -1211,7 +1287,7 @@ export default function MicroSourceDetailPage() {
             </MicroSectionCard>
 
             <MicroSectionCard>
-              <MicroSectionTitle>グループ追加</MicroSectionTitle>
+              <MicroSectionTitle>グループ</MicroSectionTitle>
 
               {groupsLoading ? (
                 <p style={mutedTextStyle}>読み込み中</p>
@@ -1354,61 +1430,87 @@ export default function MicroSourceDetailPage() {
             </MicroSectionCard>
 
             <MicroSectionCard>
-              <MicroSectionTitle>編集履歴</MicroSectionTitle>
-              {sourceVersions.length === 0 ? (
-                <p style={mutedTextStyle}>編集履歴はまだありません。</p>
-              ) : (
-                <div style={historyListStyle}>
-                  {sourceVersions.map((version) => (
-                    <article key={version.id} style={historyCardStyle}>
-                      <div style={historyMetaStyle}>
-                        {formatTimestamp(version.created_at)} /{" "}
-                        {version.created_by}
-                      </div>
-                      <div style={historyContentStyle}>
-                        変更前タイトル:{" "}
-                        {readTitleFromSnapshot(version.input_snapshot)}
-                        {"\n"}
-                        変更後タイトル:{" "}
-                        {readTitleFromSnapshot(version.output_snapshot)}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
+              <MicroSectionTitle>整理履歴</MicroSectionTitle>
+              <div style={{ ...actionRowStyle, marginTop: 16 }}>
+                <button
+                  type="button"
+                  onClick={() => setSummaryHistoryOpen((current) => !current)}
+                  style={toggleButtonStyle}
+                >
+                  {summaryHistoryOpen
+                    ? "整理履歴を閉じる"
+                    : `整理履歴を表示 (${versions.length})`}
+                </button>
+              </div>
+              {summaryHistoryOpen ? (
+                versionsLoading ? (
+                  <p style={mutedTextStyle}>読み込み中</p>
+                ) : versionsMessage ? (
+                  <p style={messageStyle}>{versionsMessage}</p>
+                ) : versions.length === 0 ? (
+                  <p style={mutedTextStyle}>整理履歴はまだありません。</p>
+                ) : (
+                  <div style={historyListStyle}>
+                    {versions.map((version) => {
+                      const summaryText =
+                        readSummaryFromSnapshot(version.output_snapshot) ||
+                        "整理内容がありません。";
+                      const versionTypeLabel =
+                        versionTypeLabels[version.version_type] ??
+                        version.version_type;
+
+                      return (
+                        <article key={version.id} style={historyCardStyle}>
+                          <div style={historyMetaStyle}>
+                            {versionTypeLabel} /{" "}
+                            {formatTimestamp(version.updated_at)} /{" "}
+                            {version.created_by}
+                          </div>
+                          <div style={historyContentStyle}>{summaryText}</div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )
+              ) : null}
             </MicroSectionCard>
 
             <MicroSectionCard>
-              <MicroSectionTitle>整理履歴</MicroSectionTitle>
-              {versionsLoading ? (
-                <p style={mutedTextStyle}>読み込み中</p>
-              ) : versionsMessage ? (
-                <p style={messageStyle}>{versionsMessage}</p>
-              ) : versions.length === 0 ? (
-                <p style={mutedTextStyle}>整理履歴はまだありません。</p>
-              ) : (
-                <div style={historyListStyle}>
-                  {versions.map((version) => {
-                    const summaryText =
-                      readSummaryFromSnapshot(version.output_snapshot) ||
-                      "整理内容がありません。";
-                    const versionTypeLabel =
-                      versionTypeLabels[version.version_type] ??
-                      version.version_type;
-
-                    return (
+              <MicroSectionTitle>編集履歴</MicroSectionTitle>
+              <div style={{ ...actionRowStyle, marginTop: 16 }}>
+                <button
+                  type="button"
+                  onClick={() => setEditHistoryOpen((current) => !current)}
+                  style={toggleButtonStyle}
+                >
+                  {editHistoryOpen
+                    ? "編集履歴を閉じる"
+                    : `編集履歴を表示 (${sourceVersions.length})`}
+                </button>
+              </div>
+              {editHistoryOpen ? (
+                sourceVersions.length === 0 ? (
+                  <p style={mutedTextStyle}>編集履歴はまだありません。</p>
+                ) : (
+                  <div style={historyListStyle}>
+                    {sourceVersions.map((version) => (
                       <article key={version.id} style={historyCardStyle}>
                         <div style={historyMetaStyle}>
-                          {versionTypeLabel} /{" "}
-                          {formatTimestamp(version.updated_at)} /{" "}
+                          {formatTimestamp(version.created_at)} /{" "}
                           {version.created_by}
                         </div>
-                        <div style={historyContentStyle}>{summaryText}</div>
+                        <div style={historyContentStyle}>
+                          変更前タイトル:{" "}
+                          {readTitleFromSnapshot(version.input_snapshot)}
+                          {"\n"}
+                          変更後タイトル:{" "}
+                          {readTitleFromSnapshot(version.output_snapshot)}
+                        </div>
                       </article>
-                    );
-                  })}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )
+              ) : null}
             </MicroSectionCard>
 
             <MicroSectionCard>
