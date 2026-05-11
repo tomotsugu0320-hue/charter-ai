@@ -567,6 +567,20 @@ const buttonStyle: CSSProperties = {
   fontWeight: 700,
 };
 
+const archiveButtonStyle: CSSProperties = {
+  ...buttonStyle,
+  border: "1px solid #f97316",
+  background: "#9a3412",
+  color: "#ffedd5",
+};
+
+const restoreButtonStyle: CSSProperties = {
+  ...buttonStyle,
+  border: "1px solid #34d399",
+  background: "#047857",
+  color: "#d1fae5",
+};
+
 const disabledButtonStyle: CSSProperties = {
   ...buttonStyle,
   border: "1px solid #4b5563",
@@ -608,6 +622,7 @@ export default function MicroSourceDetailPage() {
   const [addingGroup, setAddingGroup] = useState(false);
   const [extractingTodos, setExtractingTodos] = useState(false);
   const [updatingTodoId, setUpdatingTodoId] = useState<string | null>(null);
+  const [updatingArchive, setUpdatingArchive] = useState(false);
   const [summaryHistoryOpen, setSummaryHistoryOpen] = useState(false);
   const [editHistoryOpen, setEditHistoryOpen] = useState(false);
   const [versionsLoading, setVersionsLoading] = useState(false);
@@ -880,6 +895,46 @@ export default function MicroSourceDetailPage() {
     }
   };
 
+  const handleArchiveState = async (action: "archive" | "restore") => {
+    if (!id) return;
+
+    setUpdatingArchive(true);
+    setMessage("");
+
+    try {
+      const res = await fetch("/api/micro/source-data", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id,
+          action,
+        }),
+      });
+      const data = (await res.json()) as SourceDataResponse;
+
+      if (!res.ok || data.success === false) {
+        throw new Error(
+          data.error ||
+            (action === "archive" ? "保管に失敗しました" : "復元に失敗しました")
+        );
+      }
+
+      await loadSourceData();
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : action === "archive"
+            ? "保管に失敗しました"
+            : "復元に失敗しました"
+      );
+    } finally {
+      setUpdatingArchive(false);
+    }
+  };
+
   const handleExtractTodos = async () => {
     if (!tenantSlug || !id || !item?.raw_content.trim()) return;
 
@@ -1067,6 +1122,7 @@ export default function MicroSourceDetailPage() {
     ? sourceTypeLabels[item.source_type] ?? item.source_type
     : "";
   const statusLabel = item ? statusLabels[item.status] ?? item.status : "";
+  const isArchived = item?.status === "archived";
   const availableGroups = groups.filter((group) => !group.linked);
 
   return (
@@ -1163,6 +1219,28 @@ export default function MicroSourceDetailPage() {
                 <div style={{ ...actionRowStyle, marginTop: 16 }}>
                   <button type="button" onClick={handleStartEdit} style={buttonStyle}>
                     編集
+                  </button>
+                  <button
+                    type="button"
+                    disabled={updatingArchive}
+                    onClick={() =>
+                      void handleArchiveState(isArchived ? "restore" : "archive")
+                    }
+                    style={
+                      updatingArchive
+                        ? disabledButtonStyle
+                        : isArchived
+                          ? restoreButtonStyle
+                          : archiveButtonStyle
+                    }
+                  >
+                    {updatingArchive
+                      ? isArchived
+                        ? "復元中"
+                        : "保管中"
+                      : isArchived
+                        ? "復元"
+                        : "保管"}
                   </button>
                 </div>
               </>
