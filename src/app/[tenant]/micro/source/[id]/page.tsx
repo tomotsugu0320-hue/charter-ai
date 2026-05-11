@@ -68,6 +68,21 @@ type TagsResponse = {
   alreadyExists?: boolean;
 };
 
+type MicroTodo = {
+  id: string;
+  title: string;
+  description: string | null;
+  todo_state: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type TodosResponse = {
+  success?: boolean;
+  error?: string;
+  todos?: MicroTodo[];
+};
+
 type SourceEditVersion = {
   id: string;
   input_snapshot: unknown;
@@ -138,6 +153,12 @@ const versionTypeLabels: Record<string, string> = {
   user_edit: "ユーザー修正",
   status_change: "状態変更",
   archive_restore: "保管・復元",
+};
+
+const todoStateLabels: Record<string, string> = {
+  open: "未完了",
+  done: "完了",
+  blocked: "保留",
 };
 
 function formatDate(value: string | null) {
@@ -468,6 +489,52 @@ const tagPillStyle: CSSProperties = {
   overflowWrap: "anywhere",
 };
 
+const todoListStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+  marginTop: 16,
+};
+
+const todoCardStyle: CSSProperties = {
+  background: "#0f172a",
+  color: "#f8fafc",
+  border: "1px solid #334155",
+  borderRadius: 8,
+  padding: 12,
+};
+
+const todoTitleStyle: CSSProperties = {
+  margin: 0,
+  color: "#ffffff",
+  fontSize: 16,
+  lineHeight: 1.5,
+  overflowWrap: "anywhere",
+};
+
+const todoDescriptionStyle: CSSProperties = {
+  margin: "8px 0 0",
+  color: "#dbeafe",
+  lineHeight: 1.65,
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere",
+};
+
+const todoStateStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  alignSelf: "flex-start",
+  background: "#064e3b",
+  color: "#d1fae5",
+  border: "1px solid #047857",
+  borderRadius: 999,
+  padding: "3px 9px",
+  fontSize: 12,
+  fontWeight: 700,
+  lineHeight: 1.5,
+  marginTop: 10,
+};
+
 const actionRowStyle: CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
@@ -505,17 +572,20 @@ export default function MicroSourceDetailPage() {
   const [groups, setGroups] = useState<MicroGroup[]>([]);
   const [sourceGroups, setSourceGroups] = useState<MicroGroup[]>([]);
   const [tags, setTags] = useState<MicroTag[]>([]);
+  const [todos, setTodos] = useState<MicroTodo[]>([]);
   const [sourceVersions, setSourceVersions] = useState<SourceEditVersion[]>([]);
   const [versions, setVersions] = useState<SummaryVersion[]>([]);
   const [loading, setLoading] = useState(false);
   const [openingRelatedId, setOpeningRelatedId] = useState<string | null>(null);
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [tagsLoading, setTagsLoading] = useState(false);
+  const [todosLoading, setTodosLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [savingTag, setSavingTag] = useState(false);
   const [savingGroup, setSavingGroup] = useState(false);
   const [addingGroup, setAddingGroup] = useState(false);
+  const [extractingTodos, setExtractingTodos] = useState(false);
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editRawContent, setEditRawContent] = useState("");
@@ -527,6 +597,7 @@ export default function MicroSourceDetailPage() {
   const [message, setMessage] = useState("");
   const [groupMessage, setGroupMessage] = useState("");
   const [tagMessage, setTagMessage] = useState("");
+  const [todoMessage, setTodoMessage] = useState("");
   const [versionsMessage, setVersionsMessage] = useState("");
 
   const loadSourceData = useCallback(async () => {
@@ -629,6 +700,38 @@ export default function MicroSourceDetailPage() {
     }
   }, [id, tenantSlug]);
 
+  const loadTodos = useCallback(async () => {
+    if (!tenantSlug || !id) return;
+
+    setTodosLoading(true);
+    setTodoMessage("");
+
+    try {
+      const res = await fetch(
+        `/api/micro/todos?tenant_slug=${encodeURIComponent(
+          tenantSlug
+        )}&sourceDataId=${encodeURIComponent(id)}`,
+        { cache: "no-store" }
+      );
+      const data = (await res.json()) as TodosResponse;
+
+      if (!res.ok || data.success === false) {
+        throw new Error(data.error || "ToDo候補の読み込みに失敗しました");
+      }
+
+      setTodos(data.todos ?? []);
+    } catch (error) {
+      setTodos([]);
+      setTodoMessage(
+        error instanceof Error
+          ? error.message
+          : "ToDo候補の読み込みに失敗しました"
+      );
+    } finally {
+      setTodosLoading(false);
+    }
+  }, [id, tenantSlug]);
+
   const loadSummaryVersions = useCallback(async () => {
     if (!tenantSlug || !id) return;
 
@@ -664,8 +767,9 @@ export default function MicroSourceDetailPage() {
     void loadSourceData();
     void loadGroups();
     void loadTags();
+    void loadTodos();
     void loadSummaryVersions();
-  }, [loadGroups, loadSourceData, loadSummaryVersions, loadTags]);
+  }, [loadGroups, loadSourceData, loadSummaryVersions, loadTags, loadTodos]);
 
   const handleOpenRelatedSource = async (relatedId: string) => {
     if (!tenantSlug) return;
@@ -749,6 +853,40 @@ export default function MicroSourceDetailPage() {
       setMessage(error instanceof Error ? error.message : "保存に失敗しました");
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const handleExtractTodos = async () => {
+    if (!tenantSlug || !id || !item?.raw_content.trim()) return;
+
+    setExtractingTodos(true);
+    setTodoMessage("");
+
+    try {
+      const res = await fetch("/api/micro/todos", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          tenant_slug: tenantSlug,
+          sourceDataId: id,
+          rawContent: item.raw_content,
+        }),
+      });
+      const data = (await res.json()) as TodosResponse;
+
+      if (!res.ok || data.success === false) {
+        throw new Error(data.error || "ToDo抽出に失敗しました");
+      }
+
+      await loadTodos();
+    } catch (error) {
+      setTodoMessage(
+        error instanceof Error ? error.message : "ToDo抽出に失敗しました"
+      );
+    } finally {
+      setExtractingTodos(false);
     }
   };
 
@@ -984,6 +1122,47 @@ export default function MicroSourceDetailPage() {
                 <div style={summaryStyle}>{item.summary}</div>
               ) : (
                 <p style={mutedTextStyle}>整理はまだありません。</p>
+              )}
+            </MicroSectionCard>
+
+            <MicroSectionCard>
+              <MicroSectionTitle>ToDo候補</MicroSectionTitle>
+
+              <div style={{ ...actionRowStyle, marginTop: 16 }}>
+                <button
+                  type="button"
+                  onClick={() => void handleExtractTodos()}
+                  disabled={extractingTodos || item.raw_content.trim().length === 0}
+                  style={
+                    extractingTodos || item.raw_content.trim().length === 0
+                      ? disabledButtonStyle
+                      : buttonStyle
+                  }
+                >
+                  {extractingTodos ? "抽出中" : "ToDo抽出"}
+                </button>
+              </div>
+
+              {todosLoading ? (
+                <p style={mutedTextStyle}>読み込み中</p>
+              ) : todoMessage ? (
+                <p style={messageStyle}>{todoMessage}</p>
+              ) : todos.length === 0 ? (
+                <p style={mutedTextStyle}>ToDo候補はまだありません。</p>
+              ) : (
+                <div style={todoListStyle}>
+                  {todos.map((todo) => (
+                    <article key={todo.id} style={todoCardStyle}>
+                      <h3 style={todoTitleStyle}>{todo.title}</h3>
+                      {todo.description && (
+                        <p style={todoDescriptionStyle}>{todo.description}</p>
+                      )}
+                      <span style={todoStateStyle}>
+                        {todoStateLabels[todo.todo_state] ?? todo.todo_state}
+                      </span>
+                    </article>
+                  ))}
+                </div>
               )}
             </MicroSectionCard>
 
