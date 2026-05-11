@@ -490,6 +490,12 @@ const tagPillStyle: CSSProperties = {
   overflowWrap: "anywhere",
 };
 
+const tagLinkStyle: CSSProperties = {
+  ...tagPillStyle,
+  display: "inline-block",
+  textDecoration: "none",
+};
+
 const todoListStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -1254,9 +1260,15 @@ export default function MicroSourceDetailPage() {
               ) : (
                 <div style={tagListStyle}>
                   {tags.map((tag) => (
-                    <span key={tag.id} style={tagPillStyle}>
+                    <Link
+                      key={tag.id}
+                      href={`/${encodeURIComponent(
+                        tenantSlug
+                      )}/micro/tag/${encodeURIComponent(tag.name)}`}
+                      style={tagLinkStyle}
+                    >
                       {tag.name}
-                    </span>
+                    </Link>
                   ))}
                 </div>
               )}
