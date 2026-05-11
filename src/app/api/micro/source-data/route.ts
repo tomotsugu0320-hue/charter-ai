@@ -32,6 +32,39 @@ const SOURCE_TYPES = new Set([
 
 const SOURCE_STATUSES = new Set(["draft", "active", "archived"]);
 
+const RELATED_STOP_WORDS = new Set([
+  "は",
+  "が",
+  "を",
+  "に",
+  "の",
+  "か",
+  "へ",
+  "で",
+  "と",
+  "も",
+  "や",
+  "ね",
+  "な",
+  "だ",
+  "です",
+  "ます",
+  "する",
+  "した",
+  "して",
+  "いる",
+  "ある",
+  "これ",
+  "それ",
+  "あれ",
+  "この",
+  "その",
+  "どの",
+  "こと",
+  "もの",
+  "ため",
+]);
+
 type SourceDataRow = {
   id: string;
   tenant_slug?: string | null;
@@ -81,25 +114,41 @@ function normalizeText(value: string | null | undefined) {
   return (value ?? "").trim().toLocaleLowerCase("ja-JP");
 }
 
-function getRelatedTerms(sourceData: SourceDataRow) {
-  const candidates = [
-    normalizeText(sourceData.title),
-    ...normalizeText(sourceData.raw_content)
-      .split(/[\s、。,.!?！？\n\r]+/)
-      .map((value) => value.trim()),
-  ];
-
-  return Array.from(
-    new Set(
-      candidates.filter((value) => value.length >= 2 && value.length <= 40)
+function getRelatedKeywordCandidates(value: string | null | undefined) {
+  return normalizeText(value)
+    .split(
+      /[\s、。,.!?！？?「」『』（）()【】[\]［］:：;；/／\\|｜・…ー-]+|[はがをにのか]+/
     )
-  ).slice(0, 20);
+    .map((keyword) => keyword.trim())
+    .filter(
+      (keyword) =>
+        keyword.length >= 2 &&
+        keyword.length <= 40 &&
+        !RELATED_STOP_WORDS.has(keyword)
+    );
 }
 
-function hasPartialMatch(sourceData: SourceDataRow, terms: string[]) {
+function getRelatedTerms(
+  sourceData: SourceDataRow,
+  summary: string | null | undefined
+) {
+  const candidates = [
+    ...getRelatedKeywordCandidates(sourceData.title),
+    ...getRelatedKeywordCandidates(sourceData.raw_content),
+    ...getRelatedKeywordCandidates(summary),
+  ];
+
+  return Array.from(new Set(candidates)).slice(0, 40);
+}
+
+function hasPartialMatch(
+  sourceData: SourceDataRow,
+  terms: string[],
+  summary: string | null | undefined
+) {
   const target = `${normalizeText(sourceData.title)} ${normalizeText(
     sourceData.raw_content
-  )}`;
+  )} ${normalizeText(summary)}`;
 
   return terms.some((term) => target.includes(term));
 }
@@ -214,8 +263,10 @@ export async function GET(req: NextRequest) {
     }
 
     const sourceData = data as SourceDataRow;
-    const relatedTerms = getRelatedTerms(sourceData);
+    const sourceSummaryContent = summary?.content ?? null;
+    const relatedTerms = getRelatedTerms(sourceData, sourceSummaryContent);
     let relatedSources: SourceDataRow[] = [];
+    const relatedSummaryBySourceDataId = new Map<string, string>();
 
     if (relatedTerms.length > 0) {
       const { data: relatedCandidates, error: relatedError } = await supabase
@@ -234,8 +285,47 @@ export async function GET(req: NextRequest) {
         );
       }
 
-      relatedSources = ((relatedCandidates ?? []) as SourceDataRow[])
-        .filter((candidate) => hasPartialMatch(candidate, relatedTerms))
+      const relatedCandidateRows = (relatedCandidates ?? []) as SourceDataRow[];
+      const relatedCandidateIds = relatedCandidateRows.map((item) => item.id);
+
+      if (relatedCandidateIds.length > 0) {
+        const { data: relatedSummaries, error: relatedSummariesError } =
+          await supabase
+            .from("micro_summaries")
+            .select("target_id, content, updated_at")
+            .eq("tenant_slug", tenantSlug)
+            .eq("target_type", "source_data")
+            .eq("summary_type", "short")
+            .in("target_id", relatedCandidateIds)
+            .order("updated_at", { ascending: false });
+
+        if (relatedSummariesError) {
+          return NextResponse.json(
+            { success: false, error: relatedSummariesError.message },
+            { status: 500 }
+          );
+        }
+
+        ((relatedSummaries ?? []) as SummaryRow[]).forEach(
+          (relatedSummary) => {
+            if (!relatedSummaryBySourceDataId.has(relatedSummary.target_id)) {
+              relatedSummaryBySourceDataId.set(
+                relatedSummary.target_id,
+                relatedSummary.content
+              );
+            }
+          }
+        );
+      }
+
+      relatedSources = relatedCandidateRows
+        .filter((candidate) =>
+          hasPartialMatch(
+            candidate,
+            relatedTerms,
+            relatedSummaryBySourceDataId.get(candidate.id)
+          )
+        )
         .sort((a, b) => {
           const aSameSourceType = a.source_type === sourceData.source_type;
           const bSameSourceType = b.source_type === sourceData.source_type;
@@ -247,37 +337,6 @@ export async function GET(req: NextRequest) {
           return compareUpdatedAtDesc(a, b);
         })
         .slice(0, 5);
-    }
-
-    const relatedSourceIds = relatedSources.map((item) => item.id);
-    const relatedSummaryBySourceDataId = new Map<string, string>();
-
-    if (relatedSourceIds.length > 0) {
-      const { data: relatedSummaries, error: relatedSummariesError } =
-        await supabase
-          .from("micro_summaries")
-          .select("target_id, content, updated_at")
-          .eq("tenant_slug", tenantSlug)
-          .eq("target_type", "source_data")
-          .eq("summary_type", "short")
-          .in("target_id", relatedSourceIds)
-          .order("updated_at", { ascending: false });
-
-      if (relatedSummariesError) {
-        return NextResponse.json(
-          { success: false, error: relatedSummariesError.message },
-          { status: 500 }
-        );
-      }
-
-      ((relatedSummaries ?? []) as SummaryRow[]).forEach((relatedSummary) => {
-        if (!relatedSummaryBySourceDataId.has(relatedSummary.target_id)) {
-          relatedSummaryBySourceDataId.set(
-            relatedSummary.target_id,
-            relatedSummary.content
-          );
-        }
-      });
     }
 
     return NextResponse.json({
