@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   CSSProperties,
   FormEvent,
@@ -152,6 +153,26 @@ const actionRowStyle: CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
   gap: 8,
+};
+
+const navListStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr",
+  gap: 10,
+  marginTop: 16,
+};
+
+const navLinkStyle: CSSProperties = {
+  display: "block",
+  background: "#0f172a",
+  color: "#bfdbfe",
+  border: "1px solid #334155",
+  borderRadius: 8,
+  padding: "12px 14px",
+  textDecoration: "none",
+  fontSize: 15,
+  fontWeight: 700,
+  lineHeight: 1.5,
 };
 
 const currentSearchStyle: CSSProperties = {
@@ -487,6 +508,24 @@ export default function MicroPage() {
   return (
     <main style={pageStyle}>
       <div style={shellStyle}>
+        <MicroSectionCard>
+          <MicroSectionTitle>ナビゲーション</MicroSectionTitle>
+          <div style={navListStyle}>
+            <Link
+              href={`/${encodeURIComponent(tenantSlug)}/micro/todos`}
+              style={navLinkStyle}
+            >
+              ToDo一覧
+            </Link>
+            <Link
+              href={`/${encodeURIComponent(tenantSlug)}/micro/archived`}
+              style={navLinkStyle}
+            >
+              保管済み
+            </Link>
+          </div>
+        </MicroSectionCard>
+
         <MicroSectionCard>
           <MicroSectionTitle level={1}>Micro</MicroSectionTitle>
 
