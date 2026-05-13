@@ -30,7 +30,7 @@ type SourceData = {
 type SourceDataResponse = {
   success?: boolean;
   error?: string;
-  sourceData?: SourceData[];
+  sourceData?: SourceData[] | SourceData;
 };
 
 type MicroGroup = {
@@ -47,6 +47,11 @@ type GroupsResponse = {
 };
 
 type SummaryResponse = {
+  success?: boolean;
+  error?: string;
+};
+
+type MicroActionResponse = {
   success?: boolean;
   error?: string;
 };
@@ -68,6 +73,25 @@ function formatTimestamp(value: string | null | undefined) {
   if (Number.isNaN(date.getTime())) return "日時なし";
 
   return date.toLocaleString("ja-JP");
+}
+
+function getSourceDataList(value: SourceData[] | SourceData | undefined) {
+  return Array.isArray(value) ? value : [];
+}
+
+function getCreatedSourceData(value: SourceData[] | SourceData | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function parseTagInput(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(/[,\u3001]/)
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+    )
+  );
 }
 
 const pageStyle: CSSProperties = {
@@ -250,6 +274,8 @@ export default function MicroPage() {
   const [groups, setGroups] = useState<MicroGroup[]>([]);
   const [title, setTitle] = useState("");
   const [rawContent, setRawContent] = useState("");
+  const [tagInput, setTagInput] = useState("");
+  const [selectedGroupId, setSelectedGroupId] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [sourceType, setSourceType] = useState("free_log");
@@ -287,7 +313,7 @@ export default function MicroPage() {
         throw new Error(data.error || "読み込みに失敗しました");
       }
 
-      setItems(data.sourceData ?? []);
+      setItems(getSourceDataList(data.sourceData));
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "読み込みに失敗しました"
@@ -347,6 +373,9 @@ export default function MicroPage() {
     const text = rawContent.trim();
     if (!text || !tenantSlug) return;
 
+    const tagNames = parseTagInput(tagInput);
+    const groupId = selectedGroupId;
+
     setSaving(true);
     setMessage("");
 
@@ -369,9 +398,60 @@ export default function MicroPage() {
         throw new Error(data.error || "保存に失敗しました");
       }
 
+      const createdSourceData = getCreatedSourceData(data.sourceData);
+      const createdSourceDataId = createdSourceData?.id;
+      const needsLinking = tagNames.length > 0 || Boolean(groupId);
+
+      if (needsLinking && !createdSourceDataId) {
+        throw new Error("保存後の紐付けに失敗しました");
+      }
+
+      if (createdSourceDataId) {
+        for (const tagName of tagNames) {
+          const tagRes = await fetch("/api/micro/tags", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              tenant_slug: tenantSlug,
+              sourceDataId: createdSourceDataId,
+              name: tagName,
+            }),
+          });
+          const tagData = (await tagRes.json()) as MicroActionResponse;
+
+          if (!tagRes.ok || tagData.success === false) {
+            throw new Error(tagData.error || "タグの紐付けに失敗しました");
+          }
+        }
+
+        if (groupId) {
+          const groupRes = await fetch("/api/micro/groups", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              tenant_slug: tenantSlug,
+              action: "add_source",
+              groupId,
+              sourceDataId: createdSourceDataId,
+            }),
+          });
+          const groupData = (await groupRes.json()) as MicroActionResponse;
+
+          if (!groupRes.ok || groupData.success === false) {
+            throw new Error(groupData.error || "グループの紐付けに失敗しました");
+          }
+        }
+      }
+
       setTitle("");
       setRawContent("");
-      await loadSourceData();
+      setTagInput("");
+      setSelectedGroupId("");
+      await Promise.all([loadSourceData(), loadGroups()]);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "保存に失敗しました");
     } finally {
@@ -550,6 +630,37 @@ export default function MicroPage() {
                 {sourceTypeOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label style={fieldStyle}>
+              <span style={labelStyle}>タグ</span>
+              <input
+                value={tagInput}
+                onChange={(event) => setTagInput(event.target.value)}
+                placeholder="タグをカンマ区切りで入力"
+                style={inputStyle}
+              />
+            </label>
+
+            <label style={fieldStyle}>
+              <span style={labelStyle}>既存グループ</span>
+              <select
+                value={selectedGroupId}
+                onChange={(event) => setSelectedGroupId(event.target.value)}
+                style={selectStyle}
+              >
+                <option value="">グループを選択しない</option>
+                {groupsLoading && (
+                  <option value="" disabled>
+                    読み込み中
+                  </option>
+                )}
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.title}
                   </option>
                 ))}
               </select>
