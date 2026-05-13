@@ -12,7 +12,8 @@ const TODO_COLUMNS = `
   todo_state,
   created_by,
   created_at,
-  updated_at
+  updated_at,
+  archived_at
 `;
 
 const EXTRACT_TODOS_PROMPT =
@@ -24,8 +25,10 @@ type TodoCandidate = {
 };
 
 type TodoRow = {
+  status?: string | null;
   todo_state?: string | null;
   created_at?: string | null;
+  archived_at?: string | null;
 };
 
 function getSupabaseClient() {
@@ -125,6 +128,13 @@ export async function GET(req: NextRequest) {
     searchParams.get("sourceDataId")?.trim() ||
     searchParams.get("source_data_id")?.trim() ||
     "";
+  const includeArchived = ["1", "true", "yes"].includes(
+    (
+      searchParams.get("include_archived")?.trim() ||
+      searchParams.get("includeArchived")?.trim() ||
+      ""
+    ).toLowerCase()
+  );
 
   if (!tenantSlug && !sourceDataId) {
     return NextResponse.json(
@@ -136,8 +146,11 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from("micro_todos")
     .select(TODO_COLUMNS)
-    .neq("status", "archived")
     .order("created_at", { ascending: false });
+
+  if (!includeArchived) {
+    query = query.neq("status", "archived");
+  }
 
   if (tenantSlug) {
     query = query.eq("tenant_slug", tenantSlug);

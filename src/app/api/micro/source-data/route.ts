@@ -661,13 +661,27 @@ export async function PATCH(req: NextRequest) {
 
   const values: Record<string, boolean | number | string | null> = {};
   let currentForVersion: SourceDataRow | null = null;
+  let todoArchiveValues: Record<string, string | null> | null = null;
+  let todoCurrentStatus = "";
 
   if (action === "archive") {
+    const archivedAt = new Date().toISOString();
+
     values.status = "archived";
-    values.archived_at = new Date().toISOString();
+    values.archived_at = archivedAt;
+    todoArchiveValues = {
+      status: "archived",
+      archived_at: archivedAt,
+    };
+    todoCurrentStatus = "active";
   } else if (action === "restore") {
     values.status = "active";
     values.archived_at = null;
+    todoArchiveValues = {
+      status: "active",
+      archived_at: null,
+    };
+    todoCurrentStatus = "archived";
   } else if (action === "pin" || action === "unpin") {
     values.pinned = action === "pin";
   } else if (action === "update") {
@@ -763,6 +777,22 @@ export async function PATCH(req: NextRequest) {
       { success: false, error: error.message },
       { status: 500 }
     );
+  }
+
+  if (todoArchiveValues) {
+    const { error: todoArchiveError } = await supabase
+      .from("micro_todos")
+      .update(todoArchiveValues)
+      .eq("source_data_id", id)
+      .eq("status", todoCurrentStatus)
+      .eq("todo_state", "open");
+
+    if (todoArchiveError) {
+      return NextResponse.json(
+        { success: false, error: todoArchiveError.message },
+        { status: 500 }
+      );
+    }
   }
 
   if (action === "update" && currentForVersion) {
