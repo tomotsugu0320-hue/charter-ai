@@ -72,6 +72,7 @@ type MicroTodo = {
   id: string;
   title: string;
   description: string | null;
+  status: string;
   todo_state: string;
   created_at: string;
   updated_at: string;
@@ -162,6 +163,11 @@ const todoStateLabels: Record<string, string> = {
   blocked: "保留",
 };
 
+const todoStatusLabels: Record<string, string> = {
+  active: "通常表示",
+  archived: "保管中",
+};
+
 function formatDate(value: string | null) {
   if (!value) return "未使用";
 
@@ -194,11 +200,26 @@ function readTitleFromSnapshot(value: unknown) {
   return typeof title === "string" && title.trim() ? title : "無題";
 }
 
+function readRawContentFromSnapshot(value: unknown) {
+  if (!value || typeof value !== "object") return "";
+
+  const rawContent = (value as Record<string, unknown>).raw_content;
+  return typeof rawContent === "string" ? rawContent : "";
+}
+
+function getRawContentPreview(value: string) {
+  const text = value.trim();
+
+  if (!text) return "本文なし";
+
+  return text.length > 240 ? `${text.slice(0, 240)}...` : text;
+}
+
 const pageStyle: CSSProperties = {
   minHeight: "100vh",
   background: "#111827",
   color: "#f9fafb",
-  padding: "32px 16px",
+  padding: "28px 16px",
 };
 
 const shellStyle: CSSProperties = {
@@ -207,7 +228,7 @@ const shellStyle: CSSProperties = {
   margin: "0 auto",
   display: "flex",
   flexDirection: "column",
-  gap: 20,
+  gap: 16,
 };
 
 const backLinkStyle: CSSProperties = {
@@ -308,7 +329,7 @@ const metaGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr",
   gap: 10,
-  marginTop: 16,
+  marginTop: 14,
 };
 
 const metaItemStyle: CSSProperties = {
@@ -332,7 +353,7 @@ const historyListStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 10,
-  marginTop: 16,
+  marginTop: 14,
 };
 
 const historyCardStyle: CSSProperties = {
@@ -361,7 +382,7 @@ const relatedListStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 10,
-  marginTop: 16,
+  marginTop: 14,
 };
 
 const relatedCardStyle: CSSProperties = {
@@ -410,7 +431,7 @@ const formStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 12,
-  marginTop: 16,
+  marginTop: 14,
 };
 
 const fieldStyle: CSSProperties = {
@@ -458,7 +479,7 @@ const groupListStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 8,
-  marginTop: 16,
+  marginTop: 14,
 };
 
 const groupItemStyle: CSSProperties = {
@@ -481,7 +502,7 @@ const tagListStyle: CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
   gap: 8,
-  marginTop: 16,
+  marginTop: 14,
 };
 
 const tagPillStyle: CSSProperties = {
@@ -506,7 +527,7 @@ const todoListStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 10,
-  marginTop: 16,
+  marginTop: 14,
 };
 
 const todoCardStyle: CSSProperties = {
@@ -553,6 +574,26 @@ const todoDoneStateStyle: CSSProperties = {
   background: "#1e3a8a",
   color: "#dbeafe",
   border: "1px solid #2563eb",
+};
+
+const todoStatusStyle: CSSProperties = {
+  ...todoStateStyle,
+  background: "#1e293b",
+  color: "#e0f2fe",
+  border: "1px solid #334155",
+};
+
+const todoArchivedStatusStyle: CSSProperties = {
+  ...todoStateStyle,
+  background: "#78350f",
+  color: "#fef3c7",
+  border: "1px solid #92400e",
+};
+
+const todoBadgeRowStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 8,
 };
 
 const actionRowStyle: CSSProperties = {
@@ -755,7 +796,7 @@ export default function MicroSourceDetailPage() {
       const res = await fetch(
         `/api/micro/todos?tenant_slug=${encodeURIComponent(
           tenantSlug
-        )}&sourceDataId=${encodeURIComponent(id)}`,
+        )}&sourceDataId=${encodeURIComponent(id)}&include_archived=true`,
         { cache: "no-store" }
       );
       const data = (await res.json()) as TodosResponse;
@@ -1138,11 +1179,11 @@ export default function MicroSourceDetailPage() {
           href={`/${encodeURIComponent(tenantSlug)}/micro`}
           style={backLinkStyle}
         >
-          一覧へ戻る
+          戻る
         </Link>
 
         <MicroSectionCard>
-          <MicroSectionTitle level={1}>基本情報</MicroSectionTitle>
+          <MicroSectionTitle level={1}>ログ詳細</MicroSectionTitle>
 
           {loading ? (
             <p style={mutedTextStyle}>読み込み中</p>
@@ -1204,7 +1245,7 @@ export default function MicroSourceDetailPage() {
                     onClick={handleCancelEdit}
                     style={savingEdit ? disabledButtonStyle : buttonStyle}
                   >
-                    キャンセル
+                    取消
                   </button>
                 </div>
               </form>
@@ -1216,7 +1257,7 @@ export default function MicroSourceDetailPage() {
                   <span style={badgeStyle}>{sourceTypeLabel}</span>
                   <span style={statusBadgeStyle}>{statusLabel}</span>
                   {item.pinned && (
-                    <span style={pinnedBadgeStyle}>ピン留め中</span>
+                    <span style={pinnedBadgeStyle}>ピン</span>
                   )}
                 </div>
 
@@ -1268,9 +1309,9 @@ export default function MicroSourceDetailPage() {
             </MicroSectionCard>
 
             <MicroSectionCard>
-              <MicroSectionTitle>ToDo候補</MicroSectionTitle>
+              <MicroSectionTitle>ToDo</MicroSectionTitle>
 
-              <div style={{ ...actionRowStyle, marginTop: 16 }}>
+              <div style={{ ...actionRowStyle, marginTop: 14 }}>
                 <button
                   type="button"
                   onClick={() => void handleExtractTodos()}
@@ -1281,7 +1322,7 @@ export default function MicroSourceDetailPage() {
                       : buttonStyle
                   }
                 >
-                  {extractingTodos ? "抽出中" : "ToDo抽出"}
+                  {extractingTodos ? "抽出中" : "抽出"}
                 </button>
               </div>
 
@@ -1290,11 +1331,12 @@ export default function MicroSourceDetailPage() {
               ) : todoMessage ? (
                 <p style={messageStyle}>{todoMessage}</p>
               ) : todos.length === 0 ? (
-                <p style={mutedTextStyle}>ToDo候補はまだありません。</p>
+                <p style={mutedTextStyle}>ToDoはまだありません。</p>
               ) : (
                 <div style={todoListStyle}>
                   {todos.map((todo) => {
                     const isDone = todo.todo_state === "done";
+                    const isTodoArchived = todo.status === "archived";
                     const action = isDone ? "reopen" : "done";
                     const isUpdating = updatingTodoId === todo.id;
 
@@ -1304,11 +1346,22 @@ export default function MicroSourceDetailPage() {
                         {todo.description && (
                           <p style={todoDescriptionStyle}>{todo.description}</p>
                         )}
-                        <span
-                          style={isDone ? todoDoneStateStyle : todoStateStyle}
-                        >
-                          {todoStateLabels[todo.todo_state] ?? todo.todo_state}
-                        </span>
+                        <div style={todoBadgeRowStyle}>
+                          <span
+                            style={isDone ? todoDoneStateStyle : todoStateStyle}
+                          >
+                            {todoStateLabels[todo.todo_state] ?? todo.todo_state}
+                          </span>
+                          <span
+                            style={
+                              isTodoArchived
+                                ? todoArchivedStatusStyle
+                                : todoStatusStyle
+                            }
+                          >
+                            {todoStatusLabels[todo.status] ?? todo.status}
+                          </span>
+                        </div>
                         <div style={{ ...actionRowStyle, marginTop: 12 }}>
                           <button
                             type="button"
@@ -1321,7 +1374,7 @@ export default function MicroSourceDetailPage() {
                             {isUpdating
                               ? "更新中"
                               : isDone
-                                ? "未完了に戻す"
+                                ? "戻す"
                                 : "完了"}
                           </button>
                         </div>
@@ -1359,11 +1412,11 @@ export default function MicroSourceDetailPage() {
 
               <form onSubmit={handleAddTag} style={formStyle}>
                 <label style={fieldStyle}>
-                  <span style={labelStyle}>タグ名</span>
+                  <span style={labelStyle}>タグ</span>
                   <input
                     value={tagName}
                     onChange={(event) => setTagName(event.target.value)}
-                    placeholder="タグ名を書く"
+                    placeholder="タグを書く"
                     style={inputStyle}
                   />
                 </label>
@@ -1377,7 +1430,7 @@ export default function MicroSourceDetailPage() {
                       : buttonStyle
                   }
                 >
-                  {savingTag ? "追加中" : "タグ追加"}
+                  {savingTag ? "追加中" : "追加"}
                 </button>
               </form>
             </MicroSectionCard>
@@ -1393,7 +1446,7 @@ export default function MicroSourceDetailPage() {
 
               <form onSubmit={handleCreateGroup} style={formStyle}>
                 <label style={fieldStyle}>
-                  <span style={labelStyle}>新規グループ名</span>
+                  <span style={labelStyle}>新規グループ</span>
                   <input
                     value={groupTitle}
                     onChange={(event) => setGroupTitle(event.target.value)}
@@ -1423,7 +1476,7 @@ export default function MicroSourceDetailPage() {
                       : buttonStyle
                   }
                 >
-                  {savingGroup ? "作成中" : "作成して追加"}
+                  {savingGroup ? "作成中" : "作成"}
                 </button>
               </form>
 
@@ -1435,7 +1488,7 @@ export default function MicroSourceDetailPage() {
                     onChange={(event) => setSelectedGroupId(event.target.value)}
                     style={selectStyle}
                   >
-                    <option value="">追加先を選択</option>
+                    <option value="">選択しない</option>
                     {availableGroups.map((group) => (
                       <option key={group.id} value={group.id}>
                         {group.title}
@@ -1533,15 +1586,15 @@ export default function MicroSourceDetailPage() {
 
             <MicroSectionCard>
               <MicroSectionTitle>整理履歴</MicroSectionTitle>
-              <div style={{ ...actionRowStyle, marginTop: 16 }}>
+              <div style={{ ...actionRowStyle, marginTop: 14 }}>
                 <button
                   type="button"
                   onClick={() => setSummaryHistoryOpen((current) => !current)}
                   style={toggleButtonStyle}
                 >
                   {summaryHistoryOpen
-                    ? "整理履歴を閉じる"
-                    : `整理履歴を表示 (${versions.length})`}
+                    ? "閉じる"
+                    : `表示 (${versions.length})`}
                 </button>
               </div>
               {summaryHistoryOpen ? (
@@ -1579,15 +1632,15 @@ export default function MicroSourceDetailPage() {
 
             <MicroSectionCard>
               <MicroSectionTitle>編集履歴</MicroSectionTitle>
-              <div style={{ ...actionRowStyle, marginTop: 16 }}>
+              <div style={{ ...actionRowStyle, marginTop: 14 }}>
                 <button
                   type="button"
                   onClick={() => setEditHistoryOpen((current) => !current)}
                   style={toggleButtonStyle}
                 >
                   {editHistoryOpen
-                    ? "編集履歴を閉じる"
-                    : `編集履歴を表示 (${sourceVersions.length})`}
+                    ? "閉じる"
+                    : `表示 (${sourceVersions.length})`}
                 </button>
               </div>
               {editHistoryOpen ? (
@@ -1595,31 +1648,50 @@ export default function MicroSourceDetailPage() {
                   <p style={mutedTextStyle}>編集履歴はまだありません。</p>
                 ) : (
                   <div style={historyListStyle}>
-                    {sourceVersions.map((version) => (
-                      <article key={version.id} style={historyCardStyle}>
-                        <div style={historyMetaStyle}>
-                          {formatTimestamp(version.created_at)} /{" "}
-                          {version.created_by}
-                        </div>
-                        <div style={historyContentStyle}>
-                          変更前タイトル:{" "}
-                          {readTitleFromSnapshot(version.input_snapshot)}
-                          {"\n"}
-                          変更後タイトル:{" "}
-                          {readTitleFromSnapshot(version.output_snapshot)}
-                        </div>
-                      </article>
-                    ))}
+                    {sourceVersions.map((version) => {
+                      const beforeRawContent = readRawContentFromSnapshot(
+                        version.input_snapshot
+                      );
+                      const afterRawContent = readRawContentFromSnapshot(
+                        version.output_snapshot
+                      );
+                      const bodyChanged =
+                        beforeRawContent !== afterRawContent;
+
+                      return (
+                        <article key={version.id} style={historyCardStyle}>
+                          <div style={historyMetaStyle}>
+                            {formatTimestamp(version.created_at)} /{" "}
+                            {version.created_by}
+                          </div>
+                          <div style={historyContentStyle}>
+                            変更前タイトル:{" "}
+                            {readTitleFromSnapshot(version.input_snapshot)}
+                            {"\n"}
+                            変更後タイトル:{" "}
+                            {readTitleFromSnapshot(version.output_snapshot)}
+                            {"\n"}
+                            {bodyChanged ? "本文変更あり" : "本文変更なし"}
+                            {"\n"}
+                            変更前本文:{"\n"}
+                            {getRawContentPreview(beforeRawContent)}
+                            {"\n\n"}
+                            変更後本文:{"\n"}
+                            {getRawContentPreview(afterRawContent)}
+                          </div>
+                        </article>
+                      );
+                    })}
                   </div>
                 )
               ) : null}
             </MicroSectionCard>
 
             <MicroSectionCard>
-              <MicroSectionTitle>状態</MicroSectionTitle>
+              <MicroSectionTitle>利用状況</MicroSectionTitle>
               <div style={metaGridStyle}>
                 <div style={metaItemStyle}>
-                  <span style={metaLabelStyle}>利用回数</span>
+                  <span style={metaLabelStyle}>利用</span>
                   {item.usage_count ?? 0}
                 </div>
                 <div style={metaItemStyle}>
@@ -1628,10 +1700,10 @@ export default function MicroSourceDetailPage() {
                 </div>
                 <div style={metaItemStyle}>
                   <span style={metaLabelStyle}>ピン</span>
-                  {item.pinned ? "ピン留め中" : "なし"}
+                  {item.pinned ? "ピン" : "なし"}
                 </div>
                 <div style={metaItemStyle}>
-                  <span style={metaLabelStyle}>ステータス</span>
+                  <span style={metaLabelStyle}>状態</span>
                   {statusLabel}
                 </div>
               </div>

@@ -98,7 +98,7 @@ const pageStyle: CSSProperties = {
   minHeight: "100vh",
   background: "#111827",
   color: "#f9fafb",
-  padding: "32px 16px",
+  padding: "28px 16px",
 };
 
 const shellStyle: CSSProperties = {
@@ -107,14 +107,14 @@ const shellStyle: CSSProperties = {
   margin: "0 auto",
   display: "flex",
   flexDirection: "column",
-  gap: 20,
+  gap: 16,
 };
 
 const formStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 12,
-  marginTop: 16,
+  marginTop: 14,
 };
 
 const fieldStyle: CSSProperties = {
@@ -170,7 +170,7 @@ const listStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 10,
-  marginTop: 16,
+  marginTop: 14,
 };
 
 const actionRowStyle: CSSProperties = {
@@ -183,7 +183,7 @@ const navListStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr",
   gap: 10,
-  marginTop: 16,
+  marginTop: 14,
 };
 
 const navLinkStyle: CSSProperties = {
@@ -214,7 +214,7 @@ const groupListStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 10,
-  marginTop: 16,
+  marginTop: 14,
 };
 
 const groupCardStyle: CSSProperties = {
@@ -589,25 +589,25 @@ export default function MicroPage() {
     <main style={pageStyle}>
       <div style={shellStyle}>
         <MicroSectionCard>
-          <MicroSectionTitle>ナビゲーション</MicroSectionTitle>
+          <MicroSectionTitle>移動</MicroSectionTitle>
           <div style={navListStyle}>
             <Link
               href={`/${encodeURIComponent(tenantSlug)}/micro/todos`}
               style={navLinkStyle}
             >
-              ToDo一覧
+              ToDo
             </Link>
             <Link
               href={`/${encodeURIComponent(tenantSlug)}/micro/archived`}
               style={navLinkStyle}
             >
-              保管済み
+              保管ログ
             </Link>
           </div>
         </MicroSectionCard>
 
         <MicroSectionCard>
-          <MicroSectionTitle level={1}>Micro</MicroSectionTitle>
+          <MicroSectionTitle level={1}>新規ログ</MicroSectionTitle>
 
           <form onSubmit={handleSubmit} style={formStyle}>
             <label style={fieldStyle}>
@@ -621,7 +621,7 @@ export default function MicroPage() {
             </label>
 
             <label style={fieldStyle}>
-              <span style={labelStyle}>種類</span>
+              <span style={labelStyle}>ログ種別</span>
               <select
                 value={sourceType}
                 onChange={(event) => setSourceType(event.target.value)}
@@ -646,13 +646,13 @@ export default function MicroPage() {
             </label>
 
             <label style={fieldStyle}>
-              <span style={labelStyle}>既存グループ</span>
+              <span style={labelStyle}>グループ</span>
               <select
                 value={selectedGroupId}
                 onChange={(event) => setSelectedGroupId(event.target.value)}
                 style={selectStyle}
               >
-                <option value="">グループを選択しない</option>
+                <option value="">選択しない</option>
                 {groupsLoading && (
                   <option value="" disabled>
                     読み込み中
@@ -685,7 +685,7 @@ export default function MicroPage() {
         </MicroSectionCard>
 
         <MicroSectionCard>
-          <MicroSectionTitle>検索</MicroSectionTitle>
+          <MicroSectionTitle>ログ検索</MicroSectionTitle>
 
           <form onSubmit={handleSearchSubmit} style={formStyle}>
             <label style={fieldStyle}>
@@ -712,7 +712,7 @@ export default function MicroPage() {
                       : "1px solid #64748b",
                 }}
               >
-                クリア
+                解除
               </MicroButton>
             </div>
           </form>
@@ -723,7 +723,7 @@ export default function MicroPage() {
         </MicroSectionCard>
 
         <MicroSectionCard>
-          <MicroSectionTitle>グループ一覧</MicroSectionTitle>
+          <MicroSectionTitle>グループ</MicroSectionTitle>
 
           {groupsLoading ? (
             <p style={mutedTextStyle}>読み込み中</p>
@@ -761,7 +761,7 @@ export default function MicroPage() {
         </MicroSectionCard>
 
         <MicroSectionCard>
-          <MicroSectionTitle>一覧</MicroSectionTitle>
+          <MicroSectionTitle>思考ログ</MicroSectionTitle>
 
           {loading ? (
             <p style={mutedTextStyle}>読み込み中</p>

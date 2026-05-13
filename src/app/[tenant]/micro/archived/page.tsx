@@ -41,7 +41,7 @@ const pageStyle: CSSProperties = {
   minHeight: "100vh",
   background: "#111827",
   color: "#f9fafb",
-  padding: "32px 16px",
+  padding: "28px 16px",
 };
 
 const shellStyle: CSSProperties = {
@@ -50,7 +50,7 @@ const shellStyle: CSSProperties = {
   margin: "0 auto",
   display: "flex",
   flexDirection: "column",
-  gap: 20,
+  gap: 16,
 };
 
 const mutedTextStyle: CSSProperties = {
@@ -71,7 +71,7 @@ const listStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 10,
-  marginTop: 16,
+  marginTop: 14,
 };
 
 const archivedCardStyle: CSSProperties = {
@@ -176,24 +176,24 @@ export default function ArchivedMicroPage() {
     <main style={pageStyle}>
       <div style={shellStyle}>
         <MicroSectionCard>
-          <MicroSectionTitle level={1}>保管済み</MicroSectionTitle>
+          <MicroSectionTitle level={1}>保管ログ</MicroSectionTitle>
           {message && <p style={messageStyle}>{message}</p>}
         </MicroSectionCard>
 
         <MicroSectionCard>
-          <MicroSectionTitle>一覧</MicroSectionTitle>
+          <MicroSectionTitle>保管ログ</MicroSectionTitle>
 
           {loading ? (
             <p style={mutedTextStyle}>読み込み中</p>
           ) : items.length === 0 ? (
-            <p style={mutedTextStyle}>保管済みのログはありません。</p>
+            <p style={mutedTextStyle}>保管ログはありません。</p>
           ) : (
             <div style={listStyle}>
               {items.map((item) => (
                 <article key={item.id} style={archivedCardStyle}>
                   <div style={contentStyle}>{item.raw_content}</div>
                   <div style={metaStyle}>
-                    保管日時: {formatDate(item.archived_at)}
+                    保管: {formatDate(item.archived_at)}
                   </div>
                   <div style={actionStyle}>
                     <MicroButton

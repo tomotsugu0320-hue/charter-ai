@@ -11,6 +11,7 @@ type MicroTodo = {
   source_data_id: string | null;
   title: string;
   description: string | null;
+  status: string;
   todo_state: string;
   created_at: string;
 };
@@ -47,11 +48,16 @@ const todoStateLabels: Record<string, string> = {
   blocked: "保留",
 };
 
+const todoStatusLabels: Record<string, string> = {
+  active: "通常表示",
+  archived: "保管中",
+};
+
 const pageStyle: CSSProperties = {
   minHeight: "100vh",
   background: "#111827",
   color: "#f9fafb",
-  padding: "32px 16px",
+  padding: "28px 16px",
 };
 
 const shellStyle: CSSProperties = {
@@ -60,7 +66,7 @@ const shellStyle: CSSProperties = {
   margin: "0 auto",
   display: "flex",
   flexDirection: "column",
-  gap: 20,
+  gap: 16,
 };
 
 const backLinkStyle: CSSProperties = {
@@ -93,7 +99,7 @@ const listStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 10,
-  marginTop: 16,
+  marginTop: 14,
 };
 
 const todoCardStyle: CSSProperties = {
@@ -140,6 +146,37 @@ const sourceLinkStyle: CSSProperties = {
   overflowWrap: "anywhere",
 };
 
+const filterRowStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 8,
+  marginTop: 14,
+};
+
+const filterButtonStyle: CSSProperties = {
+  border: "1px solid #334155",
+  borderRadius: 8,
+  background: "#0f172a",
+  color: "#bfdbfe",
+  cursor: "pointer",
+  padding: "8px 12px",
+  fontSize: 14,
+  fontWeight: 700,
+};
+
+const activeFilterButtonStyle: CSSProperties = {
+  ...filterButtonStyle,
+  border: "1px solid #60a5fa",
+  background: "#1d4ed8",
+  color: "#ffffff",
+};
+
+const badgeRowStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 8,
+};
+
 const stateStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
@@ -160,6 +197,20 @@ const doneStateStyle: CSSProperties = {
   background: "#1e3a8a",
   color: "#dbeafe",
   border: "1px solid #2563eb",
+};
+
+const statusStyle: CSSProperties = {
+  ...stateStyle,
+  background: "#1e293b",
+  color: "#e0f2fe",
+  border: "1px solid #334155",
+};
+
+const archivedStatusStyle: CSSProperties = {
+  ...stateStyle,
+  background: "#78350f",
+  color: "#fef3c7",
+  border: "1px solid #92400e",
 };
 
 const actionRowStyle: CSSProperties = {
@@ -196,6 +247,7 @@ export default function MicroTodosPage() {
   const [todos, setTodos] = useState<MicroTodo[]>([]);
   const [loading, setLoading] = useState(false);
   const [updatingTodoId, setUpdatingTodoId] = useState<string | null>(null);
+  const [includeArchived, setIncludeArchived] = useState(false);
   const [message, setMessage] = useState("");
 
   const loadTodos = useCallback(async () => {
@@ -205,8 +257,14 @@ export default function MicroTodosPage() {
     setMessage("");
 
     try {
+      const queryParams = new URLSearchParams({ tenant_slug: tenantSlug });
+
+      if (includeArchived) {
+        queryParams.set("include_archived", "true");
+      }
+
       const res = await fetch(
-        `/api/micro/todos?tenant_slug=${encodeURIComponent(tenantSlug)}`,
+        `/api/micro/todos?${queryParams.toString()}`,
         { cache: "no-store" }
       );
       const data = (await res.json()) as TodosResponse;
@@ -226,7 +284,7 @@ export default function MicroTodosPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenantSlug]);
+  }, [includeArchived, tenantSlug]);
 
   useEffect(() => {
     void loadTodos();
@@ -273,16 +331,32 @@ export default function MicroTodosPage() {
           href={`/${encodeURIComponent(tenantSlug)}/micro`}
           style={backLinkStyle}
         >
-          一覧へ戻る
+          戻る
         </Link>
 
         <MicroSectionCard>
-          <MicroSectionTitle level={1}>ToDo一覧</MicroSectionTitle>
+          <MicroSectionTitle level={1}>ToDo</MicroSectionTitle>
+          <div style={filterRowStyle}>
+            <button
+              type="button"
+              onClick={() => setIncludeArchived(false)}
+              style={!includeArchived ? activeFilterButtonStyle : filterButtonStyle}
+            >
+              通常のみ
+            </button>
+            <button
+              type="button"
+              onClick={() => setIncludeArchived(true)}
+              style={includeArchived ? activeFilterButtonStyle : filterButtonStyle}
+            >
+              保管含む
+            </button>
+          </div>
           {message && <p style={messageStyle}>{message}</p>}
         </MicroSectionCard>
 
         <MicroSectionCard>
-          <MicroSectionTitle>未完了ToDo</MicroSectionTitle>
+          <MicroSectionTitle>ToDo一覧</MicroSectionTitle>
 
           {loading ? (
             <p style={mutedTextStyle}>読み込み中</p>
@@ -292,6 +366,7 @@ export default function MicroTodosPage() {
             <div style={listStyle}>
               {todos.map((todo) => {
                 const isDone = todo.todo_state === "done";
+                const isArchived = todo.status === "archived";
                 const action = isDone ? "reopen" : "done";
                 const isUpdating = updatingTodoId === todo.id;
 
@@ -302,12 +377,17 @@ export default function MicroTodosPage() {
                       <p style={todoDescriptionStyle}>{todo.description}</p>
                     )}
 
-                    <span style={isDone ? doneStateStyle : stateStyle}>
-                      {todoStateLabels[todo.todo_state] ?? todo.todo_state}
-                    </span>
+                    <div style={badgeRowStyle}>
+                      <span style={isDone ? doneStateStyle : stateStyle}>
+                        {todoStateLabels[todo.todo_state] ?? todo.todo_state}
+                      </span>
+                      <span style={isArchived ? archivedStatusStyle : statusStyle}>
+                        {todoStatusLabels[todo.status] ?? todo.status}
+                      </span>
+                    </div>
 
                     <div style={metaStyle}>
-                      <span>作成日時: {formatTimestamp(todo.created_at)}</span>
+                      <span>作成: {formatTimestamp(todo.created_at)}</span>
                       {todo.source_data_id ? (
                         <Link
                           href={`/${encodeURIComponent(
@@ -317,10 +397,10 @@ export default function MicroTodosPage() {
                           )}`}
                           style={sourceLinkStyle}
                         >
-                          source_data_id: {todo.source_data_id}
+                          元ログ: {todo.source_data_id}
                         </Link>
                       ) : (
-                        <span>source_data_id: なし</span>
+                        <span>元ログ: なし</span>
                       )}
                     </div>
 
@@ -334,7 +414,7 @@ export default function MicroTodosPage() {
                         {isUpdating
                           ? "更新中"
                           : isDone
-                            ? "未完了に戻す"
+                            ? "戻す"
                             : "完了"}
                       </button>
                     </div>
