@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import MicroSectionCard from "@/components/micro/MicroSectionCard";
 import MicroSectionTitle from "@/components/micro/MicroSectionTitle";
 
@@ -132,6 +132,7 @@ const sourceListStyle: CSSProperties = {
 };
 
 const sourceCardStyle: CSSProperties = {
+  display: "block",
   width: "100%",
   border: "1px solid #334155",
   borderRadius: 8,
@@ -141,6 +142,7 @@ const sourceCardStyle: CSSProperties = {
   textAlign: "left",
   cursor: "pointer",
   font: "inherit",
+  textDecoration: "none",
 };
 
 const sourceTitleStyle: CSSProperties = {
@@ -175,14 +177,12 @@ const summaryStyle: CSSProperties = {
 
 export default function MicroGroupDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const tenantSlug = useMemo(() => getParam(params, "tenant"), [params]);
   const id = useMemo(() => getParam(params, "id"), [params]);
 
   const [group, setGroup] = useState<MicroGroup | null>(null);
   const [sources, setSources] = useState<GroupSource[]>([]);
   const [loading, setLoading] = useState(false);
-  const [openingSourceId, setOpeningSourceId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
   const loadGroup = useCallback(async () => {
@@ -226,30 +226,17 @@ export default function MicroGroupDetailPage() {
     void loadGroup();
   }, [loadGroup]);
 
-  const handleOpenSource = async (sourceId: string) => {
-    if (!tenantSlug) return;
-
-    setOpeningSourceId(sourceId);
-
-    try {
-      await fetch("/api/micro/source-data", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id: sourceId,
-          action: "touch",
-        }),
-      });
-    } finally {
-      setOpeningSourceId(null);
-      router.push(
-        `/${encodeURIComponent(
-          tenantSlug
-        )}/micro/source/${encodeURIComponent(sourceId)}`
-      );
-    }
+  const handleTouchSource = (sourceId: string) => {
+    void fetch("/api/micro/source-data", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        id: sourceId,
+        action: "touch",
+      }),
+    });
   };
 
   return (
@@ -300,18 +287,13 @@ export default function MicroGroupDetailPage() {
                     sourceTypeLabels[source.source_type] ?? source.source_type;
 
                   return (
-                    <button
+                    <Link
                       key={source.id}
-                      type="button"
-                      disabled={openingSourceId === source.id}
-                      onClick={() => void handleOpenSource(source.id)}
-                      style={{
-                        ...sourceCardStyle,
-                        cursor:
-                          openingSourceId === source.id
-                            ? "progress"
-                            : "pointer",
-                      }}
+                      href={`/${encodeURIComponent(
+                        tenantSlug
+                      )}/micro/source/${encodeURIComponent(source.id)}`}
+                      onClick={() => handleTouchSource(source.id)}
+                      style={sourceCardStyle}
                     >
                       <h3 style={sourceTitleStyle}>{sourceTitle}</h3>
                       <div style={sourceMetaStyle}>
@@ -321,7 +303,7 @@ export default function MicroGroupDetailPage() {
                       {source.summary && (
                         <div style={summaryStyle}>{source.summary}</div>
                       )}
-                    </button>
+                    </Link>
                   );
                 })}
               </div>

@@ -471,6 +471,12 @@ const groupItemStyle: CSSProperties = {
   overflowWrap: "anywhere",
 };
 
+const groupLinkStyle: CSSProperties = {
+  ...groupItemStyle,
+  display: "block",
+  textDecoration: "none",
+};
+
 const tagListStyle: CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
@@ -1465,9 +1471,15 @@ export default function MicroSourceDetailPage() {
                   <p style={mutedTextStyle}>所属グループはまだありません。</p>
                 ) : (
                   sourceGroups.map((group) => (
-                    <div key={group.id} style={groupItemStyle}>
+                    <Link
+                      key={group.id}
+                      href={`/${encodeURIComponent(
+                        tenantSlug
+                      )}/micro/group/${encodeURIComponent(group.id)}`}
+                      style={groupLinkStyle}
+                    >
                       {group.title}
-                    </div>
+                    </Link>
                   ))
                 )}
               </div>
