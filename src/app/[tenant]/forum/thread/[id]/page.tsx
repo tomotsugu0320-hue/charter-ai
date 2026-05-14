@@ -1399,7 +1399,7 @@ function jumpToMainIssues() {
     }}
   >
 
-{mode === "normal" ? "🧠 全体理解（AIまとめ）" : "🐵 全体理解（やさしい要約）"}
+{mode === "normal" ? "この議論の要約" : "🐵 全体理解（やさしい要約）"}
   </h2>
 <PrimaryButton
   onClick={jumpToMainIssues}
@@ -1701,7 +1701,7 @@ function jumpToMainIssues() {
         marginBottom: 10,
       }}
     >
-      主な対立
+      反論・リスク
     </div>
 <div style={{ color: "#666", fontSize: currentFont.base * 0.9, marginBottom: 10 }}>
   {conflictSectionTitle}
@@ -1760,7 +1760,7 @@ function jumpToMainIssues() {
 
           <SectionCard variant="white" style={{ marginTop: 24 }}>
             <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
-              📊 投稿一覧
+              まず意見を読む
             </SectionTitle>
 
             <div style={{ marginBottom: 12 }}>
@@ -1854,7 +1854,7 @@ function jumpToMainIssues() {
 
 <div style={{ marginTop: 24 }}>
   <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
-    🌳 深掘り（議論ツリー）
+    構造で見る
   </SectionTitle>
 
 <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
