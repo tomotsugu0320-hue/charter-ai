@@ -51,14 +51,35 @@ type OrganizedResult = {
 
 const ALL_CATEGORIES = "すべて";
 const draftStorageKey = "forum_thread_draft_input";
-const NODE_LABELS: Record<string, string> = {
-  "consumption-tax": "消費税",
-  "tax-social-insurance": "税金・社会保険料",
-  "demand-shortage": "需要不足",
-  "tax-cut": "減税",
-  "fiscal-policy": "財政政策",
-  "inflation-risk": "インフレ",
-  "funding-source": "財源",
+const NODE_INFO: Record<string, { label: string; path?: string[] }> = {
+  "consumption-tax": {
+    label: "消費税",
+    path: ["問題を整理する", "税金・社会保険料", "消費税"],
+  },
+  "tax-social-insurance": {
+    label: "税金・社会保険料",
+    path: ["問題を整理する", "税金・社会保険料"],
+  },
+  "demand-shortage": {
+    label: "需要不足",
+    path: ["原因を考える", "需要不足"],
+  },
+  "tax-cut": {
+    label: "減税",
+    path: ["解決策を出す", "減税"],
+  },
+  "fiscal-policy": {
+    label: "財政政策",
+    path: ["原因を考える", "財政政策"],
+  },
+  "inflation-risk": {
+    label: "インフレ",
+    path: ["反論・リスクを確認する", "インフレ"],
+  },
+  "funding-source": {
+    label: "財源",
+    path: ["反論・リスクを確認する", "財源"],
+  },
 };
 
 const pageStyle: CSSProperties = {
@@ -464,7 +485,10 @@ export default function ForumPage() {
   const keyword = searchParams.get("keyword") || "";
   const goal = searchParams.get("goal") || "";
   const node = searchParams.get("node") || "";
-  const selectedNodeLabel = NODE_LABELS[node];
+  const selectedNodeInfo = NODE_INFO[node];
+  const selectedNodeLabel = selectedNodeInfo?.label;
+  const selectedNodePathText =
+    selectedNodeInfo?.path?.length ? selectedNodeInfo.path.join(" ＞ ") : selectedNodeLabel;
 
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -1383,7 +1407,7 @@ export default function ForumPage() {
                     )}
                     {selectedNodeLabel && (
                       <div style={{ ...smallMetaStyle, marginTop: 6 }}>
-                        対応ツリー項目：{selectedNodeLabel}
+                        対応ツリー項目：{selectedNodePathText}
                       </div>
                     )}
                     {thread.reason && (
