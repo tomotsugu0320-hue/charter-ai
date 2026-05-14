@@ -1156,7 +1156,7 @@ export default function ForumPage() {
                 入力欄に反映
               </button>
               <PrimaryButton onClick={handleUseOrganizedAndAnalyze} disabled={loading}>
-                {loading ? "整理中..." : "この内容で分析"}
+                {loading ? "整理中..." : "この内容で論点を整理"}
               </PrimaryButton>
             </div>
           </div>
@@ -1179,14 +1179,14 @@ export default function ForumPage() {
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
           <PrimaryButton onClick={handleOrganizePost} disabled={organizing || loading}>
-            {organizing ? "整えています..." : "読みやすく整える"}
+            {organizing ? "整えています..." : "投稿文を読みやすく整える"}
           </PrimaryButton>
           <PrimaryButton
             onClick={() => analyzeText(text)}
             disabled={loading || organizing}
             variant="secondary"
           >
-            {loading ? "整理中..." : "論点を整理"}
+            {loading ? "整理中..." : "論点を整理して次へ"}
           </PrimaryButton>
         </div>
       </section>
