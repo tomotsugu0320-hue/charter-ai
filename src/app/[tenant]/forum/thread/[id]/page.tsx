@@ -1796,7 +1796,7 @@ function jumpToMainIssues() {
                 checked={hideLowScore}
                 onChange={(e) => setHideLowScore(e.target.checked)}
               />
-              低スコア投稿を薄く表示する
+              読みづらい投稿を薄く表示する
             </label>
 
             <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1807,7 +1807,7 @@ function jumpToMainIssues() {
                   color: sortType === "score" ? "#fff" : "#333",
                 }}
               >
-                スコア順
+                読みやすい順
               </PrimaryButton>
 
               <PrimaryButton
