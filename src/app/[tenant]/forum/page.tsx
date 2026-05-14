@@ -51,6 +51,15 @@ type OrganizedResult = {
 
 const ALL_CATEGORIES = "すべて";
 const draftStorageKey = "forum_thread_draft_input";
+const NODE_LABELS: Record<string, string> = {
+  "consumption-tax": "消費税",
+  "tax-social-insurance": "税金・社会保険料",
+  "demand-shortage": "需要不足",
+  "tax-cut": "減税",
+  "fiscal-policy": "財政政策",
+  "inflation-risk": "インフレ",
+  "funding-source": "財源",
+};
 
 const pageStyle: CSSProperties = {
   maxWidth: 1080,
@@ -454,6 +463,8 @@ export default function ForumPage() {
 
   const keyword = searchParams.get("keyword") || "";
   const goal = searchParams.get("goal") || "";
+  const node = searchParams.get("node") || "";
+  const selectedNodeLabel = NODE_LABELS[node];
 
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -955,7 +966,7 @@ export default function ForumPage() {
         </div>
       )}
 
-      {(goal || keyword) && (
+      {(goal || keyword || selectedNodeLabel) && (
         <section style={{ ...panelStyle, marginBottom: 18 }}>
           {goal && (
             <div style={{ marginBottom: keyword ? 12 : 0 }}>
@@ -968,6 +979,14 @@ export default function ForumPage() {
               <div style={labelStyle}>注目している論点</div>
               <div style={{ fontWeight: 800, fontSize: currentFontSize }}>
                 {keyword}
+              </div>
+            </div>
+          )}
+          {selectedNodeLabel && (
+            <div style={{ marginTop: goal || keyword ? 12 : 0 }}>
+              <div style={labelStyle}>選択中の論点</div>
+              <div style={{ fontWeight: 800, fontSize: currentFontSize }}>
+                選択中の論点：{selectedNodeLabel}
               </div>
             </div>
           )}
