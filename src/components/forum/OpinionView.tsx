@@ -75,6 +75,7 @@ export default function OpinionView({
   const isBest = !!best && best.opinion.id === op.opinion.id;
   const isExpanded = isBest || expandedMap[op.opinion.id] === true;
   const short = getShortSummary(op.opinion.content);
+  const replyCount = op.children?.length ?? 0;
 
   return (
     <PostCard
@@ -223,6 +224,17 @@ export default function OpinionView({
           >
             開くと反論・補足も見られます
           </div>
+          {replyCount > 0 && (
+            <div
+              style={{
+                marginTop: 6,
+                color: "#666",
+                fontSize: currentFont.base * 0.85,
+              }}
+            >
+              反論・補足あり（{replyCount}件）
+            </div>
+          )}
         </div>
       )}
 
