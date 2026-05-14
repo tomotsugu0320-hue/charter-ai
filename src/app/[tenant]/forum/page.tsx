@@ -64,7 +64,7 @@ const NODE_INFO: Record<string, { label: string; path?: string[] }> = {
     label: "需要不足",
     path: ["原因を考える", "需要不足"],
   },
-  "tax-cut": {
+  "tax-cuts": {
     label: "減税",
     path: ["解決策を出す", "減税"],
   },
@@ -72,7 +72,7 @@ const NODE_INFO: Record<string, { label: string; path?: string[] }> = {
     label: "財政政策",
     path: ["原因を考える", "財政政策"],
   },
-  "inflation-risk": {
+  "inflation": {
     label: "インフレ",
     path: ["反論・リスクを確認する", "インフレ"],
   },
