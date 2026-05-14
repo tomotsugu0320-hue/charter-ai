@@ -1381,6 +1381,11 @@ export default function ForumPage() {
                         {truncate(thread.summary, 90)}
                       </div>
                     )}
+                    {selectedNodeLabel && (
+                      <div style={{ ...smallMetaStyle, marginTop: 6 }}>
+                        対応ツリー項目：{selectedNodeLabel}
+                      </div>
+                    )}
                     {thread.reason && (
                       <div style={{ ...smallMetaStyle, marginTop: 6 }}>
                         {thread.reason}
