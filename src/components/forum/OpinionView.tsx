@@ -108,7 +108,7 @@ export default function OpinionView({
               }}
             >
               <div style={{ display: "grid", gap: 2 }}>
-                <span>🏆 スコア上位意見 {op.opinion.logic_score ?? "-"}</span>
+                <span>🏆 まず読む意見 {op.opinion.logic_score ?? "-"}</span>
                 <span
                   style={{
                     color: "#666",
@@ -116,7 +116,7 @@ export default function OpinionView({
                     fontSize: currentFont.base * 0.85,
                   }}
                 >
-                  （論理構造の評価に基づくスコア）
+                  読みやすさの目安
                 </span>
               </div>
               <span
@@ -136,7 +136,7 @@ export default function OpinionView({
                 fontSize: currentFont.base,
               }}
             >
-              💬 意見 {op.opinion.logic_score ?? "-"}
+              意見・読みやすさ {op.opinion.logic_score ?? "-"}
             </div>
           )}
         </div>
