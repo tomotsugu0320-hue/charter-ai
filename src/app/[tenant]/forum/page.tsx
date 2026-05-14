@@ -383,7 +383,7 @@ function ThreadCard({
               lineHeight: 1.7,
             }}
           >
-            {truncate(preview)}
+            {truncate(preview, 80)}
           </p>
         )}
 
@@ -397,7 +397,7 @@ function ThreadCard({
           }}
         >
           <span>投稿数 {thread.post_count ?? 0}</span>
-          <span>整理度 {formatScore(thread.avg_logic_score)}</span>
+          <span>読みやすさ {formatScore(thread.avg_logic_score)}</span>
         </div>
       </Link>
     </article>
@@ -999,7 +999,7 @@ export default function ForumPage() {
                 />
               ))
             ) : (
-              <div style={panelStyle}>一致する活発スレッドはありません。</div>
+              <div style={panelStyle}>一致する投稿が多いスレッドはありません。</div>
             )}
           </div>
         </div>
