@@ -6,6 +6,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
+import ForumGuideTree from "@/components/forum/ForumGuideTree";
 import PrimaryButton from "@/components/forum/PrimaryButton";
 
 type ThreadRow = {
@@ -849,6 +850,8 @@ export default function ForumPage() {
           </div>
         </div>
       </header>
+
+      <ForumGuideTree />
 
       <section style={{ ...panelStyle, marginBottom: 18 }}>
         <div
