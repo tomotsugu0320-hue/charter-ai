@@ -343,18 +343,35 @@ function ThreadCard({
             marginBottom: 8,
           }}
         >
-          <span
-            style={{
-              border: "1px solid #d1d5db",
-              borderRadius: 8,
-              padding: "3px 8px",
-              fontSize: 12,
-              color: "#374151",
-              background: "#f9fafb",
-            }}
-          >
-            {thread.category ?? "未設定"}
-          </span>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <span
+              style={{
+                border: "1px solid #d1d5db",
+                borderRadius: 8,
+                padding: "3px 8px",
+                fontSize: 12,
+                color: "#374151",
+                background: "#f9fafb",
+              }}
+            >
+              {thread.category ?? "未設定"}
+            </span>
+            {isFeatured && (
+              <span
+                style={{
+                  border: "1px solid #2563eb",
+                  borderRadius: 8,
+                  padding: "3px 8px",
+                  fontSize: 12,
+                  color: "#1d4ed8",
+                  background: "#dbeafe",
+                  fontWeight: 800,
+                }}
+              >
+                まず読む
+              </span>
+            )}
+          </div>
 
           {thread.created_at && (
             <span style={{ ...smallMetaStyle, whiteSpace: "nowrap" }}>
