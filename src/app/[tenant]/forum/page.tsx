@@ -879,7 +879,7 @@ export default function ForumPage() {
         </div>
       </header>
 
-      <ForumGuideTree />
+      <ForumGuideTree tenant={tenant} />
 
       <section style={{ ...panelStyle, marginBottom: 18 }}>
         <div

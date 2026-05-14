@@ -1,8 +1,10 @@
-import type { CSSProperties } from "react";
+import Link from "next/link";
+import type { CSSProperties, ReactNode } from "react";
 
 type GuideTreeNode = {
   id: string;
   label: string;
+  nodeId?: string;
   children?: GuideTreeNode[];
 };
 
@@ -16,7 +18,11 @@ const guideTreeRoot: GuideTreeNode = {
       children: [
         { id: "economy", label: "景気" },
         { id: "wages", label: "賃金" },
-        { id: "tax-social-insurance", label: "税金・社会保険料" },
+        {
+          id: "tax-social-insurance",
+          label: "税金・社会保険料",
+          nodeId: "tax-social-insurance",
+        },
         { id: "working-generation-burden", label: "現役世代の負担" },
       ],
     },
@@ -24,9 +30,9 @@ const guideTreeRoot: GuideTreeNode = {
       id: "consider-causes",
       label: "② 原因を考える",
       children: [
-        { id: "demand-shortage", label: "需要不足" },
+        { id: "demand-shortage", label: "需要不足", nodeId: "demand-shortage" },
         { id: "fiscal-policy", label: "財政政策" },
-        { id: "consumption-tax", label: "消費税" },
+        { id: "consumption-tax", label: "消費税", nodeId: "consumption-tax" },
         { id: "social-security-system", label: "社会保障制度" },
       ],
     },
@@ -63,8 +69,26 @@ const guideTreeRoot: GuideTreeNode = {
   ],
 };
 
-function renderGuideTree(root: GuideTreeNode) {
-  const lines = [root.label, "│"];
+function renderNodeLabel(node: GuideTreeNode, tenant: string) {
+  if (!node.nodeId) return node.label;
+
+  return (
+    <Link
+      href={`/${tenant}/forum?node=${node.nodeId}`}
+      style={{
+        color: "#0d47a1",
+        fontWeight: 700,
+        textDecoration: "underline",
+        textUnderlineOffset: 2,
+      }}
+    >
+      {node.label}
+    </Link>
+  );
+}
+
+function renderGuideTree(root: GuideTreeNode, tenant: string) {
+  const lines: ReactNode[] = [root.label, "│"];
   const children = root.children ?? [];
 
   children.forEach((node, index) => {
@@ -73,11 +97,20 @@ function renderGuideTree(root: GuideTreeNode) {
     const childPrefix = isLastNode ? "    " : "│   ";
     const nodeChildren = node.children ?? [];
 
-    lines.push(`${branch} ${node.label}`);
+    lines.push(
+      <>
+        {branch} {renderNodeLabel(node, tenant)}
+      </>
+    );
 
     nodeChildren.forEach((child, childIndex) => {
       const isLastChild = childIndex === nodeChildren.length - 1;
-      lines.push(`${childPrefix}${isLastChild ? "└─" : "├─"} ${child.label}`);
+      lines.push(
+        <>
+          {childPrefix}
+          {isLastChild ? "└─" : "├─"} {renderNodeLabel(child, tenant)}
+        </>
+      );
     });
 
     if (!isLastNode) {
@@ -85,10 +118,8 @@ function renderGuideTree(root: GuideTreeNode) {
     }
   });
 
-  return lines.join("\n");
+  return lines.map((line, index) => <div key={index}>{line}</div>);
 }
-
-const guideTree = renderGuideTree(guideTreeRoot);
 
 const cardStyle: CSSProperties = {
   border: "1px solid #d7dde8",
@@ -122,13 +153,13 @@ const treeStyle: CSSProperties = {
     'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
 };
 
-export default function ForumGuideTree() {
+export default function ForumGuideTree({ tenant }: { tenant: string }) {
   return (
     <section aria-labelledby="forum-guide-tree-title" style={cardStyle}>
       <h2 id="forum-guide-tree-title" style={titleStyle}>
         この掲示板でできること
       </h2>
-      <pre style={treeStyle}>{guideTree}</pre>
+      <div style={treeStyle}>{renderGuideTree(guideTreeRoot, tenant)}</div>
     </section>
   );
 }
