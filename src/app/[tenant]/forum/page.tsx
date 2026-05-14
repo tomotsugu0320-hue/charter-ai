@@ -396,8 +396,8 @@ function ThreadCard({
             ...smallMetaStyle,
           }}
         >
-          <span>投稿 {thread.post_count ?? 0}</span>
-          <span>平均スコア {formatScore(thread.avg_logic_score)}</span>
+          <span>投稿数 {thread.post_count ?? 0}</span>
+          <span>整理度 {formatScore(thread.avg_logic_score)}</span>
         </div>
       </Link>
     </article>
@@ -967,7 +967,7 @@ export default function ForumPage() {
         }}
       >
         <div>
-          <h2 style={{ margin: "0 0 10px", fontSize: 20 }}>人気スレッド</h2>
+          <h2 style={{ margin: "0 0 10px", fontSize: 20 }}>評価が高いスレッド</h2>
           <div style={{ display: "grid", gap: 10 }}>
             {visiblePopularThreads.length > 0 ? (
               visiblePopularThreads.map((thread, index) => (
@@ -980,13 +980,13 @@ export default function ForumPage() {
                 />
               ))
             ) : (
-              <div style={panelStyle}>一致する人気スレッドはありません。</div>
+              <div style={panelStyle}>一致する評価が高いスレッドはありません。</div>
             )}
           </div>
         </div>
 
         <div>
-          <h2 style={{ margin: "0 0 10px", fontSize: 20 }}>活発スレッド</h2>
+          <h2 style={{ margin: "0 0 10px", fontSize: 20 }}>投稿が多いスレッド</h2>
           <div style={{ display: "grid", gap: 10 }}>
             {visibleActiveThreads.length > 0 ? (
               visibleActiveThreads.map((thread, index) => (
