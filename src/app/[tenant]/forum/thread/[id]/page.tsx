@@ -1937,19 +1937,20 @@ function jumpToMainIssues() {
               }}
             >
               {replyToOpinionId
-                ? "選択した意見に対する投稿です。"
+                ? "返信先の意見に書いています。"
                 : "このスレの問いに対して投稿します。"}
             </p>
 
 {selectedGuide && (
   <SectionCard>
     <div style={{ fontWeight: 800, marginBottom: 6 }}>
+      返信先
+    </div>
+                <div style={{ fontWeight: 700 }}>
       「{selectedGuide.text.length > 60
         ? selectedGuide.text.slice(0, 60) + "..."
         : selectedGuide.text}」
-      に対して意見を書いています
-    </div>
-                <div style={{ fontWeight: 700 }}>{selectedGuide.text}</div>
+                </div>
               </SectionCard>
             )}
 
@@ -1967,7 +1968,7 @@ function jumpToMainIssues() {
                       color: "#444",
                     }}
                   >
-                    過去に投稿された関連内容
+                    参考になる過去の投稿
                   </div>
 
                   {loadingRelated ? (
@@ -2016,7 +2017,9 @@ function jumpToMainIssues() {
                             >
                               {post.thread_title || "関連スレ"}
                             </div>
-                            {post.content}
+                            {post.content.length > 120
+                              ? `${post.content.slice(0, 120)}...`
+                              : post.content}
                           </div>
 
                         </PostCard>
@@ -2065,7 +2068,7 @@ function jumpToMainIssues() {
                         color: "#444",
                       }}
                     >
-                      この論点を深める
+                      近いスレッドを見る
                     </div>
 
                     <div style={{ display: "grid", gap: 8 }}>
