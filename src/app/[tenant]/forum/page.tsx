@@ -489,6 +489,7 @@ export default function ForumPage() {
   const selectedNodeLabel = selectedNodeInfo?.label;
   const selectedNodePathText =
     selectedNodeInfo?.path?.length ? selectedNodeInfo.path.join(" ＞ ") : selectedNodeLabel;
+  const initialSearchQuery = keyword || selectedNodeLabel || "";
 
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -509,7 +510,7 @@ export default function ForumPage() {
 
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
-  const [searchQuery, setSearchQuery] = useState(keyword || selectedNodeLabel || "");
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [analyzeScrollKey, setAnalyzeScrollKey] = useState(0);
   const [relatedThreads, setRelatedThreads] = useState<RelatedThread[]>([]);
   const [generatedIssue, setGeneratedIssue] = useState<GeneratedIssue | null>(null);
@@ -561,6 +562,12 @@ export default function ForumPage() {
     (total, thread) => total + (thread.post_count ?? 0),
     0
   );
+
+  useEffect(() => {
+    if (initialSearchQuery) {
+      setSearchQuery(initialSearchQuery);
+    }
+  }, [initialSearchQuery]);
 
   useEffect(() => {
     const saved = localStorage.getItem("forum_default_mode");
