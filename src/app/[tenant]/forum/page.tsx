@@ -485,7 +485,7 @@ export default function ForumPage() {
 
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(keyword || selectedNodeLabel || "");
   const [analyzeScrollKey, setAnalyzeScrollKey] = useState(0);
   const [relatedThreads, setRelatedThreads] = useState<RelatedThread[]>([]);
   const [generatedIssue, setGeneratedIssue] = useState<GeneratedIssue | null>(null);
