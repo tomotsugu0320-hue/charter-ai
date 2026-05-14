@@ -252,7 +252,7 @@ function normalizeRelatedThreads(value: unknown): RelatedThread[] {
         summary,
         reason:
           toText(item.reason).trim() ||
-          "入力内容と近い言葉を含む既存の議論です",
+          "あなたの投稿内容に近い既存スレッドです",
         stance: detectStance(title, summary),
       };
     })
@@ -1289,9 +1289,9 @@ export default function ForumPage() {
           </div>
 
           <aside style={panelStyle}>
-            <h2 style={{ margin: 0, fontSize: 20 }}>4. 参加先を選ぶ</h2>
+            <h2 style={{ margin: 0, fontSize: 20 }}>4. 近い議論に参加する</h2>
             <p style={{ ...smallMetaStyle, marginTop: 6 }}>
-              近い議論がある場合は、そちらに参加できます。
+              近いスレッドがあれば、まずそこに参加できます。なければ新しく作成します。
             </p>
 
             <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
@@ -1374,7 +1374,7 @@ export default function ForumPage() {
                     fontWeight: 900,
                   }}
                 >
-                  選んだスレッドに参加
+                  このスレッドに参加する
                 </Link>
               ) : (
                 <PrimaryButton
@@ -1385,7 +1385,7 @@ export default function ForumPage() {
                     background: "#047857",
                   }}
                 >
-                  {creatingThread ? "作成中..." : "新しいスレッドを作成"}
+                  {creatingThread ? "作成中..." : "近いスレッドがなければ新規作成"}
                 </PrimaryButton>
               )}
             </div>
