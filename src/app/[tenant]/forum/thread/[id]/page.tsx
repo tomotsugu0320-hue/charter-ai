@@ -1982,7 +1982,7 @@ function jumpToMainIssues() {
 │   └─ 需要不足
 ├─ 解決策を出す
 │   └─ 減税
-└─ 反論・リスク
+└─ 反論・リスクを確認する
     └─ 財源・インフレ`}
   </pre>
 </SectionCard>
