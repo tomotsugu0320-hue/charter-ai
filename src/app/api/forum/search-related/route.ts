@@ -81,7 +81,7 @@ export async function POST(req: Request) {
         id: string;
         title: string;
         category: string;
-        ai_ai_summary: string;
+        ai_summary: string;
       }
     >();
 
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
         id: row.thread_id,
         title: threadInfo?.title ?? "無題スレ",
         category: threadInfo?.category ?? "未分類",
-        ai_ai_summary: String(row.content ?? "").slice(0, 100),
+        ai_summary: String(row.content ?? "").slice(0, 100),
       });
     }
 
@@ -107,7 +107,7 @@ export async function POST(req: Request) {
     if (threads.length === 0) {
       let fallbackQuery = supabase
         .from("forum_threads")
-        .select("id, title, category, ai_ai_summary")
+        .select("id, title, category, ai_summary")
         .order("created_at", { ascending: false })
         .limit(3);
 
@@ -126,7 +126,7 @@ export async function POST(req: Request) {
         id: row.id,
         title: row.title ?? "無題スレ",
         category: row.category ?? "未分類",
-        ai_ai_summary: row.ai_ai_summary ?? "",
+        ai_summary: row.ai_summary ?? "",
       }));
     }
 
