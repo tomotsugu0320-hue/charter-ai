@@ -252,7 +252,7 @@ function normalizeRelatedThreads(value: unknown): RelatedThread[] {
         summary,
         reason:
           toText(item.reason).trim() ||
-          "あなたの投稿内容に近い既存スレッドです",
+          "似たテーマや言葉が含まれる既存スレッドです",
         stance: detectStance(title, summary),
       };
     })

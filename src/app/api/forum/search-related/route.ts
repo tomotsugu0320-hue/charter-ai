@@ -10,6 +10,18 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+function buildReason(searchTexts: string[], content: string | null | undefined) {
+  const source = String(content ?? "");
+  const matched = searchTexts.find((text) => {
+    const keyword = text.trim().slice(0, 20);
+    return keyword && source.includes(keyword);
+  });
+
+  return matched
+    ? `『${matched.trim().slice(0, 20)}』に近い投稿があります`
+    : "入力した内容に近い投稿があります";
+}
+
 type ForumPostRow = {
   id: string;
   content: string;
@@ -82,6 +94,7 @@ export async function POST(req: Request) {
         title: string;
         category: string;
         ai_summary: string;
+        reason: string;
       }
     >();
 
@@ -98,6 +111,7 @@ export async function POST(req: Request) {
         title: threadInfo?.title ?? "無題スレ",
         category: threadInfo?.category ?? "未分類",
         ai_summary: String(row.content ?? "").slice(0, 100),
+        reason: buildReason(searchTexts, row.content),
       });
     }
 
@@ -127,6 +141,7 @@ export async function POST(req: Request) {
         title: row.title ?? "無題スレ",
         category: row.category ?? "未分類",
         ai_summary: row.ai_summary ?? "",
+        reason: "入力した内容に近い投稿があります",
       }));
     }
 
