@@ -40,7 +40,7 @@ const guideTreeRoot: GuideTreeNode = {
       id: "propose-solutions",
       label: "③ 解決策を出す",
       children: [
-        { id: "tax-cuts", label: "減税" },
+        { id: "tax-cuts", label: "減税", nodeId: "tax-cuts" },
         { id: "fiscal-spending", label: "財政出動" },
         { id: "small-business-support", label: "中小企業支援" },
         { id: "system-reform", label: "制度改革" },
@@ -51,7 +51,7 @@ const guideTreeRoot: GuideTreeNode = {
       label: "④ 反論・リスクを確認する",
       children: [
         { id: "funding-source", label: "財源", nodeId: "funding-source" },
-        { id: "inflation", label: "インフレ" },
+        { id: "inflation", label: "インフレ", nodeId: "inflation" },
         { id: "future-burden", label: "将来負担" },
         { id: "effectiveness", label: "実効性" },
       ],
