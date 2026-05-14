@@ -31,7 +31,7 @@ const guideTreeRoot: GuideTreeNode = {
       label: "② 原因を考える",
       children: [
         { id: "demand-shortage", label: "需要不足", nodeId: "demand-shortage" },
-        { id: "fiscal-policy", label: "財政政策" },
+        { id: "fiscal-policy", label: "財政政策", nodeId: "fiscal-policy" },
         { id: "consumption-tax", label: "消費税", nodeId: "consumption-tax" },
         { id: "social-security-system", label: "社会保障制度" },
       ],
@@ -50,7 +50,7 @@ const guideTreeRoot: GuideTreeNode = {
       id: "check-risks",
       label: "④ 反論・リスクを確認する",
       children: [
-        { id: "funding-source", label: "財源" },
+        { id: "funding-source", label: "財源", nodeId: "funding-source" },
         { id: "inflation", label: "インフレ" },
         { id: "future-burden", label: "将来負担" },
         { id: "effectiveness", label: "実効性" },
