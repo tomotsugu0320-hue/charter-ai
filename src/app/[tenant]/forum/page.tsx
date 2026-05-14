@@ -2,12 +2,10 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import type { CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import SectionCard from "@/components/forum/SectionCard";
-import SectionTitle from "@/components/forum/SectionTitle";
-import PostCard from "@/components/forum/PostCard";
+import { useParams, useSearchParams } from "next/navigation";
 import PrimaryButton from "@/components/forum/PrimaryButton";
 
 type ThreadRow = {
@@ -19,8 +17,7 @@ type ThreadRow = {
   posts_content?: string;
   post_count?: number;
   avg_logic_score?: number;
-  assumption?: string;
-  evidence?: string;
+  created_at?: string;
 };
 
 type RelatedThread = {
@@ -32,81 +29,497 @@ type RelatedThread = {
   stance?: "pro" | "con" | "neutral";
 };
 
+type Conflict = {
+  opinion: string;
+  rebuttal: string;
+};
+
 type GeneratedIssue = {
   mode: "expand" | "split";
   claim: string;
   premises: string[];
   reasons: string[];
-  conflicts?: { opinion: string; rebuttal: string }[];
+  conflicts: Conflict[];
   easySummary?: string;
 };
 
-const darkInputStyle: React.CSSProperties = {
-  width: "100%",
-  borderRadius: 10,
-  padding: "12px 14px",
-  fontSize: 16,
-  background: "#1a1a1a",
-  color: "#fff",
-  border: "1px solid #666",
+type OrganizedResult = {
+  summary: string;
+  postText: string;
 };
 
-const darkButtonStyle: React.CSSProperties = {
-  border: "1px solid #666",
-  borderRadius: 8,
-  padding: "8px 12px",
-  background: "#222",
-  color: "#fff",
-  cursor: "pointer",
+const ALL_CATEGORIES = "すべて";
+const draftStorageKey = "forum_thread_draft_input";
+
+const pageStyle: CSSProperties = {
+  maxWidth: 1080,
+  margin: "0 auto",
+  padding: 24,
+  color: "#111827",
 };
+
+const panelStyle: CSSProperties = {
+  border: "1px solid #d7dde8",
+  borderRadius: 8,
+  padding: 18,
+  background: "#ffffff",
+};
+
+const darkPanelStyle: CSSProperties = {
+  border: "1px solid #2f3747",
+  borderRadius: 8,
+  padding: 18,
+  background: "#141923",
+  color: "#f9fafb",
+};
+
+const labelStyle: CSSProperties = {
+  display: "block",
+  marginBottom: 6,
+  fontSize: 13,
+  fontWeight: 700,
+  color: "#4b5563",
+};
+
+const inputStyle: CSSProperties = {
+  width: "100%",
+  borderRadius: 8,
+  padding: "11px 12px",
+  fontSize: 16,
+  background: "#ffffff",
+  color: "#111827",
+  border: "1px solid #cbd5e1",
+  outline: "none",
+};
+
+const darkInputStyle: CSSProperties = {
+  ...inputStyle,
+  background: "#10141d",
+  color: "#ffffff",
+  border: "1px solid #3d4657",
+};
+
+const ghostButtonStyle: CSSProperties = {
+  border: "1px solid #cbd5e1",
+  borderRadius: 8,
+  padding: "9px 12px",
+  background: "#ffffff",
+  color: "#111827",
+  cursor: "pointer",
+  fontWeight: 700,
+};
+
+const smallMetaStyle: CSSProperties = {
+  fontSize: 13,
+  color: "#6b7280",
+  lineHeight: 1.6,
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function toText(value: unknown, fallback = "") {
+  return typeof value === "string" ? value : fallback;
+}
+
+function toNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function toStringArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => String(item ?? "").trim())
+    .filter(Boolean)
+    .slice(0, 5);
+}
+
+function toConflicts(value: unknown): Conflict[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (!isRecord(item)) return null;
+
+      const opinion = toText(item.opinion, toText(item.a)).trim();
+      const rebuttal = toText(item.rebuttal, toText(item.b)).trim();
+
+      if (!opinion && !rebuttal) return null;
+
+      return { opinion, rebuttal };
+    })
+    .filter((item): item is Conflict => item !== null)
+    .slice(0, 5);
+}
+
+function normalizeGeneratedIssue(value: unknown, fallbackClaim: string): GeneratedIssue {
+  const record = isRecord(value) ? value : {};
+  const mode = record.mode === "split" ? "split" : "expand";
+  const claim = toText(record.claim, fallbackClaim).trim() || fallbackClaim;
+
+  return {
+    mode,
+    claim,
+    premises: toStringArray(record.premises),
+    reasons: toStringArray(record.reasons),
+    conflicts: toConflicts(record.conflicts),
+    easySummary: toText(record.easySummary).trim() || undefined,
+  };
+}
+
+function normalizeThreadRow(value: unknown): ThreadRow | null {
+  if (!isRecord(value)) return null;
+
+  const id = toText(value.id).trim();
+  if (!id) return null;
+
+  return {
+    id,
+    title: toText(value.title, "無題スレ").trim() || "無題スレ",
+    category: toText(value.category).trim() || undefined,
+    summary: toText(value.summary, toText(value.ai_summary)).trim() || undefined,
+    original_post: toText(value.original_post).trim() || undefined,
+    posts_content: toText(value.posts_content).trim() || undefined,
+    post_count: toNumber(value.post_count),
+    avg_logic_score: toNumber(value.avg_logic_score),
+    created_at: toText(value.created_at).trim() || undefined,
+  };
+}
+
+function normalizeThreadRows(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map(normalizeThreadRow)
+    .filter((thread): thread is ThreadRow => thread !== null);
+}
+
+function detectStance(title: string, summary = ""): RelatedThread["stance"] {
+  const text = `${title} ${summary}`.toLowerCase();
+
+  if (
+    text.includes("問題") ||
+    text.includes("危険") ||
+    text.includes("不要") ||
+    text.includes("反対") ||
+    text.includes("懸念")
+  ) {
+    return "con";
+  }
+
+  if (
+    text.includes("必要") ||
+    text.includes("有効") ||
+    text.includes("賛成") ||
+    text.includes("推進")
+  ) {
+    return "pro";
+  }
+
+  return "neutral";
+}
+
+function normalizeRelatedThreads(value: unknown): RelatedThread[] {
+  const source = isRecord(value)
+    ? Array.isArray(value.threads)
+      ? value.threads
+      : Array.isArray(value.results)
+      ? value.results
+      : []
+    : Array.isArray(value)
+    ? value
+    : [];
+
+  return source
+    .map((item): RelatedThread | null => {
+      if (!isRecord(item)) return null;
+
+      const id = toText(item.id).trim();
+      const title = toText(item.title, "無題スレ").trim() || "無題スレ";
+      const summary =
+        toText(item.summary, toText(item.ai_summary, toText(item.ai_ai_summary))).trim() ||
+        undefined;
+
+      if (!id) return null;
+
+      return {
+        id,
+        title,
+        category: toText(item.category, "未分類").trim() || "未分類",
+        summary,
+        reason:
+          toText(item.reason).trim() ||
+          "入力内容と近い言葉を含む既存の議論です",
+        stance: detectStance(title, summary),
+      };
+    })
+    .filter((thread): thread is RelatedThread => thread !== null)
+    .slice(0, 5);
+}
+
+function formatScore(value?: number) {
+  if (typeof value !== "number") return "0";
+  return String(Math.round(value));
+}
+
+function formatDate(value?: string) {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleDateString("ja-JP", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function truncate(value = "", max = 120) {
+  const text = value.replace(/\s+/g, " ").trim();
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)}...`;
+}
+
+function matchesThread(thread: ThreadRow, query: string, category: string) {
+  const q = query.trim().toLowerCase();
+  const searchable = [
+    thread.title,
+    thread.summary,
+    thread.original_post,
+    thread.posts_content,
+    thread.category,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const matchesSearch = q ? searchable.includes(q) : true;
+  const matchesCategory =
+    category === ALL_CATEGORIES ? true : thread.category === category;
+
+  return matchesSearch && matchesCategory;
+}
+
+function threadCardStyle(isFeatured: boolean): CSSProperties {
+  return {
+    border: isFeatured ? "1px solid #2563eb" : "1px solid #d7dde8",
+    borderRadius: 8,
+    padding: 14,
+    background: isFeatured ? "#eff6ff" : "#ffffff",
+    minHeight: 148,
+  };
+}
+
+function ThreadCard({
+  thread,
+  tenant,
+  currentFontSize,
+  isFeatured = false,
+}: {
+  thread: ThreadRow;
+  tenant: string;
+  currentFontSize: number;
+  isFeatured?: boolean;
+}) {
+  const preview =
+    thread.summary || thread.original_post || thread.posts_content || "";
+
+  return (
+    <article style={threadCardStyle(isFeatured)}>
+      <Link
+        href={`/${tenant}/forum/thread/${thread.id}`}
+        style={{ color: "inherit", textDecoration: "none" }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 10,
+            alignItems: "flex-start",
+            marginBottom: 8,
+          }}
+        >
+          <span
+            style={{
+              border: "1px solid #d1d5db",
+              borderRadius: 8,
+              padding: "3px 8px",
+              fontSize: 12,
+              color: "#374151",
+              background: "#f9fafb",
+            }}
+          >
+            {thread.category ?? "未設定"}
+          </span>
+
+          {thread.created_at && (
+            <span style={{ ...smallMetaStyle, whiteSpace: "nowrap" }}>
+              {formatDate(thread.created_at)}
+            </span>
+          )}
+        </div>
+
+        <h3
+          style={{
+            margin: 0,
+            fontSize: currentFontSize + 2,
+            lineHeight: 1.45,
+            fontWeight: 800,
+          }}
+        >
+          {thread.title}
+        </h3>
+
+        {preview && (
+          <p
+            style={{
+              margin: "8px 0 0",
+              color: "#4b5563",
+              fontSize: currentFontSize - 2,
+              lineHeight: 1.7,
+            }}
+          >
+            {truncate(preview)}
+          </p>
+        )}
+
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 8,
+            marginTop: 12,
+            ...smallMetaStyle,
+          }}
+        >
+          <span>投稿 {thread.post_count ?? 0}</span>
+          <span>平均スコア {formatScore(thread.avg_logic_score)}</span>
+        </div>
+      </Link>
+    </article>
+  );
+}
+
+function StanceLabel({ stance }: { stance?: RelatedThread["stance"] }) {
+  const label =
+    stance === "pro" ? "賛成寄り" : stance === "con" ? "反対意見あり" : "中立";
+  const color =
+    stance === "pro" ? "#047857" : stance === "con" ? "#1d4ed8" : "#4b5563";
+
+  return (
+    <span
+      style={{
+        border: `1px solid ${color}`,
+        borderRadius: 8,
+        color,
+        padding: "2px 7px",
+        fontSize: 12,
+        fontWeight: 700,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
 
 export default function ForumPage() {
   const params = useParams();
-  const tenant = params?.tenant as string;
   const searchParams = useSearchParams();
+
+  const tenantParam = params?.tenant;
+  const tenant = Array.isArray(tenantParam)
+    ? tenantParam[0]
+    : String(tenantParam ?? "dev");
 
   const keyword = searchParams.get("keyword") || "";
   const goal = searchParams.get("goal") || "";
 
-const [threads, setThreads] = useState<ThreadRow[]>([]);
-
-  const [premises, setPremises] = useState<string[]>([]);
-  const [reasons, setReasons] = useState<string[]>([]);
-  const [conflicts, setConflicts] = useState<{ opinion: string; rebuttal: string }[]>([]);
-  const [claim, setClaim] = useState("");
-
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [organizing, setOrganizing] = useState(false);
-  const [organizedResult, setOrganizedResult] = useState<{
-    summary: string;
-    postText: string;
-  } | null>(null);
+  const [creatingThread, setCreatingThread] = useState(false);
+  const [organizedResult, setOrganizedResult] = useState<OrganizedResult | null>(null);
+  const [actionError, setActionError] = useState("");
+  const [topError, setTopError] = useState("");
 
   const [popularThreads, setPopularThreads] = useState<ThreadRow[]>([]);
   const [activeThreads, setActiveThreads] = useState<ThreadRow[]>([]);
   const [defaultMode, setDefaultMode] = useState<"normal" | "easy">("normal");
-  const [fontSizeMode, setFontSizeMode] = useState<"small" | "medium" | "large">("medium");
+  const [fontSizeMode, setFontSizeMode] =
+    useState<"small" | "medium" | "large">("medium");
 
   const currentFontSize =
     fontSizeMode === "small" ? 14 : fontSizeMode === "large" ? 18 : 16;
 
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState("すべて");
+  const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
   const [searchQuery, setSearchQuery] = useState("");
-
   const [analyzeScrollKey, setAnalyzeScrollKey] = useState(0);
-  const draftStorageKey = "forum_thread_draft_input";
-
   const [relatedThreads, setRelatedThreads] = useState<RelatedThread[]>([]);
   const [generatedIssue, setGeneratedIssue] = useState<GeneratedIssue | null>(null);
 
-  const hasSearch = searchQuery.trim() !== "";
+  const hasFilter = searchQuery.trim() !== "" || categoryFilter !== ALL_CATEGORIES;
+
+  const allThreads = useMemo(() => {
+    const map = new Map<string, ThreadRow>();
+
+    for (const thread of [...popularThreads, ...activeThreads]) {
+      map.set(thread.id, thread);
+    }
+
+    return Array.from(map.values());
+  }, [activeThreads, popularThreads]);
+
+  const categoryOptions = useMemo(() => {
+    const categories = allThreads
+      .map((thread) => thread.category)
+      .filter((category): category is string => Boolean(category));
+
+    return [ALL_CATEGORIES, ...Array.from(new Set(categories)).sort()];
+  }, [allThreads]);
+
+  const filteredPopularThreads = useMemo(
+    () =>
+      popularThreads.filter((thread) =>
+        matchesThread(thread, searchQuery, categoryFilter)
+      ),
+    [categoryFilter, popularThreads, searchQuery]
+  );
+
+  const filteredActiveThreads = useMemo(
+    () =>
+      activeThreads.filter((thread) =>
+        matchesThread(thread, searchQuery, categoryFilter)
+      ),
+    [activeThreads, categoryFilter, searchQuery]
+  );
+
+  const visiblePopularThreads = hasFilter
+    ? filteredPopularThreads
+    : filteredPopularThreads.slice(0, 8);
+  const visibleActiveThreads = hasFilter
+    ? filteredActiveThreads
+    : filteredActiveThreads.slice(0, 8);
+
+  const totalPostCount = allThreads.reduce(
+    (total, thread) => total + (thread.post_count ?? 0),
+    0
+  );
 
   useEffect(() => {
     const saved = localStorage.getItem("forum_default_mode");
     if (saved === "easy" || saved === "normal") {
       setDefaultMode(saved);
+    }
+  }, []);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("forum_font_size");
+    if (saved === "small" || saved === "medium" || saved === "large") {
+      setFontSizeMode(saved);
     }
   }, []);
 
@@ -122,98 +535,68 @@ const [threads, setThreads] = useState<ThreadRow[]>([]);
   }, [text]);
 
   useEffect(() => {
-    const saved = localStorage.getItem("forum_font_size");
-    if (saved === "small" || saved === "medium" || saved === "large") {
-      setFontSizeMode(saved);
+    let cancelled = false;
+
+    async function loadTopSummary() {
+      if (!tenant) return;
+
+      try {
+        setTopError("");
+        const res = await fetch("/api/forum/top-summary", {
+          cache: "no-store",
+        });
+
+        const result: unknown = await res.json();
+
+        if (!res.ok) {
+          const message = isRecord(result)
+            ? toText(result.error, "掲示板の読み込みに失敗しました")
+            : "掲示板の読み込みに失敗しました";
+          throw new Error(message);
+        }
+
+        if (cancelled || !isRecord(result)) return;
+
+        setPopularThreads(normalizeThreadRows(result.popularThreads));
+        setActiveThreads(normalizeThreadRows(result.activeThreads));
+      } catch (error) {
+        if (cancelled) return;
+        console.error(error);
+        setTopError(
+          error instanceof Error
+            ? error.message
+            : "掲示板の読み込みに失敗しました"
+        );
+      }
     }
-  }, []);
 
+    void loadTopSummary();
 
-useEffect(() => {
-  if (!tenant) return;
-
-  (async () => {
-    try {
-      const res = await fetch("/api/forum/top-summary", {
-        cache: "no-store",
-      });
-
-      const result = await res.json();
-      setPopularThreads(result.popularThreads ?? []);
-      setActiveThreads(result.activeThreads ?? []);
-    } catch (e) {
-      console.error(e);
-    }
-  })();
-}, [tenant]);
-
+    return () => {
+      cancelled = true;
+    };
+  }, [tenant]);
 
   useEffect(() => {
     if (!analyzeScrollKey) return;
 
     requestAnimationFrame(() => {
-      const el = document.getElementById("step2-result");
+      const el = document.getElementById("forum-analysis-result");
       el?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }, [analyzeScrollKey]);
 
-  function handleEditDraft() {
-    if (!generatedIssue) return;
-    setGeneratedIssue(null);
-    setSelectedThreadId(null);
-    requestAnimationFrame(() => {
-      const el = document.getElementById("thread-draft-input");
-      el?.scrollIntoView({ behavior: "smooth", block: "center" });
-      if (el instanceof HTMLTextAreaElement) {
-        el.focus();
-      }
-    });
-  }
-
-  const filteredPopularThreads = popularThreads.filter((t) => {
-    const q = searchQuery.trim().toLowerCase();
-
-    const matchSearch =
-      q === ""
-        ? true
-        : String(t.title || "").toLowerCase().includes(q) ||
-          String(t.summary || "").toLowerCase().includes(q) ||
-          String(t.original_post || "").toLowerCase().includes(q) ||
-          String(t.posts_content || "").toLowerCase().includes(q);
-
-    const matchCategory =
-      categoryFilter === "すべて"
-        ? true
-        : String(t.category || "") === categoryFilter;
-
-    return matchSearch && matchCategory;
-  });
-
-  const filteredActiveThreads = activeThreads.filter((t) => {
-    const q = searchQuery.trim().toLowerCase();
-
-    const matchSearch =
-      q === ""
-        ? true
-        : String(t.title || "").toLowerCase().includes(q) ||
-          String(t.summary || "").toLowerCase().includes(q) ||
-          String(t.original_post || "").toLowerCase().includes(q) ||
-          String(t.posts_content || "").toLowerCase().includes(q);
-
-    const matchCategory =
-      categoryFilter === "すべて"
-        ? true
-        : String(t.category || "") === categoryFilter;
-
-    return matchSearch && matchCategory;
-  });
-
-  const handleSubmit = async () => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
+  async function analyzeText(sourceText: string) {
+    const trimmed = sourceText.trim();
+    if (!trimmed) {
+      setActionError("整理したい内容を入力してください。");
+      return;
+    }
 
     setLoading(true);
+    setActionError("");
     setSelectedThreadId(null);
+    setRelatedThreads([]);
 
     try {
       const res = await fetch("/api/forum/generate-issue", {
@@ -226,24 +609,17 @@ useEffect(() => {
         }),
       });
 
+      const data: unknown = await res.json();
 
-      const data = await res.json();
-      const { mode, claim, premises, reasons, conflicts, easySummary } = data;
+      if (!res.ok) {
+        const message = isRecord(data)
+          ? toText(data.error, "AI整理に失敗しました")
+          : "AI整理に失敗しました";
+        throw new Error(message);
+      }
 
-      setClaim(claim ?? "");
-      setPremises(Array.isArray(premises) ? premises : []);
-      setReasons(Array.isArray(reasons) ? reasons : []);
-      setConflicts(Array.isArray(conflicts) ? conflicts : []);
-
-      setGeneratedIssue({
-        mode,
-        claim,
-        premises,
-        reasons,
-        conflicts,
-        easySummary,
-      });
-
+      const issue = normalizeGeneratedIssue(data, trimmed);
+      setGeneratedIssue(issue);
       setAnalyzeScrollKey((prev) => prev + 1);
 
       const relatedRes = await fetch("/api/forum/search-related", {
@@ -252,1087 +628,766 @@ useEffect(() => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          claim,
-          premises,
-          reasons,
+          text: trimmed,
+          claim: issue.claim,
+          premises: issue.premises,
+          reasons: issue.reasons,
         }),
       });
 
-      const related = await relatedRes.json();
+      if (!relatedRes.ok) {
+        setRelatedThreads([]);
+        return;
+      }
 
-      const relatedList = Array.isArray(related)
-        ? related
-        : Array.isArray(related?.threads)
-        ? related.threads
-        : Array.isArray(related?.results)
-        ? related.results
-        : [];
-
-      setRelatedThreads(
-        relatedList.map((t: any) => {
-          const judgeText = `${t.title ?? ""} ${t.summary ?? ""}`.toLowerCase();
-
-          let stance: "pro" | "con" | "neutral" = "neutral";
-
-          if (
-            judgeText.includes("問題") ||
-            judgeText.includes("危険") ||
-            judgeText.includes("不要") ||
-            judgeText.includes("反対")
-          ) {
-            stance = "con";
-          } else if (
-            judgeText.includes("必要") ||
-            judgeText.includes("有効") ||
-            judgeText.includes("賛成")
-          ) {
-            stance = "pro";
-          }
-
-          return {
-            id: t.id,
-            title: t.title,
-            category: t.category ?? "未分類",
-            summary: t.summary ?? "",
-            reason: "この論点と前提が近いため関連しています",
-            stance,
-          };
-        })
+      const related: unknown = await relatedRes.json();
+      setRelatedThreads(normalizeRelatedThreads(related));
+    } catch (error) {
+      console.error(error);
+      setActionError(
+        error instanceof Error ? error.message : "AI整理に失敗しました"
       );
-    } catch (e) {
-      console.error(e);
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleOrganizePost = async () => {
-    if (!text.trim()) return;
+  async function handleOrganizePost() {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      setActionError("整えたい内容を入力してください。");
+      return;
+    }
+
+    setOrganizing(true);
+    setActionError("");
+    setOrganizedResult(null);
 
     try {
-      setOrganizing(true);
-      setOrganizedResult(null);
-
       const res = await fetch("/api/forum/organize-post", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text: trimmed }),
       });
 
-      const data = await res.json();
+      const data: unknown = await res.json();
 
-      if (!res.ok) {
-        alert("AI整理失敗");
-        return;
+      if (!res.ok || !isRecord(data)) {
+        throw new Error("投稿文の整形に失敗しました");
       }
 
       setOrganizedResult({
-        summary: data.summary,
-        postText: data.postText,
+        summary: toText(data.summary, "要点を整理できませんでした"),
+        postText: toText(data.postText, trimmed),
       });
-    } catch (e) {
-      console.error(e);
-      alert("AI整理失敗");
+    } catch (error) {
+      console.error(error);
+      setActionError(
+        error instanceof Error ? error.message : "投稿文の整形に失敗しました"
+      );
     } finally {
       setOrganizing(false);
     }
-  };
+  }
 
-  const handleUseOrganizedAndAnalyze = async () => {
+  async function handleUseOrganizedAndAnalyze() {
     if (!organizedResult?.postText?.trim()) return;
 
     const nextText = organizedResult.postText.trim();
     setText(nextText);
+    await analyzeText(nextText);
+  }
 
-    setLoading(true);
-    setSelectedThreadId(null);
+  async function handleCreateThread() {
+    if (!generatedIssue || selectedThreadId) return;
+
+    const finalClaim =
+      generatedIssue.claim.trim() || text.trim() || "新しい議論";
+
+    setCreatingThread(true);
+    setActionError("");
 
     try {
-      const res = await fetch("/api/forum/generate-issue", {
+      const res = await fetch("/api/forum/create-thread-from-draft", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          content: nextText,
-          type: "auto",
+          tenantSlug: tenant,
+          title: finalClaim,
+          claim: finalClaim,
+          premises: generatedIssue.premises,
+          reasons: generatedIssue.reasons,
+          conflicts: generatedIssue.conflicts,
+          postType: "auto",
         }),
       });
 
+      const result: unknown = await res.json();
 
-      const data = await res.json();
-      const { mode, claim, premises, reasons, conflicts, easySummary } = data;
+      if (!res.ok || !isRecord(result)) {
+        throw new Error("スレッド作成に失敗しました");
+      }
 
-      const safePremises = Array.isArray(premises) ? premises : [];
-      const safeReasons = Array.isArray(reasons) ? reasons : [];
-      const safeConflicts = Array.isArray(conflicts) ? conflicts : [];
+      const threadId = toText(result.threadId).trim();
+      if (!threadId) {
+        throw new Error("作成したスレッドIDを取得できませんでした");
+      }
 
-      setClaim(claim ?? "");
-      setPremises(safePremises);
-      setReasons(safeReasons);
-      setConflicts(safeConflicts);
-
-      setGeneratedIssue({
-        mode,
-        claim: claim ?? "",
-        premises: safePremises,
-        reasons: safeReasons,
-        conflicts: safeConflicts,
-        easySummary,
-      });
-
-      const relatedRes = await fetch("/api/forum/search-related", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          claim,
-          premises,
-          reasons,
-        }),
-      });
-
-      const related = await relatedRes.json();
-
-      const relatedList = Array.isArray(related)
-        ? related
-        : Array.isArray(related?.threads)
-        ? related.threads
-        : Array.isArray(related?.results)
-        ? related.results
-        : [];
-
-      setRelatedThreads(
-        relatedList.map((t: any) => {
-          const judgeText = `${t.title ?? ""} ${t.summary ?? ""}`.toLowerCase();
-
-          let stance: "pro" | "con" | "neutral" = "neutral";
-
-          if (
-            judgeText.includes("問題") ||
-            judgeText.includes("危険") ||
-            judgeText.includes("不要") ||
-            judgeText.includes("反対")
-          ) {
-            stance = "con";
-          } else if (
-            judgeText.includes("必要") ||
-            judgeText.includes("有効") ||
-            judgeText.includes("賛成")
-          ) {
-            stance = "pro";
-          }
-
-          return {
-            id: t.id,
-            title: t.title,
-            category: t.category ?? "未分類",
-            summary: t.summary ?? "",
-            reason: "この論点と前提が近いため関連しています",
-            stance,
-          };
-        })
+      sessionStorage.removeItem(draftStorageKey);
+      window.location.href = `/${tenant}/forum/thread/${threadId}`;
+    } catch (error) {
+      console.error(error);
+      setActionError(
+        error instanceof Error ? error.message : "スレッド作成に失敗しました"
       );
-    } catch (e) {
-      console.error(e);
-      alert("AI整理に失敗しました");
     } finally {
-      setLoading(false);
+      setCreatingThread(false);
     }
-  };
+  }
 
-  const renderedPremises = Array.isArray(generatedIssue?.premises)
-    ? generatedIssue.premises
-    : [];
-  const renderedReasons = Array.isArray(generatedIssue?.reasons)
-    ? generatedIssue.reasons
-    : [];
-  const renderedConflicts = Array.isArray(generatedIssue?.conflicts)
-    ? generatedIssue.conflicts
-    : [];
+  function selectMode(mode: "normal" | "easy") {
+    localStorage.setItem("forum_default_mode", mode);
+    setDefaultMode(mode);
+  }
 
-  const isPremiseFallback = (value: string) =>
-    value === "前提がまだ十分に整理されていません";
-  const isReasonFallback = (value: string) =>
-    value === "根拠がまだ十分に整理されていません";
-  const isConflictFallback = (conflict: { opinion: string; rebuttal: string }) =>
-    conflict.opinion === "この主張には別の見方があり得ます" ||
-    conflict.rebuttal === "この主張には別の見方があり得ます";
+  function selectFontSize(size: "small" | "medium" | "large") {
+    localStorage.setItem("forum_font_size", size);
+    setFontSizeMode(size);
+  }
 
-  const fallbackItemStyle: React.CSSProperties = {
-    color: "#6b7280",
-    fontSize: currentFontSize - 1,
-    fontStyle: "normal",
-  };
+  const renderedPremises = generatedIssue?.premises ?? [];
+  const renderedReasons = generatedIssue?.reasons ?? [];
+  const renderedConflicts = generatedIssue?.conflicts ?? [];
 
   return (
-    <main style={{ maxWidth: 760, margin: "0 auto", padding: 24 }}>
-      <h1 style={{ fontSize: 28, fontWeight: 800 }}>AI掲示板</h1>
-
-      <style jsx>{`
-        .forum-search-input::placeholder {
-          color: #bdbdbd;
-          opacity: 1;
-        }
-      `}</style>
-
-      {generatedIssue?.easySummary && (
-        <SectionCard
+    <main style={pageStyle}>
+      <header style={{ ...darkPanelStyle, marginBottom: 18 }}>
+        <div
           style={{
-            marginBottom: 12,
-            border: defaultMode === "easy" ? "2px solid #2a7" : undefined,
-            background: defaultMode === "easy" ? "#13261d" : undefined,
-            boxShadow:
-              defaultMode === "easy"
-                ? "0 0 0 1px rgba(42, 167, 110, 0.15)"
-                : undefined,
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 16,
+            flexWrap: "wrap",
+            alignItems: "flex-start",
           }}
         >
-          <div
-            style={{
-              fontWeight: 800,
-              marginBottom: 8,
-              fontSize: defaultMode === "easy" ? 18 : 16,
-              color: defaultMode === "easy" ? "#9df0c7" : undefined,
-            }}
-          >
-            🐵 やさしい要約
-          </div>
-
-          <div
-            style={{
-              whiteSpace: "pre-wrap",
-              lineHeight: defaultMode === "easy" ? 2.0 : 1.8,
-              fontSize: defaultMode === "easy" ? currentFontSize + 2 : currentFontSize,
-              color: defaultMode === "easy" ? "#f9fafb" : "#111827",
-            }}
-          >
-            {generatedIssue.easySummary}
-          </div>
-
-          {defaultMode === "easy" && (
+          <div style={{ maxWidth: 680 }}>
             <div
               style={{
-                marginTop: 10,
-                fontSize: currentFontSize - 2,
-                color: "#a7d9bf",
+                color: "#9ca3af",
+                fontSize: 13,
+                fontWeight: 800,
+                marginBottom: 6,
               }}
             >
-              難しい言葉をなるべく減らして表示しています
+              AI掲示板
             </div>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: 30,
+                lineHeight: 1.25,
+                letterSpacing: 0,
+              }}
+            >
+              前提と根拠をそろえて議論する
+            </h1>
+            <p
+              style={{
+                margin: "10px 0 0",
+                color: "#d1d5db",
+                lineHeight: 1.8,
+                fontSize: currentFontSize,
+              }}
+            >
+              投稿前に主張、前提、根拠、反論を分けて、近い既存スレッドも確認できます。
+            </p>
+          </div>
+
+          <Link
+            href={`/${tenant}/macro`}
+            style={{
+              display: "inline-block",
+              padding: "10px 14px",
+              borderRadius: 8,
+              border: "1px solid #64748b",
+              color: "#f9fafb",
+              textDecoration: "none",
+              fontWeight: 800,
+              background: "#1f2937",
+            }}
+          >
+            マクロで整理
+          </Link>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+            gap: 10,
+            marginTop: 18,
+          }}
+        >
+          <div>
+            <div style={{ color: "#9ca3af", fontSize: 12 }}>表示中のスレッド</div>
+            <div style={{ fontSize: 24, fontWeight: 900 }}>{allThreads.length}</div>
+          </div>
+          <div>
+            <div style={{ color: "#9ca3af", fontSize: 12 }}>表示中の投稿数</div>
+            <div style={{ fontSize: 24, fontWeight: 900 }}>{totalPostCount}</div>
+          </div>
+          <div>
+            <div style={{ color: "#9ca3af", fontSize: 12 }}>カテゴリ</div>
+            <div style={{ fontSize: 24, fontWeight: 900 }}>
+              {Math.max(categoryOptions.length - 1, 0)}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section style={{ ...panelStyle, marginBottom: 18 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
+            gap: 12,
+          }}
+        >
+          <div>
+            <label htmlFor="forum-search" style={labelStyle}>
+              検索
+            </label>
+            <input
+              id="forum-search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="タイトル、要約、投稿内容"
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="forum-category" style={labelStyle}>
+              カテゴリ
+            </label>
+            <select
+              id="forum-category"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              style={inputStyle}
+            >
+              {categoryOptions.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+            alignItems: "center",
+            marginTop: 12,
+          }}
+        >
+          <div style={smallMetaStyle}>
+            人気 {filteredPopularThreads.length}件 / 活発{" "}
+            {filteredActiveThreads.length}件
+          </div>
+
+          {hasFilter && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setCategoryFilter(ALL_CATEGORIES);
+              }}
+              style={ghostButtonStyle}
+            >
+              条件をリセット
+            </button>
           )}
-        </SectionCard>
+        </div>
+      </section>
+
+      {topError && (
+        <div
+          style={{
+            ...panelStyle,
+            marginBottom: 18,
+            borderColor: "#fca5a5",
+            background: "#fef2f2",
+            color: "#991b1b",
+          }}
+        >
+          {topError}
+        </div>
       )}
 
-      <SectionCard
+      {(goal || keyword) && (
+        <section style={{ ...panelStyle, marginBottom: 18 }}>
+          {goal && (
+            <div style={{ marginBottom: keyword ? 12 : 0 }}>
+              <div style={labelStyle}>マクロから渡されたゴール</div>
+              <div style={{ fontWeight: 800, fontSize: currentFontSize }}>{goal}</div>
+            </div>
+          )}
+          {keyword && (
+            <div>
+              <div style={labelStyle}>注目している論点</div>
+              <div style={{ fontWeight: 800, fontSize: currentFontSize }}>
+                {keyword}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      <section
         style={{
-          opacity: defaultMode === "easy" ? 0.92 : 1,
-          border: defaultMode === "easy" ? "1px solid #3a3a3a" : undefined,
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
+          gap: 18,
+          marginBottom: 22,
         }}
       >
-        <div style={{ fontWeight: 700, marginBottom: 8 }}>表示モード</div>
+        <div>
+          <h2 style={{ margin: "0 0 10px", fontSize: 20 }}>人気スレッド</h2>
+          <div style={{ display: "grid", gap: 10 }}>
+            {visiblePopularThreads.length > 0 ? (
+              visiblePopularThreads.map((thread, index) => (
+                <ThreadCard
+                  key={thread.id}
+                  thread={thread}
+                  tenant={tenant}
+                  currentFontSize={currentFontSize}
+                  isFeatured={index === 0 && !hasFilter}
+                />
+              ))
+            ) : (
+              <div style={panelStyle}>一致する人気スレッドはありません。</div>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <h2 style={{ margin: "0 0 10px", fontSize: 20 }}>活発スレッド</h2>
+          <div style={{ display: "grid", gap: 10 }}>
+            {visibleActiveThreads.length > 0 ? (
+              visibleActiveThreads.map((thread, index) => (
+                <ThreadCard
+                  key={thread.id}
+                  thread={thread}
+                  tenant={tenant}
+                  currentFontSize={currentFontSize}
+                  isFeatured={index === 0 && !hasFilter}
+                />
+              ))
+            ) : (
+              <div style={panelStyle}>一致する活発スレッドはありません。</div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section style={{ ...darkPanelStyle, marginBottom: 18 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 14,
+            flexWrap: "wrap",
+            alignItems: "flex-start",
+          }}
+        >
+          <div>
+            <h2 style={{ margin: 0, fontSize: 22 }}>新しい論点を整理</h2>
+            <p
+              style={{
+                margin: "8px 0 0",
+                color: "#cbd5e1",
+                fontSize: currentFontSize - 1,
+                lineHeight: 1.7,
+              }}
+            >
+              書きかけの考えを、投稿しやすい議論の形に整えます。
+            </p>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => selectMode("normal")}
+              style={{
+                ...ghostButtonStyle,
+                background: defaultMode === "normal" ? "#ffffff" : "#1f2937",
+                color: defaultMode === "normal" ? "#111827" : "#e5e7eb",
+                borderColor: defaultMode === "normal" ? "#ffffff" : "#475569",
+              }}
+            >
+              標準
+            </button>
+            <button
+              type="button"
+              onClick={() => selectMode("easy")}
+              style={{
+                ...ghostButtonStyle,
+                background: defaultMode === "easy" ? "#ffffff" : "#1f2937",
+                color: defaultMode === "easy" ? "#111827" : "#e5e7eb",
+                borderColor: defaultMode === "easy" ? "#ffffff" : "#475569",
+              }}
+            >
+              やさしい表示
+            </button>
+          </div>
+        </div>
 
         <div
           style={{
             display: "flex",
             gap: 8,
             flexWrap: "wrap",
-            marginBottom: 12,
+            marginTop: 14,
           }}
         >
-          <PrimaryButton
-            onClick={() => {
-              localStorage.setItem("forum_default_mode", "normal");
-              setDefaultMode("normal");
-            }}
-            variant={defaultMode === "normal" ? "primary" : "secondary"}
-          >
-            🧠 大人向け
-          </PrimaryButton>
-
-          <PrimaryButton
-            onClick={() => {
-              localStorage.setItem("forum_default_mode", "easy");
-              setDefaultMode("easy");
-            }}
-            variant={defaultMode === "easy" ? "primary" : "secondary"}
-          >
-            🐵 子供向け
-          </PrimaryButton>
-        </div>
-
-        <div style={{ fontWeight: 700, marginBottom: 8 }}>文字サイズ</div>
-
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            onClick={() => {
-              localStorage.setItem("forum_font_size", "small");
-              setFontSizeMode("small");
-            }}
-            style={{
-              border: "1px solid #666",
-              borderRadius: 8,
-              padding: "8px 12px",
-              background: fontSizeMode === "small" ? "#fff" : "#222",
-              color: fontSizeMode === "small" ? "#111" : "#fff",
-              cursor: "pointer",
-            }}
-          >
-            小
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              localStorage.setItem("forum_font_size", "medium");
-              setFontSizeMode("medium");
-            }}
-            style={{
-              border: "1px solid #666",
-              borderRadius: 8,
-              padding: "8px 12px",
-              background: fontSizeMode === "medium" ? "#fff" : "#222",
-              color: fontSizeMode === "medium" ? "#111" : "#fff",
-              cursor: "pointer",
-            }}
-          >
-            中
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              localStorage.setItem("forum_font_size", "large");
-              setFontSizeMode("large");
-            }}
-            style={{
-              border: "1px solid #666",
-              borderRadius: 8,
-              padding: "8px 12px",
-              background: fontSizeMode === "large" ? "#fff" : "#222",
-              color: fontSizeMode === "large" ? "#111" : "#fff",
-              cursor: "pointer",
-            }}
-          >
-            大
-          </button>
-        </div>
-      </SectionCard>
-
-      <SectionCard>
-        <div
-          style={{
-            fontWeight: 800,
-            marginBottom: 6,
-            color: "#fff",
-            fontSize: currentFontSize + 4,
-          }}
-        >
-          これは「正解を出す掲示板」ではありません。
-        </div>
-
-        <div
-          style={{
-            fontSize: currentFontSize,
-            color: "#d6d6d6",
-            lineHeight: 1.8,
-          }}
-        >
-          考えを分解し、前提と根拠のズレを見える化する場所です。
-          <br />
-          議論が噛み合わない原因は「前提のズレ」にあります。
-        </div>
-      </SectionCard>
-
-      <div style={{ marginTop: 16, marginBottom: 16 }}>
-        <div style={{ marginBottom: 12 }}>
-          <input
-            className="forum-search-input"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="タイトルや内容で検索"
-            style={{ ...darkInputStyle, fontSize: currentFontSize }}
-          />
-          {hasSearch && (
+          {(["small", "medium", "large"] as const).map((size) => (
             <button
-              onClick={() => setSearchQuery("")}
-              style={{ ...darkButtonStyle, marginTop: 8 }}
+              key={size}
+              type="button"
+              onClick={() => selectFontSize(size)}
+              style={{
+                ...ghostButtonStyle,
+                padding: "7px 10px",
+                background: fontSizeMode === size ? "#ffffff" : "#1f2937",
+                color: fontSizeMode === size ? "#111827" : "#e5e7eb",
+                borderColor: fontSizeMode === size ? "#ffffff" : "#475569",
+              }}
             >
-              検索をクリア
+              {size === "small" ? "小" : size === "medium" ? "中" : "大"}
             </button>
-          )}
+          ))}
         </div>
 
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          style={{
-            borderRadius: 10,
-            padding: "10px 12px",
-            fontSize: currentFontSize,
-            background: "#222",
-            color: "#fff",
-            border: "1px solid #666",
-            minWidth: 180,
-          }}
-        >
-          <option value="すべて">すべて</option>
-          <option value="政治・経済">政治・経済</option>
-          <option value="ビジネス">ビジネス</option>
-          <option value="恋愛">恋愛</option>
-          <option value="健康">健康</option>
-          <option value="雑談">雑談</option>
-        </select>
-      </div>
-
-      {hasSearch && (
-        <div style={{ marginTop: 8, color: "#666", fontSize: currentFontSize - 2 }}>
-          検索結果：人気スレ {filteredPopularThreads.length}件 / 活発スレ{" "}
-          {filteredActiveThreads.length}件
-        </div>
-      )}
-
-      {goal && (
-        <SectionCard>
-          <div style={{ fontSize: currentFontSize - 2, color: "#666" }}>
-            マクロから渡されたゴール
-          </div>
-          <div style={{ fontWeight: 700 }}>{goal}</div>
-        </SectionCard>
-      )}
-
-      {keyword && (
-        <SectionCard>
-          <div style={{ fontSize: currentFontSize - 2, color: "#666" }}>
-            注目している論点
-          </div>
-          <div style={{ fontWeight: 700 }}>{keyword}</div>
-        </SectionCard>
-      )}
-
-      <section style={{ marginTop: 24 }}>
-        <SectionTitle>🔥 人気スレ {hasSearch ? "（検索結果）" : ""}</SectionTitle>
-
-        {hasSearch && filteredPopularThreads.length === 0 && (
-          <p style={{ color: "#666" }}>
-            「{searchQuery}」に一致する人気スレはまだありません。
-          </p>
-        )}
-
-        {filteredPopularThreads.map((t) => (
-          <PostCard key={t.id}>
-            <Link
-              href={`/${tenant}/forum/thread/${t.id}`}
-              style={{
-                textDecoration: "underline",
-                color: "inherit",
-                display: "block",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: currentFontSize - 2,
-                  color: "#666",
-                  marginBottom: 6,
-                }}
-              >
-                {t.category ?? "未設定"}
-              </div>
-              <div style={{ fontWeight: 800, fontSize: currentFontSize + 2 }}>
-                {t.title}
-              </div>
-            </Link>
-
-            {t.assumption && (
-              <div
-                style={{
-                  fontSize: currentFontSize - 2,
-                  color: "#bbb",
-                  marginTop: 4,
-                }}
-              >
-                前提：{t.assumption}
-              </div>
-            )}
-
-            {t.evidence && (
-              <div
-                style={{
-                  fontSize: currentFontSize - 2,
-                  color: "#2a7",
-                  marginTop: 4,
-                }}
-              >
-                🧾 根拠：{t.evidence}
-              </div>
-            )}
-
-            <div style={{ fontSize: currentFontSize - 2, color: "#666" }}>
-              平均スコア: {t.avg_logic_score ?? 0} / 投稿数: {t.post_count ?? 0}
-            </div>
-          </PostCard>
-        ))}
-      </section>
-
-      <section style={{ marginTop: 24 }}>
-        <SectionTitle>📈 活発スレ {hasSearch ? "（検索結果）" : ""}</SectionTitle>
-
-        {hasSearch && filteredActiveThreads.length === 0 && (
-          <p style={{ color: "#666" }}>
-            「{searchQuery}」に一致する活発スレはまだありません。
-          </p>
-        )}
-
-        {filteredActiveThreads.map((t) => (
-          <PostCard key={t.id}>
-            <Link
-              href={`/${tenant}/forum/thread/${t.id}`}
-              style={{
-                textDecoration: "underline",
-                color: "inherit",
-                display: "block",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: currentFontSize - 2,
-                  color: "#666",
-                  marginBottom: 6,
-                }}
-              >
-                {t.category ?? "未設定"}
-              </div>
-              <div style={{ fontWeight: 800, fontSize: currentFontSize + 2 }}>
-                {t.title}
-              </div>
-            </Link>
-
-            {t.assumption && (
-              <div
-                style={{
-                  fontSize: currentFontSize - 2,
-                  color: "#bbb",
-                  marginTop: 4,
-                }}
-              >
-                前提：{t.assumption}
-              </div>
-            )}
-
-            {t.evidence && (
-              <div
-                style={{
-                  fontSize: currentFontSize - 2,
-                  color: "#2a7",
-                  marginTop: 4,
-                }}
-              >
-                🧾 根拠：{t.evidence}
-              </div>
-            )}
-
-            <div style={{ fontSize: currentFontSize - 2, color: "#666" }}>
-              投稿数: {t.post_count ?? 0} / 平均スコア: {t.avg_logic_score ?? 0}
-            </div>
-          </PostCard>
-        ))}
-      </section>
-
-      <div style={{ marginBottom: 12 }}>
-        <a
-          href={`/${tenant}/macro`}
-          style={{
-            display: "inline-block",
-            padding: "10px 16px",
-            borderRadius: 8,
-            background: "#1a1a1a",
-            color: "#fff",
-            fontWeight: 700,
-            textDecoration: "none",
-            border: "none",
-          }}
-        >
-          このテーマをマクロで整理する
-        </a>
-      </div>
-
-      <section style={{ marginTop: 32 }}>
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ color: "#111", fontWeight: 700 }}>
-            議論が噛み合わない原因は「前提のズレ」です。
-          </div>
-
-          <div
+        <div style={{ marginTop: 16 }}>
+          <label htmlFor="thread-draft-input" style={{ ...labelStyle, color: "#d1d5db" }}>
+            投稿の下書き
+          </label>
+          <textarea
+            id="thread-draft-input"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={`例：
+消費税は減税すべきだと思う。
+需要不足の状況では、消費税が消費を抑えてしまうため。
+一方で財源をどうするかは別途議論が必要。`}
+            rows={6}
             style={{
-              color: "#666",
-              fontSize: currentFontSize - 2,
-              marginTop: 4,
+              ...darkInputStyle,
+              resize: "vertical",
+              minHeight: 150,
+              lineHeight: 1.75,
+              fontSize: currentFontSize,
             }}
-          >
-            あなたの考えを書くと、それを分解して見える化します。
-          </div>
+          />
         </div>
-
-        <h3
-          style={{
-            fontSize: currentFontSize + 2,
-            fontWeight: 700,
-            marginBottom: 6,
-          }}
-        >
-          STEP1：あなたの考えを書く
-        </h3>
-        <div
-          style={{
-            fontSize: currentFontSize - 1,
-            color: "#444",
-            marginBottom: 6,
-          }}
-        >
-          <div
-            style={{
-              fontSize: currentFontSize - 2,
-              color: "#333",
-              marginBottom: 6,
-              fontWeight: 700,
-            }}
-          >
-            書き方の例
-          </div>
-          <br />
-          ・〇〇は問題だと思う
-          <br />
-          ・なぜなら△△だから
-          <br />
-          ・でも□□という意見もある
-        </div>
-        <textarea
-          id="thread-draft-input"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder={`例：
-消費税は減税すべき。
-日本は需要不足であり、消費税は消費を抑えるため。`}
-          rows={5}
-          style={{
-            width: "100%",
-            border: "1px solid #ccc",
-            borderRadius: 8,
-            padding: 12,
-            fontSize: currentFontSize,
-          }}
-        />
 
         {organizedResult && (
           <div
             style={{
-              marginTop: 12,
-              padding: 12,
-              border: "1px solid #666",
+              border: "1px solid #3d4657",
               borderRadius: 8,
+              padding: 14,
+              marginTop: 12,
+              background: "#10141d",
             }}
           >
-            <div style={{ fontWeight: 700 }}>AIが読み取った要点</div>
-            <div style={{ whiteSpace: "pre-wrap", marginBottom: 8 }}>
+            <div style={{ fontWeight: 800, marginBottom: 8 }}>AIが読み取った要点</div>
+            <div
+              style={{
+                whiteSpace: "pre-wrap",
+                color: "#d1d5db",
+                lineHeight: 1.7,
+                fontSize: currentFontSize - 1,
+              }}
+            >
               {organizedResult.summary}
             </div>
 
-            <div style={{ fontWeight: 700 }}>そのまま使える投稿文（コピペOK）</div>
-            <div style={{ whiteSpace: "pre-wrap" }}>{organizedResult.postText}</div>
-
-            <button
-              type="button"
-              onClick={() => setText(organizedResult.postText)}
-              style={{ marginTop: 8 }}
-            >
-              この内容を入力欄に反映
-            </button>
-
-            <button
-              type="button"
-              onClick={handleUseOrganizedAndAnalyze}
+            <div style={{ fontWeight: 800, marginTop: 14, marginBottom: 8 }}>
+              整えた投稿文
+            </div>
+            <div
               style={{
-                marginTop: 8,
-                marginLeft: 8,
-                padding: "8px 12px",
-                borderRadius: 8,
-                background: "#2a7",
-                color: "#fff",
-                border: "none",
-                cursor: "pointer",
+                whiteSpace: "pre-wrap",
+                color: "#f9fafb",
+                lineHeight: 1.8,
+                fontSize: currentFontSize,
               }}
             >
-              この内容で議論を開始する
-            </button>
+              {organizedResult.postText}
+            </div>
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+              <button
+                type="button"
+                onClick={() => setText(organizedResult.postText)}
+                style={{
+                  ...ghostButtonStyle,
+                  background: "#1f2937",
+                  color: "#f9fafb",
+                  borderColor: "#475569",
+                }}
+              >
+                入力欄に反映
+              </button>
+              <PrimaryButton onClick={handleUseOrganizedAndAnalyze} disabled={loading}>
+                {loading ? "整理中..." : "この内容で分析"}
+              </PrimaryButton>
+            </div>
           </div>
         )}
 
-        <PrimaryButton onClick={handleSubmit} disabled={loading} style={{ marginTop: 12 }}>
-          {loading ? "AIで整理中..." : "🤖 この考えを整理する"}
-        </PrimaryButton>
+        {actionError && (
+          <div
+            style={{
+              border: "1px solid #fca5a5",
+              borderRadius: 8,
+              padding: 12,
+              marginTop: 12,
+              color: "#fecaca",
+              background: "#3b1518",
+            }}
+          >
+            {actionError}
+          </div>
+        )}
 
-        <p style={{ fontSize: currentFontSize - 2, color: "#666", marginTop: 6 }}>
-          書くだけでOK。AIが主張・前提・根拠に整理します
-        </p>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
+          <PrimaryButton onClick={handleOrganizePost} disabled={organizing || loading}>
+            {organizing ? "整えています..." : "読みやすく整える"}
+          </PrimaryButton>
+          <PrimaryButton
+            onClick={() => analyzeText(text)}
+            disabled={loading || organizing}
+            variant="secondary"
+          >
+            {loading ? "整理中..." : "論点を整理"}
+          </PrimaryButton>
+        </div>
       </section>
 
       {generatedIssue && (
-        <>
-          <SectionCard>
-            <div
-              style={{
-                fontWeight: 800,
-                marginBottom: 8,
-                fontSize: currentFontSize,
-                lineHeight: 1.8,
-                color: defaultMode === "easy" ? "#cfcfcf" : undefined,
-              }}
-            >
-              <div id="step2-result" style={{ marginTop: 24 }}>
-                <h2>STEP2：AIが整理した結果</h2>
-              </div>
-
-              {generatedIssue.mode === "expand" ? (
-                <>
-                  <div style={{ fontWeight: 700 }}>問い</div>
-                  <div style={{ marginTop: 4 }}>{generatedIssue.claim}</div>
-
-                  <div style={{ marginTop: 10, fontWeight: 700 }}>考えられる前提</div>
-                  <ul style={{ marginTop: 4, paddingLeft: 20 }}>
-                    {renderedPremises.length > 0 &&
-                      renderedPremises.map((p, i) => (
-                        <li
-                          key={i}
-                          style={isPremiseFallback(p) ? fallbackItemStyle : undefined}
-                        >
-                          {p}
-                        </li>
-                      ))}
-                  </ul>
-
-                  <div style={{ marginTop: 10, fontWeight: 700 }}>考えられる根拠</div>
-                  <ul style={{ marginTop: 4, paddingLeft: 20 }}>
-                    {renderedReasons.length > 0 &&
-                      renderedReasons.map((r, i) => (
-                        <li
-                          key={i}
-                          style={isReasonFallback(r) ? fallbackItemStyle : undefined}
-                        >
-                          {r}
-                        </li>
-                      ))}
-                  </ul>
-
-                  <div style={{ marginTop: 10, fontWeight: 700 }}>考えられる対立</div>
-                  <ul style={{ marginTop: 4, paddingLeft: 20 }}>
-                    {renderedConflicts.length > 0 ? (
-                      renderedConflicts.map((c, i) =>
-                        isConflictFallback(c) ? (
-                          <li key={i} style={fallbackItemStyle}>
-                            この主張には別の見方があり得ます
-                          </li>
-                        ) : (
-                          <li key={i}>
-                            {c.opinion}
-                            {c.rebuttal ? ` ↔ ${c.rebuttal}` : ""}
-                          </li>
-                        )
-                      )
-                    ) : (
-                      <li>まだ対立は抽出されていません</li>
-                    )}
-                  </ul>
-                </>
-              ) : (
-                <>
-                  <div style={{ fontWeight: 700 }}>主張</div>
-                  <div style={{ marginTop: 4 }}>{generatedIssue.claim}</div>
-
-                  <div style={{ marginTop: 10, fontWeight: 700 }}>前提</div>
-                  <ul style={{ marginTop: 4, paddingLeft: 20 }}>
-                    {renderedPremises.length > 0 &&
-                      renderedPremises.map((p, i) => (
-                        <li
-                          key={i}
-                          style={isPremiseFallback(p) ? fallbackItemStyle : undefined}
-                        >
-                          {p}
-                        </li>
-                      ))}
-                  </ul>
-
-                  <div style={{ marginTop: 10, fontWeight: 700 }}>根拠</div>
-                  <ul style={{ marginTop: 4, paddingLeft: 20 }}>
-                    {renderedReasons.length > 0 &&
-                      renderedReasons.map((r, i) => (
-                        <li
-                          key={i}
-                          style={isReasonFallback(r) ? fallbackItemStyle : undefined}
-                        >
-                          {r}
-                        </li>
-                      ))}
-                  </ul>
-
-                  <div style={{ marginTop: 10, fontWeight: 700 }}>考えられる対立</div>
-                  <ul style={{ marginTop: 4, paddingLeft: 20 }}>
-                    {renderedConflicts.length > 0 ? (
-                      renderedConflicts.map((c, i) =>
-                        isConflictFallback(c) ? (
-                          <li key={i} style={fallbackItemStyle}>
-                            この主張には別の見方があり得ます
-                          </li>
-                        ) : (
-                          <li key={i}>
-                            {c.opinion}
-                            {c.rebuttal ? ` ↔ ${c.rebuttal}` : ""}
-                          </li>
-                        )
-                      )
-                    ) : (
-                      <li>まだ対立は抽出されていません</li>
-                    )}
-                  </ul>
-                </>
-              )}
-            </div>
-          </SectionCard>
-
-          <SectionCard style={{ marginTop: 12 }}>
-            <div
-              style={{
-                fontWeight: 800,
-                marginBottom: 8,
-                fontSize: currentFontSize + 2,
-              }}
-            >
-              STEP3：既存の議論を確認
-            </div>
-
-            {relatedThreads.length > 0 ? (
-              <>
-                <div
-                  style={{
-                    fontSize: currentFontSize - 2,
-                    color: "#9ad",
-                    marginBottom: 10,
-                  }}
-                >
-                  近い議論があれば、先にそちらに参加できます
-                </div>
-
-                <div style={{ display: "grid", gap: 10 }}>
-                  {relatedThreads.map((t) => (
-                    <div
-                      key={t.id}
-                      onClick={() => {
-                        if (selectedThreadId === t.id) {
-                          window.location.href = `/${tenant}/forum/thread/${t.id}`;
-                        } else {
-                          setSelectedThreadId(t.id);
-                        }
-                      }}
-                      style={{
-                        border:
-                          selectedThreadId === t.id
-                            ? "2px solid #2563eb"
-                            : t.stance === "con"
-                            ? "1px solid #4a6fdc"
-                            : "1px solid #444",
-                        borderRadius: 10,
-                        padding: "10px 12px",
-                        background:
-                          selectedThreadId === t.id
-                            ? "#0f2a1f"
-                            : t.stance === "con"
-                            ? "#1b2238"
-                            : "#222",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: currentFontSize - 2,
-                          color: "#bbb",
-                          marginBottom: 4,
-                        }}
-                      >
-                        {t.category ?? "未分類"}
-                      </div>
-
-                      <div style={{ fontWeight: 800, fontSize: currentFontSize + 2 }}>
-                        {t.title}
-                      </div>
-
-                      {t.reason && (
-                        <div
-                          style={{
-                            fontSize: currentFontSize - 2,
-                            color: "#666",
-                            marginTop: 6,
-                          }}
-                        >
-                          → {t.reason}
-                        </div>
-                      )}
-
-                      {t.stance && (
-                        <div
-                          style={{
-                            fontSize: currentFontSize - 2,
-                            color: t.stance === "con" ? "#8fb3ff" : "#9ad",
-                            marginTop: 6,
-                            fontWeight: t.stance === "con" ? 700 : 400,
-                          }}
-                        >
-                          {t.stance === "pro" && "賛成寄り"}
-                          {t.stance === "con" && "← 反対意見あり"}
-                          {t.stance === "neutral" && "中立"}
-                        </div>
-                      )}
-
-                      {selectedThreadId === t.id && (
-                        <div
-                          style={{
-                            color: "#2a7",
-                            fontSize: currentFontSize - 2,
-                            marginTop: 6,
-                          }}
-                        >
-                          選択中
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ marginTop: 12 }}>
-                  {selectedThreadId ? (
-                    <Link
-                      href={`/${tenant}/forum/thread/${selectedThreadId}`}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        textAlign: "center",
-                        padding: "22px 20px",
-                        fontSize: currentFontSize + 6,
-                        fontWeight: 900,
-                        borderRadius: "16px",
-                        background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
-                        color: "#fff",
-                        textDecoration: "none",
-                        border: "2px solid #60a5fa",
-                        boxShadow: "0 10px 30px rgba(37, 99, 235, 0.6)",
-                      }}
-                    >
-                      👆 この議論に参加する
-                    </Link>
-                  ) : (
-                    <div
-                      style={{
-                        width: "100%",
-                        textAlign: "center",
-                        padding: "22px 20px",
-                        fontSize: currentFontSize + 6,
-                        fontWeight: 900,
-                        borderRadius: "16px",
-                        background: "#444",
-                        color: "#ccc",
-                        opacity: 0.6,
-                      }}
-                    >
-                      👆 この議論を見る
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div style={{ color: "#aaa", fontSize: currentFontSize - 2 }}>
-                関連する既存スレはまだありません
+        <section
+          id="forum-analysis-result"
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
+            gap: 18,
+            alignItems: "start",
+          }}
+        >
+          <div style={panelStyle}>
+            <h2 style={{ margin: 0, fontSize: 22 }}>整理結果</h2>
+            {generatedIssue.easySummary && defaultMode === "easy" && (
+              <div
+                style={{
+                  marginTop: 12,
+                  border: "1px solid #bbf7d0",
+                  borderRadius: 8,
+                  padding: 12,
+                  background: "#f0fdf4",
+                  whiteSpace: "pre-wrap",
+                  lineHeight: 1.9,
+                  fontSize: currentFontSize,
+                }}
+              >
+                {generatedIssue.easySummary}
               </div>
             )}
-          </SectionCard>
 
-          <div style={{ marginTop: 12 }}>
-            <div
-              style={{
-                fontSize: currentFontSize,
-                color: "#666",
-                marginBottom: 6,
-                fontWeight: 700,
-              }}
-            >
-              STEP4：新しく作る
+            <div style={{ marginTop: 16 }}>
+              <div style={labelStyle}>
+                {generatedIssue.mode === "split" ? "主張" : "問い"}
+              </div>
+              <div
+                style={{
+                  fontWeight: 800,
+                  lineHeight: 1.7,
+                  fontSize: currentFontSize + 1,
+                }}
+              >
+                {generatedIssue.claim}
+              </div>
             </div>
 
             <div
               style={{
-                fontSize: currentFontSize - 2,
-                color: "#666",
-                marginBottom: 8,
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 12,
+                marginTop: 16,
               }}
             >
-              内容がよければ、ここで新しいスレとして保存します
+              <div>
+                <div style={labelStyle}>前提</div>
+                <ul style={{ margin: 0, paddingLeft: 20, lineHeight: 1.8 }}>
+                  {renderedPremises.length > 0 ? (
+                    renderedPremises.map((premise, index) => (
+                      <li key={`${premise}-${index}`}>{premise}</li>
+                    ))
+                  ) : (
+                    <li style={{ color: "#6b7280" }}>まだ整理されていません。</li>
+                  )}
+                </ul>
+              </div>
+
+              <div>
+                <div style={labelStyle}>根拠</div>
+                <ul style={{ margin: 0, paddingLeft: 20, lineHeight: 1.8 }}>
+                  {renderedReasons.length > 0 ? (
+                    renderedReasons.map((reason, index) => (
+                      <li key={`${reason}-${index}`}>{reason}</li>
+                    ))
+                  ) : (
+                    <li style={{ color: "#6b7280" }}>まだ整理されていません。</li>
+                  )}
+                </ul>
+              </div>
             </div>
 
-            <PrimaryButton
-              style={{
-                width: "100%",
-                padding: "12px",
-                fontSize: currentFontSize,
-                fontWeight: 600,
-                borderRadius: "10px",
-                color: "#ddd",
-                background: selectedThreadId ? "#444" : "#2563eb",
-                opacity: selectedThreadId ? 0.5 : 1,
-                cursor: selectedThreadId ? "not-allowed" : "pointer",
-              }}
-              onClick={async () => {
-                if (selectedThreadId || !generatedIssue) return;
-
-                const finalClaim =
-                  (generatedIssue?.claim && generatedIssue.claim.trim()) ||
-                  (text && text.trim()) ||
-                  "テスト投稿";
-
-                const res = await fetch("/api/forum/create-thread-from-draft", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    tenantSlug: tenant,
-                    title: finalClaim,
-                    claim: finalClaim,
-                    premises: generatedIssue?.premises ?? [],
-                    reasons: generatedIssue?.reasons ?? [],
-                    conflicts: generatedIssue?.conflicts ?? [],
-                    postType: "auto",
-                  }),
-                });
-
-                const result = await res.json();
-
-if (!res.ok) {
-  alert(result?.detail || result?.error || "スレッド作成失敗");
-  return;
-}
-
-                if (!result?.threadId) {
-                  alert("threadId が返ってきてない");
-                  console.error(result);
-                  return;
-                }
-
-                window.location.href = `/${tenant}/forum/thread/${result.threadId}`;
-              }}
-            >
-              🚀 この内容で新しいスレを作る
-            </PrimaryButton>
+            <div style={{ marginTop: 16 }}>
+              <div style={labelStyle}>対立しそうな見方</div>
+              <ul style={{ margin: 0, paddingLeft: 20, lineHeight: 1.8 }}>
+                {renderedConflicts.length > 0 ? (
+                  renderedConflicts.map((conflict, index) => (
+                    <li key={`${conflict.opinion}-${index}`}>
+                      {conflict.opinion}
+                      {conflict.rebuttal ? ` / ${conflict.rebuttal}` : ""}
+                    </li>
+                  ))
+                ) : (
+                  <li style={{ color: "#6b7280" }}>まだ抽出されていません。</li>
+                )}
+              </ul>
+            </div>
           </div>
-        </>
+
+          <aside style={panelStyle}>
+            <h2 style={{ margin: 0, fontSize: 20 }}>既存スレッド</h2>
+            <p style={{ ...smallMetaStyle, marginTop: 6 }}>
+              近い議論がある場合は、そちらに参加できます。
+            </p>
+
+            <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+              {relatedThreads.length > 0 ? (
+                relatedThreads.map((thread) => (
+                  <button
+                    key={thread.id}
+                    type="button"
+                    onClick={() =>
+                      setSelectedThreadId((current) =>
+                        current === thread.id ? null : thread.id
+                      )
+                    }
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      border:
+                        selectedThreadId === thread.id
+                          ? "2px solid #2563eb"
+                          : "1px solid #d7dde8",
+                      borderRadius: 8,
+                      padding: 12,
+                      background:
+                        selectedThreadId === thread.id ? "#eff6ff" : "#ffffff",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        alignItems: "center",
+                        marginBottom: 8,
+                      }}
+                    >
+                      <span style={smallMetaStyle}>{thread.category ?? "未分類"}</span>
+                      <StanceLabel stance={thread.stance} />
+                    </div>
+                    <div
+                      style={{
+                        fontWeight: 800,
+                        lineHeight: 1.5,
+                        fontSize: currentFontSize,
+                      }}
+                    >
+                      {thread.title}
+                    </div>
+                    {thread.summary && (
+                      <div style={{ ...smallMetaStyle, marginTop: 6 }}>
+                        {truncate(thread.summary, 90)}
+                      </div>
+                    )}
+                    {thread.reason && (
+                      <div style={{ ...smallMetaStyle, marginTop: 6 }}>
+                        {thread.reason}
+                      </div>
+                    )}
+                  </button>
+                ))
+              ) : (
+                <div style={{ ...smallMetaStyle, marginTop: 8 }}>
+                  関連する既存スレッドはまだ見つかっていません。
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
+              {selectedThreadId ? (
+                <Link
+                  href={`/${tenant}/forum/thread/${selectedThreadId}`}
+                  style={{
+                    display: "block",
+                    textAlign: "center",
+                    padding: "12px 14px",
+                    borderRadius: 8,
+                    background: "#2563eb",
+                    color: "#ffffff",
+                    textDecoration: "none",
+                    fontWeight: 900,
+                  }}
+                >
+                  選んだスレッドに参加
+                </Link>
+              ) : (
+                <PrimaryButton
+                  onClick={handleCreateThread}
+                  disabled={creatingThread || Boolean(selectedThreadId)}
+                  style={{
+                    width: "100%",
+                    background: "#047857",
+                  }}
+                >
+                  {creatingThread ? "作成中..." : "新しいスレッドを作成"}
+                </PrimaryButton>
+              )}
+            </div>
+          </aside>
+        </section>
       )}
     </main>
   );
