@@ -1914,6 +1914,79 @@ function jumpToMainIssues() {
 />
 </div>
 
+<SectionCard variant="white" style={{ marginTop: 24, color: "#111" }}>
+  <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
+    この議論の現在地
+  </SectionTitle>
+
+  <p
+    style={{
+      marginTop: 0,
+      color: "#666",
+      fontSize: currentFont.base,
+      lineHeight: 1.7,
+    }}
+  >
+    このスレッドは、議論全体の中でどの位置にあるかを確認できます。
+  </p>
+
+  <div
+    style={{
+      fontSize: currentFont.base,
+      fontWeight: 800,
+      color: "#111",
+      marginBottom: 6,
+    }}
+  >
+    現在地：
+  </div>
+  <div
+    style={{
+      fontSize: currentFont.base,
+      color: "#111",
+      marginBottom: 14,
+      lineHeight: 1.7,
+    }}
+  >
+    問題を整理する ＞ 税金・社会保険料 ＞ 消費税
+  </div>
+
+  <div
+    style={{
+      fontSize: currentFont.base,
+      fontWeight: 800,
+      color: "#111",
+      marginBottom: 6,
+    }}
+  >
+    全体マップ：
+  </div>
+  <pre
+    style={{
+      margin: 0,
+      whiteSpace: "pre-wrap",
+      overflowX: "auto",
+      background: "#f7f7f7",
+      color: "#111",
+      border: "1px solid #e0e0e0",
+      borderRadius: 8,
+      padding: 12,
+      fontSize: currentFont.base,
+      lineHeight: 1.7,
+    }}
+  >
+{`消費税
+├─ 問題を整理する
+│   └─ 消費への影響
+├─ 原因を考える
+│   └─ 需要不足
+├─ 解決策を出す
+│   └─ 減税
+└─ 反論・リスク
+    └─ 財源・インフレ`}
+  </pre>
+</SectionCard>
+
           <SectionCard variant="white" style={{ marginTop: 24 }}>
            <div id="post-form" style={{ scrollMarginTop: 120 }} />
 
