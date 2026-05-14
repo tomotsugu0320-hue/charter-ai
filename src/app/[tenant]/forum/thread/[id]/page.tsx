@@ -1310,7 +1310,7 @@ function jumpToMainIssues() {
     }}
     style={{ padding: "8px 12px" }}
   >
-    この議論を共有
+    共有
   </PrimaryButton>
 
 <LinkButton
@@ -1320,7 +1320,7 @@ function jumpToMainIssues() {
   target="_blank"
   rel="noopener noreferrer"
 >
-  Xで共有
+  X
 </LinkButton>
 
   {copied && <span style={{ color: "#2e7d32" }}>コピーした</span>}
@@ -1344,7 +1344,7 @@ function jumpToMainIssues() {
 >
   {averageLogicScore > 0 ? (
     <>
-      平均スコア: {averageLogicScore}
+      平均の読みやすさ: {averageLogicScore}
       <span
         style={{
           marginLeft: 8,
@@ -1361,7 +1361,7 @@ function jumpToMainIssues() {
       </span>
     </>
   ) : (
-    <>平均スコア: 未評価</>
+    <>平均の読みやすさ: 未評価</>
   )}
 </div>
 
@@ -1373,7 +1373,7 @@ function jumpToMainIssues() {
     fontWeight: maxLogicScore && maxLogicScore >= 80 ? 700 : 500,
   }}
 >
-  最高スコア: {maxLogicScore ?? "未評価"}
+  最も読みやすい投稿: {maxLogicScore ?? "未評価"}
 </div>
 
   <div>
@@ -1483,7 +1483,7 @@ function jumpToMainIssues() {
       marginBottom: 6,
     }}
   >
-    🔍 関連キーワード
+    🔍 調べるキーワード
   </div>
 
   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
