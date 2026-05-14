@@ -1016,7 +1016,7 @@ export default function ForumPage() {
           }}
         >
           <div>
-            <h2 style={{ margin: 0, fontSize: 22 }}>新しい論点を整理</h2>
+            <h2 style={{ margin: 0, fontSize: 22 }}>1. 投稿したい考えを書く</h2>
             <p
               style={{
                 margin: "8px 0 0",
@@ -1116,7 +1116,7 @@ export default function ForumPage() {
               background: "#10141d",
             }}
           >
-            <div style={{ fontWeight: 800, marginBottom: 8 }}>AIが読み取った要点</div>
+            <div style={{ fontWeight: 800, marginBottom: 8 }}>2. 整えた内容を確認</div>
             <div
               style={{
                 whiteSpace: "pre-wrap",
@@ -1153,7 +1153,7 @@ export default function ForumPage() {
                   borderColor: "#475569",
                 }}
               >
-                入力欄に反映
+                下書きに戻す
               </button>
               <PrimaryButton onClick={handleUseOrganizedAndAnalyze} disabled={loading}>
                 {loading ? "整理中..." : "この内容で論点を整理"}
@@ -1203,7 +1203,7 @@ export default function ForumPage() {
           }}
         >
           <div style={panelStyle}>
-            <h2 style={{ margin: 0, fontSize: 22 }}>整理結果</h2>
+            <h2 style={{ margin: 0, fontSize: 22 }}>3. 論点の整理結果</h2>
             {generatedIssue.easySummary && defaultMode === "easy" && (
               <div
                 style={{
@@ -1272,7 +1272,7 @@ export default function ForumPage() {
             </div>
 
             <div style={{ marginTop: 16 }}>
-              <div style={labelStyle}>対立しそうな見方</div>
+              <div style={labelStyle}>反論・リスク</div>
               <ul style={{ margin: 0, paddingLeft: 20, lineHeight: 1.8 }}>
                 {renderedConflicts.length > 0 ? (
                   renderedConflicts.map((conflict, index) => (
@@ -1289,7 +1289,7 @@ export default function ForumPage() {
           </div>
 
           <aside style={panelStyle}>
-            <h2 style={{ margin: 0, fontSize: 20 }}>既存スレッド</h2>
+            <h2 style={{ margin: 0, fontSize: 20 }}>4. 参加先を選ぶ</h2>
             <p style={{ ...smallMetaStyle, marginTop: 6 }}>
               近い議論がある場合は、そちらに参加できます。
             </p>
