@@ -112,6 +112,70 @@ const POST_ROLE_OPTIONS: PostRoleOption[] = [
   { value: "explanation", label: "解説" },
 ];
 
+type LocationMapNode = {
+  id: string;
+  label: string;
+  children?: LocationMapNode[];
+};
+
+const currentPath: LocationMapNode[] = [
+  { id: "organize-problems", label: "問題を整理する" },
+  { id: "tax-social-insurance", label: "税金・社会保険料" },
+  { id: "consumption-tax", label: "消費税" },
+];
+
+const mapRoot: LocationMapNode = {
+  id: "consumption-tax",
+  label: "消費税",
+};
+
+const mapBranches: LocationMapNode[] = [
+  {
+    id: "organize-problems",
+    label: "問題を整理する",
+    children: [{ id: "consumption-impact", label: "消費への影響" }],
+  },
+  {
+    id: "consider-causes",
+    label: "原因を考える",
+    children: [{ id: "demand-shortage", label: "需要不足" }],
+  },
+  {
+    id: "propose-solutions",
+    label: "解決策を出す",
+    children: [{ id: "tax-cuts", label: "減税" }],
+  },
+  {
+    id: "check-risks",
+    label: "反論・リスクを確認する",
+    children: [{ id: "funding-inflation", label: "財源・インフレ" }],
+  },
+];
+
+function renderCurrentPath(path: LocationMapNode[]) {
+  return path.map((node) => node.label).join(" ＞ ");
+}
+
+function renderLocationMap(root: LocationMapNode, branches: LocationMapNode[]) {
+  const lines = [root.label];
+
+  branches.forEach((branch, index) => {
+    const isLastBranch = index === branches.length - 1;
+    const branchPrefix = isLastBranch ? "└─" : "├─";
+    const childPrefix = isLastBranch ? "    " : "│   ";
+    const children = branch.children ?? [];
+
+    lines.push(`${branchPrefix} ${branch.label}`);
+
+    children.forEach((child, childIndex) => {
+      const isLastChild = childIndex === children.length - 1;
+      lines.push(`${childPrefix}${isLastChild ? "└─" : "├─"} ${child.label}`);
+    });
+  });
+
+  return lines.join("\n");
+}
+
 function splitContent(content: string) {
   if (!content) {
     return {
@@ -1948,7 +2012,7 @@ function jumpToMainIssues() {
       lineHeight: 1.7,
     }}
   >
-    問題を整理する ＞ 税金・社会保険料 ＞ 消費税
+    {renderCurrentPath(currentPath)}
   </div>
 
   <div
@@ -1975,15 +2039,7 @@ function jumpToMainIssues() {
       lineHeight: 1.7,
     }}
   >
-{`消費税
-├─ 問題を整理する
-│   └─ 消費への影響
-├─ 原因を考える
-│   └─ 需要不足
-├─ 解決策を出す
-│   └─ 減税
-└─ 反論・リスクを確認する
-    └─ 財源・インフレ`}
+{renderLocationMap(mapRoot, mapBranches)}
   </pre>
 </SectionCard>
 
