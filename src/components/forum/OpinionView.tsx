@@ -168,7 +168,7 @@ export default function OpinionView({
                 padding: "4px 0",
               }}
             >
-              {isExpanded ? "閉じる" : "開く"}
+              {isExpanded ? "閉じる" : "意見と返信を見る"}
             </button>
           )}
 
@@ -221,7 +221,7 @@ export default function OpinionView({
               fontSize: currentFont.base * 0.85,
             }}
           >
-            クリックで詳細表示
+            開くと反論・補足も見られます
           </div>
         </div>
       )}
