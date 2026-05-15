@@ -3,7 +3,8 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 import SectionCard from "@/components/forum/SectionCard";
 import SectionTitle from "@/components/forum/SectionTitle";
 import PostCard from "@/components/forum/PostCard";
@@ -115,18 +116,24 @@ const POST_ROLE_OPTIONS: PostRoleOption[] = [
 type LocationMapNode = {
   id: string;
   label: string;
+  nodeId?: string;
   children?: LocationMapNode[];
 };
 
 const currentPath: LocationMapNode[] = [
   { id: "organize-problems", label: "問題を整理する" },
-  { id: "tax-social-insurance", label: "税金・社会保険料" },
-  { id: "consumption-tax", label: "消費税" },
+  {
+    id: "tax-social-insurance",
+    label: "税金・社会保険料",
+    nodeId: "tax-social-insurance",
+  },
+  { id: "consumption-tax", label: "消費税", nodeId: "consumption-tax" },
 ];
 
 const mapRoot: LocationMapNode = {
   id: "consumption-tax",
   label: "消費税",
+  nodeId: "consumption-tax",
 };
 
 const mapBranches: LocationMapNode[] = [
@@ -138,12 +145,12 @@ const mapBranches: LocationMapNode[] = [
   {
     id: "consider-causes",
     label: "原因を考える",
-    children: [{ id: "demand-shortage", label: "需要不足" }],
+    children: [{ id: "demand-shortage", label: "需要不足", nodeId: "demand-shortage" }],
   },
   {
     id: "propose-solutions",
     label: "解決策を出す",
-    children: [{ id: "tax-cuts", label: "減税" }],
+    children: [{ id: "tax-cuts", label: "減税", nodeId: "tax-cuts" }],
   },
   {
     id: "check-risks",
@@ -152,12 +159,35 @@ const mapBranches: LocationMapNode[] = [
   },
 ];
 
-function renderCurrentPath(path: LocationMapNode[]) {
-  return path.map((node) => node.label).join(" ＞ ");
+function renderLocationNode(node: LocationMapNode, tenant: string) {
+  if (!node.nodeId) return node.label;
+
+  return (
+    <Link
+      href={`/${tenant}/forum?node=${node.nodeId}`}
+      style={{
+        color: "#0d47a1",
+        fontWeight: 700,
+        textDecoration: "underline",
+        textUnderlineOffset: 2,
+      }}
+    >
+      {node.label}
+    </Link>
+  );
 }
 
-function renderLocationMap(root: LocationMapNode, branches: LocationMapNode[]) {
-  const lines = [root.label];
+function renderCurrentPath(path: LocationMapNode[], tenant: string) {
+  return path.map((node, index) => (
+    <span key={node.id}>
+      {index > 0 ? " ＞ " : ""}
+      {renderLocationNode(node, tenant)}
+    </span>
+  ));
+}
+
+function renderLocationMap(root: LocationMapNode, branches: LocationMapNode[], tenant: string) {
+  const lines: ReactNode[] = [renderLocationNode(root, tenant)];
 
   branches.forEach((branch, index) => {
     const isLastBranch = index === branches.length - 1;
@@ -165,15 +195,24 @@ function renderLocationMap(root: LocationMapNode, branches: LocationMapNode[]) {
     const childPrefix = isLastBranch ? "    " : "│   ";
     const children = branch.children ?? [];
 
-    lines.push(`${branchPrefix} ${branch.label}`);
+    lines.push(
+      <>
+        {branchPrefix} {renderLocationNode(branch, tenant)}
+      </>
+    );
 
     children.forEach((child, childIndex) => {
       const isLastChild = childIndex === children.length - 1;
-      lines.push(`${childPrefix}${isLastChild ? "└─" : "├─"} ${child.label}`);
+      lines.push(
+        <>
+          {childPrefix}
+          {isLastChild ? "└─" : "├─"} {renderLocationNode(child, tenant)}
+        </>
+      );
     });
   });
 
-  return lines.join("\n");
+  return lines.map((line, index) => <div key={index}>{line}</div>);
 }
 
 function splitContent(content: string) {
@@ -2012,7 +2051,7 @@ function jumpToMainIssues() {
       lineHeight: 1.7,
     }}
   >
-    {renderCurrentPath(currentPath)}
+    {renderCurrentPath(currentPath, tenant)}
   </div>
 
   <div
@@ -2025,7 +2064,7 @@ function jumpToMainIssues() {
   >
     全体マップ：
   </div>
-  <pre
+  <div
     style={{
       margin: 0,
       whiteSpace: "pre-wrap",
@@ -2037,10 +2076,12 @@ function jumpToMainIssues() {
       padding: 12,
       fontSize: currentFont.base,
       lineHeight: 1.7,
+      fontFamily:
+        'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
     }}
   >
-{renderLocationMap(mapRoot, mapBranches)}
-  </pre>
+{renderLocationMap(mapRoot, mapBranches, tenant)}
+  </div>
 </SectionCard>
 
           <SectionCard variant="white" style={{ marginTop: 24 }}>
