@@ -1019,6 +1019,11 @@ export default function ForumPage() {
               <div style={{ fontWeight: 800, fontSize: currentFontSize }}>
                 選択中の論点：{selectedNodeLabel}
               </div>
+              {selectedNodePathText && (
+                <div style={{ ...smallMetaStyle, marginTop: 6 }}>
+                  位置：{selectedNodePathText}
+                </div>
+              )}
             </div>
           )}
         </section>
