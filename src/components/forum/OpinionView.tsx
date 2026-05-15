@@ -75,6 +75,7 @@ export default function OpinionView({
   const isBest = !!best && best.opinion.id === op.opinion.id;
   const isExpanded = isBest || expandedMap[op.opinion.id] === true;
   const short = getShortSummary(op.opinion.content);
+  const replyCount = op.children?.length ?? 0;
 
   return (
     <PostCard
@@ -108,7 +109,7 @@ export default function OpinionView({
               }}
             >
               <div style={{ display: "grid", gap: 2 }}>
-                <span>🏆 スコア上位意見 {op.opinion.logic_score ?? "-"}</span>
+                <span>🏆 まず読む意見 {op.opinion.logic_score ?? "-"}</span>
                 <span
                   style={{
                     color: "#666",
@@ -116,7 +117,7 @@ export default function OpinionView({
                     fontSize: currentFont.base * 0.85,
                   }}
                 >
-                  （論理構造の評価に基づくスコア）
+                  読みやすさの目安
                 </span>
               </div>
               <span
@@ -136,7 +137,7 @@ export default function OpinionView({
                 fontSize: currentFont.base,
               }}
             >
-              💬 意見 {op.opinion.logic_score ?? "-"}
+              意見・読みやすさ {op.opinion.logic_score ?? "-"}
             </div>
           )}
         </div>
@@ -168,7 +169,7 @@ export default function OpinionView({
                 padding: "4px 0",
               }}
             >
-              {isExpanded ? "閉じる" : "開く"}
+              {isExpanded ? "閉じる" : "意見と返信を見る"}
             </button>
           )}
 
@@ -221,8 +222,19 @@ export default function OpinionView({
               fontSize: currentFont.base * 0.85,
             }}
           >
-            クリックで詳細表示
+            開くと反論・補足も見られます
           </div>
+          {replyCount > 0 && (
+            <div
+              style={{
+                marginTop: 6,
+                color: "#666",
+                fontSize: currentFont.base * 0.85,
+              }}
+            >
+              反論・補足あり（{replyCount}件）
+            </div>
+          )}
         </div>
       )}
 

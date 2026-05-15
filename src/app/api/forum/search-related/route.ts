@@ -10,6 +10,18 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+function buildReason(searchTexts: string[], content: string | null | undefined) {
+  const source = String(content ?? "");
+  const matched = searchTexts.find((text) => {
+    const keyword = text.trim().slice(0, 20);
+    return keyword && source.includes(keyword);
+  });
+
+  return matched
+    ? `『${matched.trim().slice(0, 20)}』に近い投稿があります`
+    : "入力した内容に近い投稿があります";
+}
+
 type ForumPostRow = {
   id: string;
   content: string;
@@ -81,7 +93,8 @@ export async function POST(req: Request) {
         id: string;
         title: string;
         category: string;
-        ai_ai_summary: string;
+        ai_summary: string;
+        reason: string;
       }
     >();
 
@@ -97,7 +110,8 @@ export async function POST(req: Request) {
         id: row.thread_id,
         title: threadInfo?.title ?? "無題スレ",
         category: threadInfo?.category ?? "未分類",
-        ai_ai_summary: String(row.content ?? "").slice(0, 100),
+        ai_summary: String(row.content ?? "").slice(0, 100),
+        reason: buildReason(searchTexts, row.content),
       });
     }
 
@@ -107,7 +121,7 @@ export async function POST(req: Request) {
     if (threads.length === 0) {
       let fallbackQuery = supabase
         .from("forum_threads")
-        .select("id, title, category, ai_ai_summary")
+        .select("id, title, category, ai_summary")
         .order("created_at", { ascending: false })
         .limit(3);
 
@@ -126,7 +140,8 @@ export async function POST(req: Request) {
         id: row.id,
         title: row.title ?? "無題スレ",
         category: row.category ?? "未分類",
-        ai_ai_summary: row.ai_ai_summary ?? "",
+        ai_summary: row.ai_summary ?? "",
+        reason: "入力した内容に近い投稿があります",
       }));
     }
 

@@ -3,7 +3,8 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 import SectionCard from "@/components/forum/SectionCard";
 import SectionTitle from "@/components/forum/SectionTitle";
 import PostCard from "@/components/forum/PostCard";
@@ -111,6 +112,108 @@ const POST_ROLE_OPTIONS: PostRoleOption[] = [
   { value: "supplement", label: "補足" },
   { value: "explanation", label: "解説" },
 ];
+
+type LocationMapNode = {
+  id: string;
+  label: string;
+  nodeId?: string;
+  children?: LocationMapNode[];
+};
+
+const currentPath: LocationMapNode[] = [
+  { id: "organize-problems", label: "問題を整理する" },
+  {
+    id: "tax-social-insurance",
+    label: "税金・社会保険料",
+    nodeId: "tax-social-insurance",
+  },
+  { id: "consumption-tax", label: "消費税", nodeId: "consumption-tax" },
+];
+
+const mapRoot: LocationMapNode = {
+  id: "consumption-tax",
+  label: "消費税",
+  nodeId: "consumption-tax",
+};
+
+const mapBranches: LocationMapNode[] = [
+  {
+    id: "organize-problems",
+    label: "問題を整理する",
+    children: [{ id: "consumption-impact", label: "消費への影響" }],
+  },
+  {
+    id: "consider-causes",
+    label: "原因を考える",
+    children: [{ id: "demand-shortage", label: "需要不足", nodeId: "demand-shortage" }],
+  },
+  {
+    id: "propose-solutions",
+    label: "解決策を出す",
+    children: [{ id: "tax-cuts", label: "減税", nodeId: "tax-cuts" }],
+  },
+  {
+    id: "check-risks",
+    label: "反論・リスクを確認する",
+    children: [{ id: "funding-inflation", label: "財源・インフレ" }],
+  },
+];
+
+function renderLocationNode(node: LocationMapNode, tenant: string) {
+  if (!node.nodeId) return node.label;
+
+  return (
+    <Link
+      href={`/${tenant}/forum?node=${node.nodeId}`}
+      style={{
+        color: "#0d47a1",
+        fontWeight: 700,
+        textDecoration: "underline",
+        textUnderlineOffset: 2,
+      }}
+    >
+      {node.label}
+    </Link>
+  );
+}
+
+function renderCurrentPath(path: LocationMapNode[], tenant: string) {
+  return path.map((node, index) => (
+    <span key={node.id}>
+      {index > 0 ? " ＞ " : ""}
+      {renderLocationNode(node, tenant)}
+    </span>
+  ));
+}
+
+function renderLocationMap(root: LocationMapNode, branches: LocationMapNode[], tenant: string) {
+  const lines: ReactNode[] = [renderLocationNode(root, tenant)];
+
+  branches.forEach((branch, index) => {
+    const isLastBranch = index === branches.length - 1;
+    const branchPrefix = isLastBranch ? "└─" : "├─";
+    const childPrefix = isLastBranch ? "    " : "│   ";
+    const children = branch.children ?? [];
+
+    lines.push(
+      <>
+        {branchPrefix} {renderLocationNode(branch, tenant)}
+      </>
+    );
+
+    children.forEach((child, childIndex) => {
+      const isLastChild = childIndex === children.length - 1;
+      lines.push(
+        <>
+          {childPrefix}
+          {isLastChild ? "└─" : "├─"} {renderLocationNode(child, tenant)}
+        </>
+      );
+    });
+  });
+
+  return lines.map((line, index) => <div key={index}>{line}</div>);
+}
 
 function splitContent(content: string) {
   if (!content) {
@@ -1310,7 +1413,7 @@ function jumpToMainIssues() {
     }}
     style={{ padding: "8px 12px" }}
   >
-    この議論を共有
+    共有
   </PrimaryButton>
 
 <LinkButton
@@ -1320,7 +1423,7 @@ function jumpToMainIssues() {
   target="_blank"
   rel="noopener noreferrer"
 >
-  Xで共有
+  X
 </LinkButton>
 
   {copied && <span style={{ color: "#2e7d32" }}>コピーした</span>}
@@ -1344,7 +1447,7 @@ function jumpToMainIssues() {
 >
   {averageLogicScore > 0 ? (
     <>
-      平均スコア: {averageLogicScore}
+      平均の読みやすさ: {averageLogicScore}
       <span
         style={{
           marginLeft: 8,
@@ -1361,7 +1464,7 @@ function jumpToMainIssues() {
       </span>
     </>
   ) : (
-    <>平均スコア: 未評価</>
+    <>平均の読みやすさ: 未評価</>
   )}
 </div>
 
@@ -1373,7 +1476,7 @@ function jumpToMainIssues() {
     fontWeight: maxLogicScore && maxLogicScore >= 80 ? 700 : 500,
   }}
 >
-  最高スコア: {maxLogicScore ?? "未評価"}
+  最も読みやすい投稿: {maxLogicScore ?? "未評価"}
 </div>
 
   <div>
@@ -1399,7 +1502,7 @@ function jumpToMainIssues() {
     }}
   >
 
-{mode === "normal" ? "🧠 全体理解（AIまとめ）" : "🐵 全体理解（やさしい要約）"}
+{mode === "normal" ? "この議論の要約" : "🐵 全体理解（やさしい要約）"}
   </h2>
 <PrimaryButton
   onClick={jumpToMainIssues}
@@ -1483,7 +1586,7 @@ function jumpToMainIssues() {
       marginBottom: 6,
     }}
   >
-    🔍 関連キーワード
+    🔍 調べるキーワード
   </div>
 
   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -1701,7 +1804,7 @@ function jumpToMainIssues() {
         marginBottom: 10,
       }}
     >
-      主な対立
+      反論・リスク
     </div>
 <div style={{ color: "#666", fontSize: currentFont.base * 0.9, marginBottom: 10 }}>
   {conflictSectionTitle}
@@ -1760,7 +1863,7 @@ function jumpToMainIssues() {
 
           <SectionCard variant="white" style={{ marginTop: 24 }}>
             <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
-              📊 投稿一覧
+              まず意見を読む
             </SectionTitle>
 
             <div style={{ marginBottom: 12 }}>
@@ -1796,7 +1899,7 @@ function jumpToMainIssues() {
                 checked={hideLowScore}
                 onChange={(e) => setHideLowScore(e.target.checked)}
               />
-              低スコア投稿を薄く表示する
+              読みづらい投稿を薄く表示する
             </label>
 
             <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1807,7 +1910,7 @@ function jumpToMainIssues() {
                   color: sortType === "score" ? "#fff" : "#333",
                 }}
               >
-                スコア順
+                読みやすい順
               </PrimaryButton>
 
               <PrimaryButton
@@ -1854,7 +1957,7 @@ function jumpToMainIssues() {
 
 <div style={{ marginTop: 24 }}>
   <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
-    🌳 深掘り（議論ツリー）
+    構造で見る
   </SectionTitle>
 
 <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1914,6 +2017,73 @@ function jumpToMainIssues() {
 />
 </div>
 
+<SectionCard variant="white" style={{ marginTop: 24, color: "#111" }}>
+  <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
+    この議論の現在地
+  </SectionTitle>
+
+  <p
+    style={{
+      marginTop: 0,
+      color: "#666",
+      fontSize: currentFont.base,
+      lineHeight: 1.7,
+    }}
+  >
+    このスレッドは、議論全体の中でどの位置にあるかを確認できます。
+  </p>
+
+  <div
+    style={{
+      fontSize: currentFont.base,
+      fontWeight: 800,
+      color: "#111",
+      marginBottom: 6,
+    }}
+  >
+    現在地：
+  </div>
+  <div
+    style={{
+      fontSize: currentFont.base,
+      color: "#111",
+      marginBottom: 14,
+      lineHeight: 1.7,
+    }}
+  >
+    {renderCurrentPath(currentPath, tenant)}
+  </div>
+
+  <div
+    style={{
+      fontSize: currentFont.base,
+      fontWeight: 800,
+      color: "#111",
+      marginBottom: 6,
+    }}
+  >
+    全体マップ：
+  </div>
+  <div
+    style={{
+      margin: 0,
+      whiteSpace: "pre-wrap",
+      overflowX: "auto",
+      background: "#f7f7f7",
+      color: "#111",
+      border: "1px solid #e0e0e0",
+      borderRadius: 8,
+      padding: 12,
+      fontSize: currentFont.base,
+      lineHeight: 1.7,
+      fontFamily:
+        'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+    }}
+  >
+{renderLocationMap(mapRoot, mapBranches, tenant)}
+  </div>
+</SectionCard>
+
           <SectionCard variant="white" style={{ marginTop: 24 }}>
            <div id="post-form" style={{ scrollMarginTop: 120 }} />
 
@@ -1937,19 +2107,20 @@ function jumpToMainIssues() {
               }}
             >
               {replyToOpinionId
-                ? "選択した意見に対する投稿です。"
+                ? "返信先の意見に書いています。"
                 : "このスレの問いに対して投稿します。"}
             </p>
 
 {selectedGuide && (
   <SectionCard>
     <div style={{ fontWeight: 800, marginBottom: 6 }}>
+      返信先
+    </div>
+                <div style={{ fontWeight: 700 }}>
       「{selectedGuide.text.length > 60
         ? selectedGuide.text.slice(0, 60) + "..."
         : selectedGuide.text}」
-      に対して意見を書いています
-    </div>
-                <div style={{ fontWeight: 700 }}>{selectedGuide.text}</div>
+                </div>
               </SectionCard>
             )}
 
@@ -1967,7 +2138,7 @@ function jumpToMainIssues() {
                       color: "#444",
                     }}
                   >
-                    過去に投稿された関連内容
+                    参考になる過去の投稿
                   </div>
 
                   {loadingRelated ? (
@@ -2016,7 +2187,9 @@ function jumpToMainIssues() {
                             >
                               {post.thread_title || "関連スレ"}
                             </div>
-                            {post.content}
+                            {post.content.length > 120
+                              ? `${post.content.slice(0, 120)}...`
+                              : post.content}
                           </div>
 
                         </PostCard>
@@ -2065,7 +2238,7 @@ function jumpToMainIssues() {
                         color: "#444",
                       }}
                     >
-                      この論点を深める
+                      近いスレッドを見る
                     </div>
 
                     <div style={{ display: "grid", gap: 8 }}>

@@ -74,6 +74,7 @@ if (!thread) {
   prediction_target,
   prediction_deadline,
   prediction_result,
+  parent_opinion_id,
   is_deleted,
   deleted_at,
   delete_reason

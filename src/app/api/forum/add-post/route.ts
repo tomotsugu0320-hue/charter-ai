@@ -309,6 +309,8 @@ export async function POST(req: NextRequest) {
     const content = String(body?.content ?? "").trim();
     const postRole = String(body?.postRole ?? "").trim();
 const authorKey = getOrCreateAuthorKey(req);
+const parentOpinionId =
+  String(body?.parentOpinionId ?? body?.parent_opinion_id ?? "").trim() || null;
 const predictionFlag = Boolean(body?.prediction_flag);
 const predictionTarget = predictionFlag
   ? String(body?.prediction_target ?? "").trim() || null
@@ -413,6 +415,7 @@ const { data: insertedRows, error } = await supabase
   post_role: postRole,
   content,
   author_key: authorKey,
+  parent_opinion_id: parentOpinionId,
   trust_status: "trusted",
   raw_text: content,
   sanitized_text: privacy.maskedText,

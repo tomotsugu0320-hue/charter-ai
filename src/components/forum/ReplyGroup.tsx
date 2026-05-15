@@ -71,7 +71,7 @@ export default function ReplyGroup({
           color: "#555",
         }}
       >
-        返信を見る（{op.children.length}件）
+        反論・補足を見る（{op.children.length}件）
       </summary>
 
       <div

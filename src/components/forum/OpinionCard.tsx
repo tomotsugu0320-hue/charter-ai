@@ -193,7 +193,7 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
             fontSize: currentFont?.base,
           }}
         >
-          反論
+          反論する
         </PrimaryButton>
 
         <PrimaryButton
@@ -210,7 +210,7 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
             fontSize: currentFont?.base,
           }}
         >
-          補足
+          補足する
         </PrimaryButton>
       </div>
 

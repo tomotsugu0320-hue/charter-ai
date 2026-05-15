@@ -11,6 +11,8 @@ type ThreadRow = {
   title: string;
   category: string | null;
   created_at: string | null;
+  original_post: string | null;
+  ai_summary: string | null;
 };
 
 type PostRow = {
@@ -28,7 +30,7 @@ export async function GET() {
   try {
     const { data: threads, error: threadsError } = await supabase
       .from("forum_threads")
-      .select("id, title, category, created_at")
+      .select("id, title, category, created_at, original_post, ai_summary")
       .eq("is_deleted", false);
 
     if (threadsError) {
@@ -46,6 +48,7 @@ export async function GET() {
 
     const countMap = new Map<string, number>();
     const logicMap = new Map<string, { total: number; count: number }>();
+    const contentMap = new Map<string, string[]>();
 
     for (const post of (posts ?? []) as PostRow[]) {
       countMap.set(post.thread_id, (countMap.get(post.thread_id) ?? 0) + 1);
@@ -56,6 +59,15 @@ export async function GET() {
           total: current.total + post.logic_score,
           count: current.count + 1,
         });
+      }
+
+      const content = post.content?.trim();
+      if (content) {
+        const current = contentMap.get(post.thread_id) ?? [];
+        if (current.length < 5) {
+          current.push(content);
+          contentMap.set(post.thread_id, current);
+        }
       }
     }
 
@@ -71,6 +83,9 @@ export async function GET() {
           title: t.title,
           category: t.category,
           created_at: t.created_at,
+          original_post: t.original_post,
+          summary: t.ai_summary,
+          posts_content: (contentMap.get(t.id) ?? []).join("\n"),
           post_count: count,
           avg_logic_score: avgLogicScore,
         };
@@ -104,7 +119,7 @@ export async function GET() {
           new Date(a.created_at ?? 0).getTime()
         );
       })
-      .slice(0, 5);
+      .slice(0, 8);
 
     return NextResponse.json({
       success: true,
