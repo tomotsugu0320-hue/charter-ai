@@ -1052,7 +1052,14 @@ export default function ForumPage() {
                 />
               ))
             ) : (
-              <div style={panelStyle}>一致する評価が高いスレッドはありません。</div>
+              <div style={panelStyle}>
+                一致する評価が高いスレッドはありません。
+                {selectedNodeLabel && (
+                  <div style={{ ...smallMetaStyle, marginTop: 6 }}>
+                    この論点について、下の入力欄から新しく投稿できます。
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
