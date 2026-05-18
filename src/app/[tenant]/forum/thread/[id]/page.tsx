@@ -1035,6 +1035,15 @@ const initialReasons = visibleReasons.slice(0, 2);
 const initialConflicts = visibleConflicts.slice(0, 2);
 const initialPostCount = summary?.counts?.total ?? posts.length;
 const showInitialDiscussionNote = initialPostCount <= 3;
+const provisionalSummarySource = summary?.summary_text?.trim() ?? "";
+const provisionalAnswerText =
+  provisionalSummarySource.length > 0
+    ? `現時点の要約では、${
+        provisionalSummarySource.length > 120
+          ? `${provisionalSummarySource.slice(0, 120)}...`
+          : provisionalSummarySource
+      } という整理が見えます。論理性の目安として確認してください。`
+    : "現時点では、投稿内容と論点整理をもとに、どの見方が論理的に強いかを確認している段階です。";
 
 /*
 const oldPremiseSectionTitle = hasInferred(displayPremiseItems)
@@ -1596,6 +1605,50 @@ function jumpToMainIssues() {
         </div>
       )}
     </div>
+  </div>
+</div>
+
+<div
+  style={{
+    marginTop: 16,
+    padding: 14,
+    border: "1px solid #dbe3ef",
+    borderRadius: 10,
+    background: "#f8fafc",
+    color: "#111",
+  }}
+>
+  <h2
+    style={{
+      margin: 0,
+      fontSize: currentFont.title,
+      fontWeight: 800,
+      lineHeight: 1.4,
+      color: "#111",
+    }}
+  >
+    AIの暫定回答
+  </h2>
+
+  <p
+    style={{
+      margin: "8px 0 10px",
+      color: "#333",
+      fontSize: currentFont.base,
+      lineHeight: 1.7,
+    }}
+  >
+    {provisionalAnswerText}
+  </p>
+
+  <div
+    style={{
+      color: "#555",
+      fontSize: currentFont.base * 0.9,
+      lineHeight: 1.6,
+    }}
+  >
+    この回答は投稿と議論に応じて更新されます。
   </div>
 </div>
 
