@@ -66,6 +66,13 @@ const guideTreeRoot: GuideTreeNode = {
         { id: "related-threads", label: "関連スレッド" },
       ],
     },
+    {
+      id: "review-policies",
+      label: "⑥ 政策を検証する",
+      children: [
+        { id: "abenomics", label: "アベノミクス", nodeId: "abenomics" },
+      ],
+    },
   ],
 };
 

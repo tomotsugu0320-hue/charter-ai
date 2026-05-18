@@ -80,6 +80,10 @@ const NODE_INFO: Record<string, { label: string; path?: string[] }> = {
     label: "財源",
     path: ["反論・リスクを確認する", "財源"],
   },
+  abenomics: {
+    label: "アベノミクス",
+    path: ["政策を検証する", "アベノミクス"],
+  },
 };
 
 const pageStyle: CSSProperties = {

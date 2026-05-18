@@ -151,6 +151,14 @@ const topicCards = [
     discussion:
       "財源だけで政策を止めると、需要不足が長引くという懸念があります。",
   },
+  {
+    title: "アベノミクス",
+    nodeId: "abenomics",
+    aiView:
+      "金融緩和はデフレ脱却に合理的でしたが、財政政策と増税が効果を弱めました。",
+    discussion:
+      "成功か失敗かではなく、何が正しく、どこでブレーキがかかったかを分解すべきです。",
+  },
 ];
 
 export default async function EconomyPage({ params }: PageProps) {
