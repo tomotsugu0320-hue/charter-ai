@@ -61,6 +61,98 @@ const secondaryLinkStyle: CSSProperties = {
   textAlign: "center",
 };
 
+const topicSectionStyle: CSSProperties = {
+  marginBottom: 18,
+};
+
+const topicGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
+  gap: 12,
+};
+
+const topicCardStyle: CSSProperties = {
+  border: "1px solid #dbe3ef",
+  borderRadius: 8,
+  padding: 16,
+  background: "#ffffff",
+  color: "#111827",
+};
+
+const topicLabelStyle: CSSProperties = {
+  margin: "12px 0 4px",
+  color: "#475569",
+  fontSize: 12,
+  fontWeight: 900,
+};
+
+const topicTextStyle: CSSProperties = {
+  margin: 0,
+  color: "#334155",
+  lineHeight: 1.7,
+  fontSize: 14,
+};
+
+const detailLinkStyle: CSSProperties = {
+  display: "inline-block",
+  marginTop: 12,
+  color: "#1d4ed8",
+  fontWeight: 800,
+  textDecoration: "underline",
+};
+
+const topicCards = [
+  {
+    title: "消費税",
+    nodeId: "consumption-tax",
+    aiView:
+      "消費税は安定財源ですが、需要不足局面では消費を抑える可能性があります。",
+    discussion:
+      "可処分所得を減らし、需要不足を悪化させるという見方があります。",
+  },
+  {
+    title: "需要不足",
+    nodeId: "demand-shortage",
+    aiView: "需要不足が続くと、投資や賃上げが弱くなる可能性があります。",
+    discussion:
+      "日本の停滞は供給力不足より需要不足が大きいという見方があります。",
+  },
+  {
+    title: "減税",
+    nodeId: "tax-cuts",
+    aiView: "減税は可処分所得を増やしますが、対象と期間設計が重要です。",
+    discussion: "一時給付より、恒久的な負担軽減を重視する意見があります。",
+  },
+  {
+    title: "財政政策",
+    nodeId: "fiscal-policy",
+    aiView: "財政政策は需要を支えますが、使い道と規模の設計が重要です。",
+    discussion:
+      "緊縮よりも、需要不足を補う支出が必要という見方があります。",
+  },
+  {
+    title: "社会保険料",
+    nodeId: "tax-social-insurance",
+    aiView: "社会保険料は現役世代の可処分所得に大きく影響します。",
+    discussion:
+      "税金以上に重い負担として、生活実感を圧迫している可能性があります。",
+  },
+  {
+    title: "インフレ",
+    nodeId: "inflation",
+    aiView: "インフレは需要要因と供給要因を分けて見る必要があります。",
+    discussion: "物価高だけを見て、需要不足を見落とす危険があります。",
+  },
+  {
+    title: "財源",
+    nodeId: "funding-source",
+    aiView:
+      "財源論は重要ですが、経済全体への影響も同時に見る必要があります。",
+    discussion:
+      "財源だけで政策を止めると、需要不足が長引くという懸念があります。",
+  },
+];
+
 export default async function EconomyPage({ params }: PageProps) {
   const { tenant } = await params;
 
@@ -101,6 +193,35 @@ export default async function EconomyPage({ params }: PageProps) {
           <Link href={`/${tenant}/forum?node=tax-cuts`} style={secondaryLinkStyle}>
             減税を考える
           </Link>
+        </div>
+      </section>
+
+      <section style={topicSectionStyle}>
+        <h2 style={{ margin: "0 0 12px", fontSize: 22, letterSpacing: 0 }}>
+          主要論点
+        </h2>
+
+        <div style={topicGridStyle}>
+          {topicCards.map((topic) => (
+            <article key={topic.nodeId} style={topicCardStyle}>
+              <h3 style={{ margin: 0, fontSize: 18, letterSpacing: 0 }}>
+                {topic.title}
+              </h3>
+
+              <div style={topicLabelStyle}>AIの見立て</div>
+              <p style={topicTextStyle}>{topic.aiView}</p>
+
+              <div style={topicLabelStyle}>議論のまとめ</div>
+              <p style={topicTextStyle}>{topic.discussion}</p>
+
+              <Link
+                href={`/${tenant}/forum?node=${topic.nodeId}`}
+                style={detailLinkStyle}
+              >
+                詳しく見る
+              </Link>
+            </article>
+          ))}
         </div>
       </section>
 
