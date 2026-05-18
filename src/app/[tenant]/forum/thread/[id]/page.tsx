@@ -1502,6 +1502,50 @@ function jumpToMainIssues() {
 <div
   style={{
     marginTop: 16,
+    padding: 16,
+    border: "1px solid #fb923c",
+    borderRadius: 12,
+    background: "#fff7ed",
+    color: "#111",
+  }}
+>
+  <h2
+    style={{
+      margin: 0,
+      fontSize: currentFont.title,
+      fontWeight: 900,
+      lineHeight: 1.4,
+      color: "#9a3412",
+    }}
+  >
+    AIの暫定回答
+  </h2>
+
+  <p
+    style={{
+      margin: "8px 0 10px",
+      color: "#333",
+      fontSize: currentFont.base,
+      lineHeight: 1.7,
+    }}
+  >
+    {provisionalAnswerText}
+  </p>
+
+  <div
+    style={{
+      color: "#7c2d12",
+      fontSize: currentFont.base * 0.9,
+      lineHeight: 1.6,
+    }}
+  >
+    この回答は投稿と議論に応じて更新されます。
+  </div>
+</div>
+
+<div
+  style={{
+    marginTop: 16,
     padding: 14,
     border: "1px solid #dbe3ef",
     borderRadius: 10,
@@ -1605,50 +1649,6 @@ function jumpToMainIssues() {
         </div>
       )}
     </div>
-  </div>
-</div>
-
-<div
-  style={{
-    marginTop: 16,
-    padding: 14,
-    border: "1px solid #dbe3ef",
-    borderRadius: 10,
-    background: "#f8fafc",
-    color: "#111",
-  }}
->
-  <h2
-    style={{
-      margin: 0,
-      fontSize: currentFont.title,
-      fontWeight: 800,
-      lineHeight: 1.4,
-      color: "#111",
-    }}
-  >
-    AIの暫定回答
-  </h2>
-
-  <p
-    style={{
-      margin: "8px 0 10px",
-      color: "#333",
-      fontSize: currentFont.base,
-      lineHeight: 1.7,
-    }}
-  >
-    {provisionalAnswerText}
-  </p>
-
-  <div
-    style={{
-      color: "#555",
-      fontSize: currentFont.base * 0.9,
-      lineHeight: 1.6,
-    }}
-  >
-    この回答は投稿と議論に応じて更新されます。
   </div>
 </div>
 
