@@ -1626,6 +1626,99 @@ function jumpToMainIssues() {
 {/* ←ここで完全に閉じる */}
 
 
+          <SectionCard variant="white" style={{ marginTop: 24 }}>
+            <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
+              まず意見を読む
+            </SectionTitle>
+
+            <div style={{ marginBottom: 12 }}>
+              <input
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                placeholder="投稿を検索"
+                style={{
+                  width: "100%",
+                  border: "1px solid #ccc",
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                  fontSize: currentFont.base,
+                  background: "#fff",
+                  color: "#000",
+                }}
+              />
+            </div>
+
+            <label
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 12,
+                fontSize: currentFont.base,
+                color: "#444",
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={hideLowScore}
+                onChange={(e) => setHideLowScore(e.target.checked)}
+              />
+              読みづらい投稿を薄く表示する
+            </label>
+
+            <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <PrimaryButton
+                onClick={() => setSortType("score")}
+                style={{
+                  background: sortType === "score" ? "#111" : "#eee",
+                  color: sortType === "score" ? "#fff" : "#333",
+                }}
+              >
+                読みやすい順
+              </PrimaryButton>
+
+              <PrimaryButton
+                onClick={() => setSortType("new")}
+                style={{
+                  background: sortType === "new" ? "#111" : "#eee",
+                  color: sortType === "new" ? "#fff" : "#333",
+                }}
+              >
+                新着順
+              </PrimaryButton>
+            </div>
+
+
+
+            {visiblePosts.length === 0 ? (
+              <div style={{ color: "#666" }}>まだ投稿がない。</div>
+            ) : (
+              <div style={{ display: "grid", gap: 14 }}>
+
+
+
+<OpinionView
+  groupedByOpinion={groupedByOpinion}
+  bestOpinionsByIssue={bestOpinionsByIssue}
+  hideLowScore={hideLowScore}
+  currentFont={currentFont}
+  thread={thread}
+  setSelectedGuide={setSelectedGuide}
+  setPostRole={setPostRole}
+  setReplyToOpinionId={setReplyToOpinionId}
+  explanations={explanations}
+  feedbackLoadingPostId={feedbackLoadingPostId}
+  handleFeedback={handleFeedback}
+  onHidePost={handleHidePost}
+  currentAuthorKey={currentAuthorKey}
+/>
+
+</div>
+            )}
+          </SectionCard>
+
+
 <SectionCard variant="white" style={{ marginTop: 24 }}>
   <div id="main-issues" style={{ scrollMarginTop: 80 }} />
 
@@ -1859,100 +1952,6 @@ function jumpToMainIssues() {
     )}
   </div>
 </SectionCard>
-
-
-          <SectionCard variant="white" style={{ marginTop: 24 }}>
-            <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
-              まず意見を読む
-            </SectionTitle>
-
-            <div style={{ marginBottom: 12 }}>
-              <input
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                placeholder="投稿を検索"
-                style={{
-                  width: "100%",
-                  border: "1px solid #ccc",
-                  borderRadius: 10,
-                  padding: "12px 14px",
-                  fontSize: currentFont.base,
-                  background: "#fff",
-                  color: "#000",
-                }}
-              />
-            </div>
-
-            <label
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 12,
-                fontSize: currentFont.base,
-                color: "#444",
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={hideLowScore}
-                onChange={(e) => setHideLowScore(e.target.checked)}
-              />
-              読みづらい投稿を薄く表示する
-            </label>
-
-            <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <PrimaryButton
-                onClick={() => setSortType("score")}
-                style={{
-                  background: sortType === "score" ? "#111" : "#eee",
-                  color: sortType === "score" ? "#fff" : "#333",
-                }}
-              >
-                読みやすい順
-              </PrimaryButton>
-
-              <PrimaryButton
-                onClick={() => setSortType("new")}
-                style={{
-                  background: sortType === "new" ? "#111" : "#eee",
-                  color: sortType === "new" ? "#fff" : "#333",
-                }}
-              >
-                新着順
-              </PrimaryButton>
-            </div>
-
-
-
-            {visiblePosts.length === 0 ? (
-              <div style={{ color: "#666" }}>まだ投稿がない。</div>
-            ) : (
-              <div style={{ display: "grid", gap: 14 }}>
-
-
-
-<OpinionView
-  groupedByOpinion={groupedByOpinion}
-  bestOpinionsByIssue={bestOpinionsByIssue}
-  hideLowScore={hideLowScore}
-  currentFont={currentFont}
-  thread={thread}
-  setSelectedGuide={setSelectedGuide}
-  setPostRole={setPostRole}
-  setReplyToOpinionId={setReplyToOpinionId}
-  explanations={explanations}
-  feedbackLoadingPostId={feedbackLoadingPostId}
-  handleFeedback={handleFeedback}
-  onHidePost={handleHidePost}
-  currentAuthorKey={currentAuthorKey}
-/>
-
-</div>
-            )}
-          </SectionCard>
-
 
 
 <div style={{ marginTop: 24 }}>
