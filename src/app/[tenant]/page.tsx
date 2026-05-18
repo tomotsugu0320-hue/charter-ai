@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -207,6 +208,10 @@ export default function Home() {
 
       <p style={{ opacity: 0.8, marginTop: 8, marginBottom: 0 }}>
         トレーニングや食事を記録すると、AIコーチが継続をサポートします。
+      </p>
+
+      <p style={{ marginTop: 10, marginBottom: 0, fontSize: 14 }}>
+        <Link href={`/${tenantSlug}/economy`}>日本経済の議論を見る</Link>
       </p>
 
       {warning && (
