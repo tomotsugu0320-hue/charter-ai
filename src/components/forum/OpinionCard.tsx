@@ -92,6 +92,20 @@ const displayText = op.opinion.is_sensitive
   : (op.opinion.sanitized_text || op.opinion.content);
 
 const { claim, premises, reasons } = splitContent(displayText);
+const savedConclusionExplanation = String(
+  op.opinion.ai_conclusion_explanation ?? ""
+).trim();
+const savedCounterargumentExplanation = String(
+  op.opinion.ai_counterargument_explanation ?? ""
+).trim();
+const feedbackActions = [
+  ["conclusion_unknown", "AIで結論を解説"],
+  ["counterargument_unknown", "AIで反対意見を解説"],
+].filter(([type]) => {
+  if (type === "conclusion_unknown") return !savedConclusionExplanation;
+  if (type === "counterargument_unknown") return !savedCounterargumentExplanation;
+  return true;
+});
 
   return (
     <PostCard
@@ -222,6 +236,57 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
 
       </div>
 
+      {(savedConclusionExplanation || savedCounterargumentExplanation) && (
+        <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+          {savedConclusionExplanation && (
+<SectionCard
+  variant="info"
+  style={{
+    color: "#111",
+    fontSize: currentFont?.base,
+    lineHeight: 1.7,
+    border: "1px solid #bbdefb",
+  }}
+>
+  <div
+    style={{
+      fontWeight: 800,
+      marginBottom: 6,
+      color: "#0d47a1",
+    }}
+  >
+    AIの整理
+  </div>
+  <div>{savedConclusionExplanation}</div>
+</SectionCard>
+          )}
+
+          {savedCounterargumentExplanation && (
+<SectionCard
+  variant="info"
+  style={{
+    color: "#111",
+    fontSize: currentFont?.base,
+    lineHeight: 1.7,
+    border: "1px solid #bbdefb",
+  }}
+>
+  <div
+    style={{
+      fontWeight: 800,
+      marginBottom: 6,
+      color: "#0d47a1",
+    }}
+  >
+    反対側の見方
+  </div>
+  <div>{savedCounterargumentExplanation}</div>
+</SectionCard>
+          )}
+        </div>
+      )}
+
+      {feedbackActions.length > 0 && (
       <div
         style={{
           marginTop: 10,
@@ -231,10 +296,7 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
           gap: 8,
         }}
       >
-        {[
-  ["conclusion_unknown", "AIで結論を解説"],
-  ["counterargument_unknown", "AIで反対意見を解説"],
-].map(([type, label]) => (
+        {feedbackActions.map(([type, label]) => (
           <PrimaryButton
             key={type}
             variant="secondary"
@@ -250,6 +312,7 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
           </PrimaryButton>
         ))}
       </div>
+      )}
 
 <PrimaryButton
   variant="secondary"

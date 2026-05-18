@@ -47,6 +47,10 @@ type PostRow = {
   prediction_deadline?: string | null;
   parent_opinion_id?: string | null;
   prediction_result?: string | null;
+  ai_conclusion_explanation?: string | null;
+  ai_conclusion_explained_at?: string | null;
+  ai_counterargument_explanation?: string | null;
+  ai_counterargument_explained_at?: string | null;
   feedback_counts?: {
     term_unknown?: number;
     premise_unknown?: number;

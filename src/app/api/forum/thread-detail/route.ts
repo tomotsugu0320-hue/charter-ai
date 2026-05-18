@@ -75,6 +75,10 @@ if (!thread) {
   prediction_deadline,
   prediction_result,
   parent_opinion_id,
+  ai_conclusion_explanation,
+  ai_conclusion_explained_at,
+  ai_counterargument_explanation,
+  ai_counterargument_explained_at,
   is_deleted,
   deleted_at,
   delete_reason
