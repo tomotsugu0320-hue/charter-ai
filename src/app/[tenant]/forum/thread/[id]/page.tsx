@@ -2072,10 +2072,20 @@ function jumpToMainIssues() {
 </SectionCard>
 
 
-<div style={{ marginTop: 24 }}>
-  <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
+<details style={{ marginTop: 24 }}>
+  <summary
+    style={{
+      cursor: "pointer",
+      fontSize: currentFont.title,
+      fontWeight: 800,
+      color: "#111",
+      lineHeight: 1.4,
+    }}
+  >
     構造で見る
-  </SectionTitle>
+  </summary>
+
+<div style={{ marginTop: 12 }}>
 
 <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
   <PrimaryButton
@@ -2133,11 +2143,22 @@ function jumpToMainIssues() {
   }}
 />
 </div>
+</details>
 
-<SectionCard variant="white" style={{ marginTop: 24, color: "#111" }}>
-  <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
+<details style={{ marginTop: 24 }}>
+  <summary
+    style={{
+      cursor: "pointer",
+      fontSize: currentFont.title,
+      fontWeight: 800,
+      color: "#111",
+      lineHeight: 1.4,
+    }}
+  >
     この議論の現在地
-  </SectionTitle>
+  </summary>
+
+<SectionCard variant="white" style={{ marginTop: 12, color: "#111" }}>
 
   <p
     style={{
@@ -2200,6 +2221,7 @@ function jumpToMainIssues() {
 {renderLocationMap(mapRoot, mapBranches, tenant)}
   </div>
 </SectionCard>
+</details>
 
           <SectionCard variant="white" style={{ marginTop: 24 }}>
            <div id="post-form" style={{ scrollMarginTop: 120 }} />
