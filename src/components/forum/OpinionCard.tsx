@@ -222,23 +222,6 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
 
       </div>
 
-<PrimaryButton
-  variant="secondary"
-  onClick={() =>
-    window.open(
-      `https://www.google.com/search?q=${encodeURIComponent(claim || displayText)}`,
-      "_blank"
-    )
-  }
-  style={{
-    borderRadius: 999,
-    padding: "6px 10px",
-    fontSize: currentFont?.base,
-  }}
->
-  Googleで検索
-</PrimaryButton>
-
       <div
         style={{
           marginTop: 10,
@@ -267,6 +250,24 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
           </PrimaryButton>
         ))}
       </div>
+
+<PrimaryButton
+  variant="secondary"
+  onClick={() =>
+    window.open(
+      `https://www.google.com/search?q=${encodeURIComponent(claim || displayText)}`,
+      "_blank"
+    )
+  }
+  style={{
+    borderRadius: 999,
+    padding: "5px 9px",
+    fontSize: currentFont?.base ? currentFont.base * 0.9 : undefined,
+    marginTop: 2,
+  }}
+>
+  Googleで調べる
+</PrimaryButton>
 
       {feedbackLoadingPostId === op.opinion.id &&
         !explanations?.[op.opinion.id] && (
