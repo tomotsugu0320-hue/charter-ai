@@ -2076,13 +2076,32 @@ function jumpToMainIssues() {
   <summary
     style={{
       cursor: "pointer",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 12,
+      padding: "12px 14px",
+      border: "1px solid #d7dde8",
+      borderRadius: 8,
+      background: "#f8fafc",
+      color: "#111",
       fontSize: currentFont.title,
       fontWeight: 800,
-      color: "#111",
       lineHeight: 1.4,
+      minHeight: 44,
     }}
   >
-    構造で見る
+    <span>構造で見る</span>
+    <span
+      style={{
+        fontSize: currentFont.base * 0.85,
+        color: "#64748b",
+        fontWeight: 700,
+        whiteSpace: "nowrap",
+      }}
+    >
+      タップして開く
+    </span>
   </summary>
 
 <div style={{ marginTop: 12 }}>
@@ -2149,13 +2168,32 @@ function jumpToMainIssues() {
   <summary
     style={{
       cursor: "pointer",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 12,
+      padding: "12px 14px",
+      border: "1px solid #d7dde8",
+      borderRadius: 8,
+      background: "#f8fafc",
+      color: "#111",
       fontSize: currentFont.title,
       fontWeight: 800,
-      color: "#111",
       lineHeight: 1.4,
+      minHeight: 44,
     }}
   >
-    この議論の現在地
+    <span>この議論の現在地</span>
+    <span
+      style={{
+        fontSize: currentFont.base * 0.85,
+        color: "#64748b",
+        fontWeight: 700,
+        whiteSpace: "nowrap",
+      }}
+    >
+      タップして開く
+    </span>
   </summary>
 
 <SectionCard variant="white" style={{ marginTop: 12, color: "#111" }}>
