@@ -79,12 +79,12 @@ export default async function EconomyPage({ params }: PageProps) {
         </h1>
 
         <p style={leadStyle}>
-          AIの初期回答と、人間の議論から見える答えを比較しながら、政策のどこが正しく、どこが不十分なのかを整理する場所です。
+          消費税、需要不足、減税などの論点を選び、AIの整理と人間の議論を見ながら、日本経済を良くするための政策を考える入口です。
         </p>
 
         <div style={ctaGridStyle}>
           <Link href={`/${tenant}/forum`} style={primaryLinkStyle}>
-            掲示板を見る
+            議論一覧を見る
           </Link>
           <Link
             href={`/${tenant}/forum?node=consumption-tax`}
