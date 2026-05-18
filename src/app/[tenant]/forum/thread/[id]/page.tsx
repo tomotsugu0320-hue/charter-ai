@@ -1026,6 +1026,11 @@ const visibleConflicts =
   conflictQualityDisplay.mode === "empty"
     ? []
     : conflictQualityDisplay.items;
+const initialPremises = visiblePremises.slice(0, 2);
+const initialReasons = visibleReasons.slice(0, 2);
+const initialConflicts = visibleConflicts.slice(0, 2);
+const initialPostCount = summary?.counts?.total ?? posts.length;
+const showInitialDiscussionNote = initialPostCount <= 3;
 
 /*
 const oldPremiseSectionTitle = hasInferred(displayPremiseItems)
@@ -1480,6 +1485,115 @@ function jumpToMainIssues() {
 </div>
 
   <div>
+
+<div
+  style={{
+    marginTop: 16,
+    padding: 14,
+    border: "1px solid #dbe3ef",
+    borderRadius: 10,
+    background: "#f8fafc",
+    color: "#111",
+  }}
+>
+  <h2
+    style={{
+      margin: 0,
+      fontSize: currentFont.title,
+      fontWeight: 800,
+      lineHeight: 1.4,
+      color: "#111",
+    }}
+  >
+    AIの初期整理
+  </h2>
+
+  <p
+    style={{
+      margin: "8px 0 12px",
+      color: "#555",
+      fontSize: currentFont.base,
+      lineHeight: 1.7,
+    }}
+  >
+    議論が少ない段階では、AIの整理を叩き台として表示しています。
+  </p>
+
+  {showInitialDiscussionNote && (
+    <div
+      style={{
+        marginBottom: 12,
+        color: "#6b4e00",
+        background: "#fffbeb",
+        border: "1px solid #fde68a",
+        borderRadius: 8,
+        padding: "8px 10px",
+        fontSize: currentFont.base * 0.9,
+        lineHeight: 1.6,
+      }}
+    >
+      議論のまとめはまだ十分ではありません。まずはAIの初期整理を叩き台にできます。
+    </div>
+  )}
+
+  <div style={{ display: "grid", gap: 10 }}>
+    <div>
+      <div style={{ fontWeight: 800, marginBottom: 4 }}>主張</div>
+      <div style={{ color: "#333", lineHeight: 1.7, fontSize: currentFont.base }}>
+        {thread.original_post.length > 160
+          ? `${thread.original_post.slice(0, 160)}...`
+          : thread.original_post}
+      </div>
+    </div>
+
+    <div>
+      <div style={{ fontWeight: 800, marginBottom: 4 }}>前提</div>
+      {initialPremises.length > 0 ? (
+        <ul style={{ margin: 0, paddingLeft: 20, color: "#333", lineHeight: 1.7 }}>
+          {initialPremises.map((premise, index) => (
+            <li key={`initial-premise-${index}`}>{premise}</li>
+          ))}
+        </ul>
+      ) : (
+        <div style={{ color: "#666", fontSize: currentFont.base }}>
+          まだ前提は十分に整理されていません。
+        </div>
+      )}
+    </div>
+
+    <div>
+      <div style={{ fontWeight: 800, marginBottom: 4 }}>根拠</div>
+      {initialReasons.length > 0 ? (
+        <ul style={{ margin: 0, paddingLeft: 20, color: "#333", lineHeight: 1.7 }}>
+          {initialReasons.map((reason, index) => (
+            <li key={`initial-reason-${index}`}>{reason}</li>
+          ))}
+        </ul>
+      ) : (
+        <div style={{ color: "#666", fontSize: currentFont.base }}>
+          まだ根拠は十分に整理されていません。
+        </div>
+      )}
+    </div>
+
+    <div>
+      <div style={{ fontWeight: 800, marginBottom: 4 }}>反論・リスク</div>
+      {initialConflicts.length > 0 ? (
+        <ul style={{ margin: 0, paddingLeft: 20, color: "#333", lineHeight: 1.7 }}>
+          {initialConflicts.map((conflict, index) => (
+            <li key={`initial-conflict-${index}`}>
+              {conflict.rebuttal || conflict.opinion}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div style={{ color: "#666", fontSize: currentFont.base }}>
+          まだ反論・リスクは十分に整理されていません。
+        </div>
+      )}
+    </div>
+  </div>
+</div>
 
 <div
   style={{
