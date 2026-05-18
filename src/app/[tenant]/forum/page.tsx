@@ -910,8 +910,6 @@ export default function ForumPage() {
         </div>
       </header>
 
-      <ForumGuideTree tenant={tenant} />
-
       <section style={{ ...panelStyle, marginBottom: 18 }}>
         <div
           style={{
@@ -1476,6 +1474,8 @@ export default function ForumPage() {
           </aside>
         </section>
       )}
+
+      <ForumGuideTree tenant={tenant} />
     </main>
   );
 }
