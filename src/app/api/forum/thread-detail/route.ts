@@ -62,6 +62,7 @@ if (!thread) {
   thread_id,
   source_type,
   post_role,
+  stance_label,
   content,
   author_key,
   trust_status,

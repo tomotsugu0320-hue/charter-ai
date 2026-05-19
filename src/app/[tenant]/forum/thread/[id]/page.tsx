@@ -29,11 +29,14 @@ type ThreadRow = {
 };
 
 
+type StanceLabel = "support" | "oppose" | "neutral" | "other" | "unknown";
+
 type PostRow = {
   id: string;
   thread_id: string;
   source_type: string;
   post_role: string;
+  stance_label?: StanceLabel | null;
   content: string;
   author_key?: string;
   trust_status: string;
@@ -115,6 +118,19 @@ const POST_ROLE_OPTIONS: PostRoleOption[] = [
   { value: "rebuttal", label: "反論" },
   { value: "supplement", label: "補足" },
   { value: "explanation", label: "解説" },
+];
+
+type StanceLabelOption = {
+  value: StanceLabel;
+  label: string;
+};
+
+const STANCE_LABEL_OPTIONS: StanceLabelOption[] = [
+  { value: "unknown", label: "未分類：あとでAIが整理" },
+  { value: "support", label: "賛成" },
+  { value: "oppose", label: "反対" },
+  { value: "neutral", label: "中立" },
+  { value: "other", label: "その他" },
 ];
 
 type LocationMapNode = {
@@ -570,6 +586,7 @@ for (const word of matches) {
 
   const [postRole, setPostRole] =
     useState<PostRoleOption["value"]>("opinion");
+  const [stanceLabel, setStanceLabel] = useState<StanceLabel>("unknown");
 
 const [treeVariant, setTreeVariant] = useState<"A" | "C">("A");
 
@@ -1218,6 +1235,7 @@ if (postRole === "rebuttal" && !replyToOpinionId) {
           threadId,
           content: contentToPost,
           postRole,
+          stance_label: stanceLabel,
           parentOpinionId: replyToOpinionId,
           prediction_flag: predictionFlag,
           prediction_target: predictionFlag ? predictionTarget : null,
@@ -1236,6 +1254,7 @@ if (postRole === "rebuttal" && !replyToOpinionId) {
       setReplyToOpinionId(null);
       setText("");
       setPostRole("opinion");
+      setStanceLabel("unknown");
       setPredictionFlag(false);
       setPredictionTarget("");
       setPredictionDeadline("");
@@ -2541,6 +2560,44 @@ function jumpToMainIssues() {
 
             <div style={{ marginBottom: 14 }}>
               <label
+                htmlFor="stance-label"
+                style={{
+                  display: "block",
+                  marginBottom: 8,
+                  fontSize: currentFont.base,
+                  fontWeight: 700,
+                  color: "#111",
+                }}
+              >
+                投稿の立場
+              </label>
+
+              <select
+                id="stance-label"
+                value={stanceLabel}
+                onChange={(e) => setStanceLabel(e.target.value as StanceLabel)}
+                disabled={posting}
+                style={{
+                  width: "100%",
+                  maxWidth: 260,
+                  border: "1px solid #ccc",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  fontSize: currentFont.base,
+                  background: "#fff",
+                  color: "#111",
+                }}
+              >
+                {STANCE_LABEL_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label
                 htmlFor="post-role"
                 style={{
                   display: "block",
@@ -2663,6 +2720,7 @@ function jumpToMainIssues() {
                   setText("");
                   setSelectedGuide(null);
                   setPostRole("opinion");
+                  setStanceLabel("unknown");
                   setPredictionFlag(false);
                   setPredictionTarget("");
                   setPredictionDeadline("");

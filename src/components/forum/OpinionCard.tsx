@@ -58,6 +58,23 @@ function roleColor(role: string) {
   }
 }
 
+function stanceLabelText(stance?: string | null) {
+  switch (stance) {
+    case "support":
+      return "賛成";
+    case "oppose":
+      return "反対";
+    case "neutral":
+      return "中立";
+    case "other":
+      return "その他";
+    case "unknown":
+      return "未分類";
+    default:
+      return "";
+  }
+}
+
 
 function scoreColor(score?: number) {
   if (score === null || score === undefined) return "#777";
@@ -98,6 +115,7 @@ const savedConclusionExplanation = String(
 const savedCounterargumentExplanation = String(
   op.opinion.ai_counterargument_explanation ?? ""
 ).trim();
+const stanceText = stanceLabelText(op.opinion.stance_label);
 const feedbackActions = [
   ["conclusion_unknown", "AIで結論を解説"],
   ["counterargument_unknown", "AIで反対意見を解説"],
@@ -145,6 +163,23 @@ const feedbackActions = [
 <span style={{ marginLeft: 8, color: scoreColor(score) }}>
   {score === null || score === undefined ? "未評価" : score}
 </span>
+          {stanceText && (
+            <span
+              style={{
+                marginLeft: 8,
+                padding: "2px 7px",
+                border: "1px solid #d1d5db",
+                borderRadius: 999,
+                background: "#f9fafb",
+                color: "#374151",
+                fontSize: currentFont?.base ? currentFont.base * 0.85 : 12,
+                fontWeight: 700,
+                whiteSpace: "nowrap",
+              }}
+            >
+              立場: {stanceText}
+            </span>
+          )}
         </div>
 
         {canHideOpinion && (

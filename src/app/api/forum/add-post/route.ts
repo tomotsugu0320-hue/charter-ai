@@ -107,9 +107,26 @@ const ALLOWED_POST_ROLES = [
 
 type AllowedPostRole = (typeof ALLOWED_POST_ROLES)[number];
 
+const ALLOWED_STANCE_LABELS = [
+  "support",
+  "oppose",
+  "neutral",
+  "other",
+  "unknown",
+] as const;
+
+type AllowedStanceLabel = (typeof ALLOWED_STANCE_LABELS)[number];
+
 
 function isAllowedPostRole(value: string): value is AllowedPostRole {
   return ALLOWED_POST_ROLES.includes(value as AllowedPostRole);
+}
+
+function normalizeStanceLabel(value: unknown): AllowedStanceLabel {
+  const label = String(value ?? "").trim();
+  return ALLOWED_STANCE_LABELS.includes(label as AllowedStanceLabel)
+    ? (label as AllowedStanceLabel)
+    : "unknown";
 }
 
 
@@ -308,6 +325,7 @@ export async function POST(req: NextRequest) {
     const threadId = body?.threadId;
     const content = String(body?.content ?? "").trim();
     const postRole = String(body?.postRole ?? "").trim();
+const stanceLabel = normalizeStanceLabel(body?.stance_label ?? body?.stanceLabel);
 const authorKey = getOrCreateAuthorKey(req);
 const parentOpinionId =
   String(body?.parentOpinionId ?? body?.parent_opinion_id ?? "").trim() || null;
@@ -413,6 +431,7 @@ const { data: insertedRows, error } = await supabase
   thread_id: threadId,
   source_type: "human",
   post_role: postRole,
+  stance_label: stanceLabel,
   content,
   author_key: authorKey,
   parent_opinion_id: parentOpinionId,
