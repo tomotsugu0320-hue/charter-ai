@@ -32,6 +32,45 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
+type GenerateIssueCacheValue = {
+  response: Record<string, unknown>;
+  createdAt: number;
+};
+
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const MAX_CACHE_SIZE = 100;
+const generateIssueCache = new Map<string, GenerateIssueCacheValue>();
+
+function normalizeCacheText(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function getCacheKey(tenantSlug: string, text: string) {
+  return `${tenantSlug}:${normalizeCacheText(text)}`;
+}
+
+function pruneCache(now: number) {
+  for (const [key, value] of generateIssueCache.entries()) {
+    if (now - value.createdAt > CACHE_TTL_MS) {
+      generateIssueCache.delete(key);
+    }
+  }
+
+  while (generateIssueCache.size > MAX_CACHE_SIZE) {
+    const oldestKey = generateIssueCache.keys().next().value;
+    if (!oldestKey) break;
+    generateIssueCache.delete(oldestKey);
+  }
+}
+
+function cacheResponse(cacheKey: string, response: Record<string, unknown>) {
+  generateIssueCache.set(cacheKey, {
+    response,
+    createdAt: Date.now(),
+  });
+  pruneCache(Date.now());
+}
+
 // =========================
 // キーワード抽出（強化版）
 // =========================
@@ -239,10 +278,30 @@ function fallbackStructure(): DbStructure {
 
 export async function POST(req: Request) {
   let text = "";
+  let cacheKey = "";
 
   try {
     const body = await req.json();
-    text = typeof body?.text === "string" ? body.text : "";
+    const inputText = body?.text ?? body?.content ?? body?.input;
+    text = typeof inputText === "string" ? inputText : "";
+    const tenantSlug =
+      String(body?.tenantSlug ?? body?.tenant_slug ?? "default").trim() ||
+      "default";
+    cacheKey = getCacheKey(tenantSlug, text);
+
+    const now = Date.now();
+    pruneCache(now);
+
+    const cached = generateIssueCache.get(cacheKey);
+
+    if (cached && now - cached.createdAt <= CACHE_TTL_MS) {
+      return NextResponse.json({
+        ...cached.response,
+        cached: true,
+        reused: true,
+        source: "memory",
+      });
+    }
 
     // ① DB検索
     const dbResult = await loadDbStructure(text);
@@ -255,7 +314,7 @@ if (
   dbResult.reasons.length >= 1 ||
   dbResult.conflicts.length >= 1
 ) {
-  return NextResponse.json({
+  const response = {
     mode: "expand",
 claim: typeof text === "string" ? text : "",
     premises: dbResult.premises.slice(0, 3),
@@ -265,7 +324,9 @@ claim: typeof text === "string" ? text : "",
       rebuttal: c.b ?? "",
     })),
     source: "db",
-  });
+  };
+  cacheResponse(cacheKey, response);
+  return NextResponse.json(response);
 }
 
 
@@ -336,7 +397,7 @@ const safeConflictsRaw =
     ? parsed.conflicts.slice(0, 3)
     : fallback.conflicts.slice(0, 3);
 
-return NextResponse.json({
+const response = {
   mode: "expand",
 claim: text,
   premises: safePremises,
@@ -346,13 +407,15 @@ claim: text,
     rebuttal: c?.rebuttal ?? c?.b ?? "",
   })),
   source: "ai",
-});
+};
+cacheResponse(cacheKey, response);
+return NextResponse.json(response);
   } catch (e) {
     console.error(e);
 
     const fallback = fallbackStructure();
 
-    return NextResponse.json({
+    const response = {
       mode: "expand",
       claim: typeof text === "string" ? text : "",
       premises: fallback.premises,
@@ -362,6 +425,10 @@ claim: text,
         rebuttal: c.b ?? "",
       })),
       source: "fallback",
-    });
+    };
+    if (cacheKey) {
+      cacheResponse(cacheKey, response);
+    }
+    return NextResponse.json(response);
   }
 }
