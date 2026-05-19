@@ -355,7 +355,7 @@ if (!isAllowedPostRole(postRole)) {
 }
 
 const privacy = checkPrivacyRisk(content);
-const logicResult = await evaluateLogicScore(content, postRole);
+const logicResult = calcLogicScoreFallback(content, postRole);
 let logicBreakType: string | null = null;
 let logicBreakNote: string | null = null;
 
