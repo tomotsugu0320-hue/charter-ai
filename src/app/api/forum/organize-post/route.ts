@@ -8,16 +8,67 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+type OrganizeCacheValue = {
+  summary: string;
+  postText: string;
+  createdAt: number;
+};
+
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const MAX_CACHE_SIZE = 100;
+const organizeCache = new Map<string, OrganizeCacheValue>();
+
+function normalizeCacheText(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function getCacheKey(tenantSlug: string, text: string) {
+  return `${tenantSlug}:${normalizeCacheText(text)}`;
+}
+
+function pruneCache(now: number) {
+  for (const [key, value] of organizeCache.entries()) {
+    if (now - value.createdAt > CACHE_TTL_MS) {
+      organizeCache.delete(key);
+    }
+  }
+
+  while (organizeCache.size > MAX_CACHE_SIZE) {
+    const oldestKey = organizeCache.keys().next().value;
+    if (!oldestKey) break;
+    organizeCache.delete(oldestKey);
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const text = String(body?.text ?? "").trim();
+    const tenantSlug =
+      String(body?.tenantSlug ?? body?.tenant_slug ?? "default").trim() ||
+      "default";
 
     if (!text) {
       return NextResponse.json(
         { error: "text is required" },
         { status: 400 }
       );
+    }
+
+    const now = Date.now();
+    pruneCache(now);
+
+    const cacheKey = getCacheKey(tenantSlug, text);
+    const cached = organizeCache.get(cacheKey);
+
+    if (cached && now - cached.createdAt <= CACHE_TTL_MS) {
+      return NextResponse.json({
+        summary: cached.summary,
+        postText: cached.postText,
+        cached: true,
+        reused: true,
+        source: "memory",
+      });
     }
 
     const prompt = `
@@ -79,10 +130,18 @@ ${text}
       };
     }
 
-    return NextResponse.json({
+    const result = {
       summary: String(parsed.summary ?? "").trim(),
       postText: String(parsed.postText ?? "").trim() || text,
+    };
+
+    organizeCache.set(cacheKey, {
+      ...result,
+      createdAt: now,
     });
+    pruneCache(Date.now());
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error("[organize-post]", error);
     return NextResponse.json(
