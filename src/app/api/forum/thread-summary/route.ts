@@ -430,33 +430,22 @@ function buildProvisionalAnswer(
     return "現時点では投稿が少ないため、AIの初期整理を叩き台として確認している段階です。";
   }
 
-  const mainView =
-    summary.key_points.opinions[0] ||
-    summary.key_points.reasons?.[0]?.text ||
-    summary.key_points.issues[0] ||
-    "";
-
+  const wholeSummary = shortText(summary.summary_text, 140);
   const remainingConcern =
-    summary.key_points.rebuttals[0] ||
     conflictPairs[0]?.rebuttal ||
+    summary.key_points.rebuttals[0] ||
     summary.key_points.counterpoints?.[0]?.text ||
     "";
 
-  if (mainView && remainingConcern) {
-    return `現時点では、「${shortText(
-      mainView,
-      70
-    )}」という整理が比較的論理的に見えます。ただし、「${shortText(
+  if (wholeSummary && remainingConcern) {
+    return `現時点では、単純な賛成・反対や成功・失敗で判断するより、「${wholeSummary}」という全体整理をもとに、前提・根拠・反論リスクを見比べる段階です。ただし、「${shortText(
       remainingConcern,
       70
     )}」という反論・リスクも残ります。論理性の目安として確認してください。`;
   }
 
-  if (mainView) {
-    return `暫定的には、「${shortText(
-      mainView,
-      80
-    )}」という見方を中心に確認できます。まだ反論や補足が少ないため、論理性の目安として見てください。`;
+  if (wholeSummary) {
+    return `暫定的には、「${wholeSummary}」という全体整理をもとに確認できます。単一の立場に寄せず、前提・根拠・反論リスクを見比べる段階です。論理性の目安として見てください。`;
   }
 
   return "現時点では、投稿内容と論点整理をもとに、どの見方が論理的に強いかを確認している段階です。";
