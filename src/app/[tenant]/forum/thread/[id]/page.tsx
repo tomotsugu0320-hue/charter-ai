@@ -87,6 +87,7 @@ type ThreadSummary = {
   };
   summary_text: string;
   easy_summary_text?: string;
+  provisional_answer?: string | null;
   key_points: {
     issues: string[];
     opinions: string[];
@@ -1052,15 +1053,9 @@ const initialReasons = visibleReasons.slice(0, 2);
 const initialConflicts = visibleConflicts.slice(0, 2);
 const initialPostCount = summary?.counts?.total ?? posts.length;
 const showInitialDiscussionNote = initialPostCount <= 3;
-const provisionalSummarySource = summary?.summary_text?.trim() ?? "";
 const provisionalAnswerText =
-  provisionalSummarySource.length > 0
-    ? `現時点の要約では、${
-        provisionalSummarySource.length > 120
-          ? `${provisionalSummarySource.slice(0, 120)}...`
-          : provisionalSummarySource
-      } という整理が見えます。論理性の目安として確認してください。`
-    : "現時点では、投稿内容と論点整理をもとに、どの見方が論理的に強いかを確認している段階です。";
+  summary?.provisional_answer?.trim() ||
+  "現時点では、投稿内容と論点整理をもとに、どの見方が論理的に強いかを確認している段階です。";
 
 /*
 const oldPremiseSectionTitle = hasInferred(displayPremiseItems)
