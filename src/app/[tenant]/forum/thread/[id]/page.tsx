@@ -1155,23 +1155,8 @@ setTimeout(() => {
         throw new Error(result?.error || "読込失敗");
       }
 
-      const summaryRes = await fetch(
-        `/api/forum/thread-summary?threadId=${threadId}`,
-        {
-          method: "GET",
-        }
-      );
-
-      const summaryResult = await summaryRes.json();
-
-      if (!summaryRes.ok) {
-        throw new Error(summaryResult?.error || "要約読込失敗");
-      }
-
-      setConflicts(summaryResult.conflict_pairs || []);
       setThread(result.thread ?? null);
       setPosts(result.posts ?? []);
-      setSummary(summaryResult.summary ?? null);
     } catch (e: any) {
       console.error(e);
       setError(e?.message || "読込失敗");
