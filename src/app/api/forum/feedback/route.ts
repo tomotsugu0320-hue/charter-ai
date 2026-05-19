@@ -212,23 +212,6 @@ export async function POST(req: NextRequest) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    const { data: feedbackData, error: feedbackError } = await supabase
-      .from("forum_post_feedback")
-      .insert({
-        thread_id: threadId,
-        post_id: postId,
-        feedback_type: feedbackType,
-      })
-      .select("id, thread_id, post_id, feedback_type, created_at");
-
-    if (feedbackError) {
-      return NextResponse.json(
-        { success: false, error: feedbackError.message },
-        { status: 500 }
-      );
-    }
-
-
 const explanationColumn = getExplanationColumn(feedbackType);
 
 const selectColumns = explanationColumn
@@ -267,12 +250,31 @@ if (explanationColumn) {
   if (cachedExplanation) {
     return NextResponse.json({
       success: true,
-      feedback: feedbackData ?? [],
+      feedback: [],
       explanation: cachedExplanation,
       cached: true,
+      reused: true,
+      source: "existing",
     });
   }
 }
+
+    const { data: feedbackData, error: feedbackError } = await supabase
+      .from("forum_post_feedback")
+      .insert({
+        thread_id: threadId,
+        post_id: postId,
+        feedback_type: feedbackType,
+      })
+      .select("id, thread_id, post_id, feedback_type, created_at");
+
+    if (feedbackError) {
+      return NextResponse.json(
+        { success: false, error: feedbackError.message },
+        { status: 500 }
+      );
+    }
+
 
 const explanation = await generateExplanation(feedbackType, content);
 
