@@ -2596,45 +2596,70 @@ function jumpToMainIssues() {
               </select>
             </div>
 
-            <div style={{ marginBottom: 14 }}>
-              <label
-                htmlFor="post-role"
+            <details style={{ marginBottom: 14 }}>
+              <summary
                 style={{
-                  display: "block",
-                  marginBottom: 8,
-                  fontSize: currentFont.base,
+                  cursor: "pointer",
+                  color: "#555",
+                  fontSize: currentFont.base * 0.9,
                   fontWeight: 700,
-                  color: "#111",
+                  lineHeight: 1.6,
                 }}
               >
-                投稿分類
-              </label>
+                詳細設定：投稿分類
+              </summary>
 
-              <select
-                id="post-role"
-                value={postRole}
-                onChange={(e) =>
-                  setPostRole(e.target.value as PostRoleOption["value"])
-                }
-                disabled={posting}
-                style={{
-                  width: "100%",
-                  maxWidth: 260,
-                  border: "1px solid #ccc",
-                  borderRadius: 10,
-                  padding: "10px 12px",
-                  fontSize: currentFont.base,
-                  background: "#fff",
-                  color: "#111",
-                }}
-              >
-                {POST_ROLE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+              <div style={{ marginTop: 10 }}>
+                <label
+                  htmlFor="post-role"
+                  style={{
+                    display: "block",
+                    marginBottom: 8,
+                    fontSize: currentFont.base,
+                    fontWeight: 700,
+                    color: "#111",
+                  }}
+                >
+                  投稿分類
+                </label>
+
+                <div
+                  style={{
+                    marginBottom: 8,
+                    color: "#666",
+                    fontSize: currentFont.base * 0.85,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  迷ったら意見のままでOKです。あとでAIが整理できます。
+                </div>
+
+                <select
+                  id="post-role"
+                  value={postRole}
+                  onChange={(e) =>
+                    setPostRole(e.target.value as PostRoleOption["value"])
+                  }
+                  disabled={posting}
+                  style={{
+                    width: "100%",
+                    maxWidth: 260,
+                    border: "1px solid #ccc",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    fontSize: currentFont.base,
+                    background: "#fff",
+                    color: "#111",
+                  }}
+                >
+                  {POST_ROLE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </details>
 
 {postRole === "rebuttal" ? (
   <div style={{ display: "grid", gap: 10 }}>
