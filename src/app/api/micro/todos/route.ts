@@ -185,15 +185,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (!apiKey) {
-    return NextResponse.json(
-      { success: false, error: "OPENAI_API_KEY is missing" },
-      { status: 500 }
-    );
-  }
-
   let body: Record<string, unknown>;
 
   try {
@@ -208,6 +199,7 @@ export async function POST(req: NextRequest) {
   const tenantSlug = readString(body.tenantSlug || body.tenant_slug);
   const sourceDataId = readString(body.sourceDataId || body.source_data_id);
   const rawContent = readString(body.rawContent || body.raw_content);
+  const force = body.force === true;
 
   if (!tenantSlug) {
     return NextResponse.json(
@@ -227,6 +219,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { success: false, error: "rawContent is required" },
       { status: 400 }
+    );
+  }
+
+  if (!force) {
+    const { data: existingTodos, error: existingTodosError } = await supabase
+      .from("micro_todos")
+      .select(TODO_COLUMNS)
+      .eq("tenant_slug", tenantSlug)
+      .eq("source_data_id", sourceDataId)
+      .neq("status", "archived")
+      .or("todo_state.eq.open,todo_state.is.null")
+      .order("created_at", { ascending: false });
+
+    if (existingTodosError) {
+      return NextResponse.json(
+        { success: false, error: existingTodosError.message },
+        { status: 500 }
+      );
+    }
+
+    if ((existingTodos ?? []).length > 0) {
+      return NextResponse.json({
+        success: true,
+        todos: ((existingTodos ?? []) as TodoRow[]).sort(compareTodos),
+        reused: true,
+        source: "existing",
+      });
+    }
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    return NextResponse.json(
+      { success: false, error: "OPENAI_API_KEY is missing" },
+      { status: 500 }
     );
   }
 
