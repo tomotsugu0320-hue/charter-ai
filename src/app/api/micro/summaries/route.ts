@@ -155,15 +155,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (!apiKey) {
-    return NextResponse.json(
-      { success: false, error: "OPENAI_API_KEY is missing" },
-      { status: 500 }
-    );
-  }
-
   let body: Record<string, unknown>;
 
   try {
@@ -178,6 +169,7 @@ export async function POST(req: NextRequest) {
   const tenantSlug = readString(body.tenantSlug || body.tenant_slug);
   const sourceDataId = readString(body.sourceDataId || body.source_data_id);
   const rawContent = readString(body.rawContent || body.raw_content);
+  const force = body.force === true;
 
   if (!tenantSlug) {
     return NextResponse.json(
@@ -200,6 +192,42 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const { data: existingSummary, error: existingSummaryError } = await supabase
+    .from("micro_summaries")
+    .select(SUMMARY_COLUMNS)
+    .eq("tenant_slug", tenantSlug)
+    .eq("target_type", "source_data")
+    .eq("target_id", sourceDataId)
+    .eq("summary_type", "short")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingSummaryError) {
+    return NextResponse.json(
+      { success: false, error: existingSummaryError.message },
+      { status: 500 }
+    );
+  }
+
+  if (existingSummary && !force) {
+    return NextResponse.json({
+      success: true,
+      summary: existingSummary,
+      reused: true,
+      source: "existing",
+    });
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    return NextResponse.json(
+      { success: false, error: "OPENAI_API_KEY is missing" },
+      { status: 500 }
+    );
+  }
+
   try {
     const client = new OpenAI({ apiKey });
     const response = await client.responses.create({
@@ -212,25 +240,6 @@ export async function POST(req: NextRequest) {
     if (!summaryText) {
       return NextResponse.json(
         { success: false, error: "summary generation failed" },
-        { status: 500 }
-      );
-    }
-
-    const { data: existingSummary, error: existingSummaryError } =
-      await supabase
-        .from("micro_summaries")
-        .select("id, content")
-        .eq("tenant_slug", tenantSlug)
-        .eq("target_type", "source_data")
-        .eq("target_id", sourceDataId)
-        .eq("summary_type", "short")
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-    if (existingSummaryError) {
-      return NextResponse.json(
-        { success: false, error: existingSummaryError.message },
         { status: 500 }
       );
     }
