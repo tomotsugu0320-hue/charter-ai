@@ -62,6 +62,7 @@ const [searchText, setSearchText] = useState("");
   const [verifyingIssueId, setVerifyingIssueId] = useState<string | null>(null);
   const [lastVerifiedAtMap, setLastVerifiedAtMap] = useState<Record<string, number>>({});
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [suggestingEntryId, setSuggestingEntryId] = useState<string | null>(null);
 
   const [suggestedIssuesMap, setSuggestedIssuesMap] = useState<Record<string, Issue[]>>({});
   const [suggestedNewIssuesMap, setSuggestedNewIssuesMap] = useState<Record<string, string[]>>({});
@@ -844,6 +845,55 @@ async function loadStanceStats(issueId: string) {
 }
 
 
+async function suggestIssuesForEntry(entry: Entry) {
+  if (entry.role !== "user") return;
+
+  const text = entry.content.trim();
+  if (!text) return;
+
+  setSuggestingEntryId(entry.id);
+
+  try {
+    const res = await fetch("/api/suggest-issues", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text,
+        issues,
+      }),
+    });
+
+    const data = await res.json();
+
+    const matchedIssues = data.matches
+      .map((m: { title: string; reason?: string }) => {
+        const issue = issues.find((i) => i.title === m.title);
+        if (!issue) return null;
+        return { ...issue, reason: m.reason };
+      })
+      .filter(Boolean);
+
+    const newIssueTitles: string[] = Array.isArray(data.newIssues)
+      ? data.newIssues.filter((t: any) => typeof t === "string")
+      : [];
+
+    setSuggestedIssuesMap((prev) => ({
+      ...prev,
+      [entry.id]: matchedIssues,
+    }));
+
+    setSuggestedNewIssuesMap((prev) => ({
+      ...prev,
+      [entry.id]: newIssueTitles,
+    }));
+  } catch (e) {
+    console.error("suggestIssuesForEntry error:", e);
+  } finally {
+    setSuggestingEntryId(null);
+  }
+}
+
+
   async function sendMessage() {
     const text = toHalfWidth(input).trim();
 
@@ -866,81 +916,6 @@ async function loadStanceStats(issueId: string) {
         "ai",
         "投稿を受け付けました。必要ならテーマを追加し、この投稿を関連づけてください。"
       );
-
-      const res = await fetch("/api/suggest-issues", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text,
-          issues,
-        }),
-      });
-
-      const data = await res.json();
-
-const matchedIssues = data.matches
-.map((m: { title: string; reason?: string }) => {
-    const issue = issues.find((i) => i.title === m.title);
-    if (!issue) return null;
-    return { ...issue, reason: m.reason };
-  })
-  .filter(Boolean);
-
-const newIssueTitles: string[] = Array.isArray(data.newIssues)
-  ? data.newIssues.filter((t: any) => typeof t === "string")
-  : [];
-
-
-setSuggestedIssuesMap((prev) => ({
-  ...prev,
-  [userEntry.id]: matchedIssues,
-}));
-
-setSuggestedNewIssuesMap((prev) => ({
-  ...prev,
-  [userEntry.id]: newIssueTitles,
-}));
-
-const score = (issue: Issue) => {
-  let s = 0;
-  if (text.includes(issue.title)) s += 3;
-  if (issue.title.includes(text)) s += 3;
-
-  for (let i = 0; i < issue.title.length; i++) {
-    if (text.includes(issue.title[i])) s += 0.2;
-  }
-
-  return s;
-};
-
-const sortedMatchedIssues = [...matchedIssues].sort((a, b) => {
-  return score(b) - score(a);
-});
-
-
-const limitedMatchedIssues = sortedMatchedIssues.slice(0, 2);
-
-
-for (const issue of limitedMatchedIssues) {
-  await linkPostToIssue(userEntry.id, issue.id);
-}
-
-const normalizedExistingTitles = issues.map((i) =>
-  i.title.replace(/\s/g, "").toLowerCase()
-);
-
-const filteredNewIssueTitles = newIssueTitles.filter((title: string) => {
-  const normalized = title.replace(/\s/g, "").toLowerCase();
-
-  return !normalizedExistingTitles.some((existing) =>
-    existing.includes(normalized) || normalized.includes(existing)
-  );
-});
-
-for (const title of filteredNewIssueTitles) {
-  await addIssueAndLink(title, userEntry.id);
-}
-
 
 await loadEntries();
 await loadIssues(threadId);
@@ -1688,6 +1663,20 @@ const mainIssue = mainSuggested ?? relatedIssues[0];
     <div style={{ color: "#4b5563" }}>
       ここに記録の振り返りや補足説明を表示する予定
     </div>
+  </div>
+)}
+
+{entry.role === "user" && (
+  <div style={{ marginTop: 8 }}>
+    <button
+      type="button"
+      onClick={() => void suggestIssuesForEntry(entry)}
+      disabled={suggestingEntryId === entry.id}
+    >
+      {suggestingEntryId === entry.id
+        ? "論点候補を探しています..."
+        : "AIで論点候補を探す"}
+    </button>
   </div>
 )}
 
