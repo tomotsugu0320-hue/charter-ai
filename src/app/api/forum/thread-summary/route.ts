@@ -416,6 +416,16 @@ function buildSimpleSummary(posts: ForumPost[]) {
   };
 }
 
+function isImmatureSummaryText(text: string) {
+  const normalized = text.replace(/\s+/g, "");
+  return [
+    "まだ議論の整理が十分に進んでいません",
+    "まだAIまとめはありません",
+    "議論の整理が十分に進んでいません",
+    "まだ要約できるほど投稿が集まっていない",
+  ].some((phrase) => normalized.includes(phrase.replace(/\s+/g, "")));
+}
+
 function buildProvisionalAnswer(
   summary: ReturnType<typeof buildSimpleSummary>,
   conflictPairs: ConflictPair[]
@@ -430,7 +440,16 @@ function buildProvisionalAnswer(
     return "現時点では投稿が少ないため、AIの初期整理を叩き台として確認している段階です。";
   }
 
-  const wholeSummary = shortText(summary.summary_text, 140);
+  const summaryText = summary.summary_text?.trim() ?? "";
+  const wholeSummary = isImmatureSummaryText(summaryText)
+    ? ""
+    : shortText(summaryText, 140);
+  const focusText =
+    summary.key_points.issues[0] ||
+    summary.key_points.reasons?.[0]?.text ||
+    summary.key_points.explanations[0] ||
+    summary.key_points.supplements[0] ||
+    "";
   const remainingConcern =
     conflictPairs[0]?.rebuttal ||
     summary.key_points.rebuttals[0] ||
@@ -446,6 +465,30 @@ function buildProvisionalAnswer(
 
   if (wholeSummary) {
     return `暫定的には、「${wholeSummary}」という全体整理をもとに確認できます。単一の立場に寄せず、前提・根拠・反論リスクを見比べる段階です。論理性の目安として見てください。`;
+  }
+
+  if (focusText && remainingConcern) {
+    return `現時点では、単純な賛成・反対や成功・失敗で判断するより、「${shortText(
+      focusText,
+      70
+    )}」を軸に、主要な主張・根拠・反論リスクを分けて確認する段階です。ただし、「${shortText(
+      remainingConcern,
+      70
+    )}」という反論・リスクも残ります。論理性の目安として確認してください。`;
+  }
+
+  if (focusText) {
+    return `現時点では、単純な賛成・反対や成功・失敗で判断するより、「${shortText(
+      focusText,
+      70
+    )}」を軸に、主要な主張・根拠・反論リスクを分けて確認する段階です。論理性の目安として確認してください。`;
+  }
+
+  if (remainingConcern) {
+    return `現時点では、単純な賛成・反対や成功・失敗で判断するより、主要な主張・根拠・反論リスクを分けて確認する段階です。ただし、「${shortText(
+      remainingConcern,
+      70
+    )}」という反論・リスクも残ります。論理性の目安として確認してください。`;
   }
 
   return "現時点では、投稿内容と論点整理をもとに、どの見方が論理的に強いかを確認している段階です。";
