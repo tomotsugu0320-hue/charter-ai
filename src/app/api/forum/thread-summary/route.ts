@@ -537,15 +537,11 @@ export async function GET(req: NextRequest) {
     let summary = buildSimpleSummary(safePosts);
 
     try {
-      const [normalAiText, easyAiText] = await Promise.all([
-        generateNormalSummaryWithAI(safePosts),
-        generateEasySummaryWithAI(safePosts),
-      ]);
+      const normalAiText = await generateNormalSummaryWithAI(safePosts);
 
       summary = {
         ...summary,
         summary_text: normalAiText,
-        easy_summary_text: easyAiText,
       };
     } catch (aiError) {
       console.error("[thread-summary ai fallback]", aiError);
