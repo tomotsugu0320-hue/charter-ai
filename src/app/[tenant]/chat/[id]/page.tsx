@@ -925,10 +925,6 @@ for (const issue of limitedMatchedIssues) {
   await linkPostToIssue(userEntry.id, issue.id);
 }
 
-for (const issue of limitedMatchedIssues) {
-  await autoClassifyLinkedPost(userEntry, issue);
-}
-
 const normalizedExistingTitles = issues.map((i) =>
   i.title.replace(/\s/g, "").toLowerCase()
 );
@@ -942,10 +938,7 @@ const filteredNewIssueTitles = newIssueTitles.filter((title: string) => {
 });
 
 for (const title of filteredNewIssueTitles) {
-  const newIssue = await addIssueAndLink(title, userEntry.id);
-  if (newIssue?.id) {
-await autoClassifyLinkedPost(userEntry, newIssue as Issue);
-  }
+  await addIssueAndLink(title, userEntry.id);
 }
 
 
