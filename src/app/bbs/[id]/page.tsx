@@ -57,6 +57,7 @@ async function handleGenerate() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        postId: post.id,
         content: post.content,
       }),
     });

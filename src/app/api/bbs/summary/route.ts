@@ -1,15 +1,47 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { createClient } from "@supabase/supabase-js";
 
 export async function POST(req: Request) {
   try {
-    const { content } = await req.json();
+    const { content, postId, force } = await req.json();
 
     if (!content || typeof content !== "string") {
       return NextResponse.json(
         { error: "content がありません。" },
         { status: 400 }
       );
+    }
+
+    if (postId && force !== true) {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+      const { data, error } = await supabase
+        .from("posts")
+        .select("ai_summary")
+        .eq("id", postId)
+        .maybeSingle();
+
+      if (error) {
+        return NextResponse.json(
+          { error: error.message },
+          { status: 500 }
+        );
+      }
+
+      const existingSummary = String(data?.ai_summary ?? "").trim();
+
+      if (existingSummary) {
+        return NextResponse.json({
+          success: true,
+          summary: existingSummary,
+          reused: true,
+          source: "existing",
+        });
+      }
     }
 
     if (!process.env.OPENAI_API_KEY) {
