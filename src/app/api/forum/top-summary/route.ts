@@ -21,6 +21,11 @@ type PostRow = {
   logic_score: number | null;
 };
 
+type ThreadStructureRow = {
+  thread_id: string;
+  summary_text: string | null;
+};
+
 export async function GET() {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -44,6 +49,27 @@ export async function GET() {
 
     if (postsError) {
       throw new Error(postsError.message);
+    }
+
+    const threadIds = ((threads ?? []) as ThreadRow[]).map((thread) => thread.id);
+    const summaryMap = new Map<string, string>();
+
+    if (threadIds.length > 0) {
+      const { data: structures, error: structuresError } = await supabase
+        .from("thread_ai_structures")
+        .select("thread_id, summary_text")
+        .in("thread_id", threadIds);
+
+      if (structuresError) {
+        throw new Error(structuresError.message);
+      }
+
+      for (const row of (structures ?? []) as ThreadStructureRow[]) {
+        const summaryText = row.summary_text?.trim();
+        if (summaryText) {
+          summaryMap.set(row.thread_id, summaryText);
+        }
+      }
     }
 
     const countMap = new Map<string, number>();
@@ -84,7 +110,7 @@ export async function GET() {
           category: t.category,
           created_at: t.created_at,
           original_post: t.original_post,
-          summary: t.ai_summary,
+          summary: summaryMap.get(t.id) ?? t.ai_summary,
           posts_content: (contentMap.get(t.id) ?? []).join("\n"),
           post_count: count,
           avg_logic_score: avgLogicScore,
