@@ -6,9 +6,102 @@ type StructureResponse = {
   core_conflict?: string;
 };
 
+type CachedStructure = {
+  value: StructureResponse;
+  expiresAt: number;
+};
+
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const MAX_CACHE_SIZE = 100;
+const structureCache = new Map<string, CachedStructure>();
+
+function normalizeCacheText(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function getCacheKey(input: {
+  issueId: string;
+  tenantSlug: string;
+  title: string;
+  text: string;
+}) {
+  return [
+    input.tenantSlug || "default",
+    input.issueId || "no-issue",
+    normalizeCacheText(input.title),
+    normalizeCacheText(input.text),
+  ].join(":");
+}
+
+function getCachedStructure(cacheKey: string) {
+  const cached = structureCache.get(cacheKey);
+  if (!cached) return null;
+
+  if (cached.expiresAt <= Date.now()) {
+    structureCache.delete(cacheKey);
+    return null;
+  }
+
+  return cached.value;
+}
+
+function setCachedStructure(cacheKey: string, value: StructureResponse) {
+  const now = Date.now();
+
+  for (const [key, entry] of structureCache.entries()) {
+    if (entry.expiresAt <= now) {
+      structureCache.delete(key);
+    }
+  }
+
+  while (structureCache.size >= MAX_CACHE_SIZE) {
+    const oldestKey = structureCache.keys().next().value;
+    if (!oldestKey) break;
+    structureCache.delete(oldestKey);
+  }
+
+  structureCache.set(cacheKey, {
+    value,
+    expiresAt: now + CACHE_TTL_MS,
+  });
+}
+
 export async function POST(req: Request) {
   try {
-    const { text } = await req.json();
+    const body = await req.json();
+    const issueId = typeof body.issueId === "string" ? body.issueId : "";
+    const tenantSlug =
+      typeof body.tenantSlug === "string"
+        ? body.tenantSlug
+        : typeof body.tenant_slug === "string"
+          ? body.tenant_slug
+          : "";
+    const title =
+      typeof body.title === "string"
+        ? body.title
+        : typeof body.issueTitle === "string"
+          ? body.issueTitle
+          : "";
+    const text =
+      typeof body.text === "string"
+        ? body.text
+        : typeof body.content === "string"
+          ? body.content
+          : typeof body.postContent === "string"
+            ? body.postContent
+            : "";
+    const cacheKey = getCacheKey({ issueId, tenantSlug, title, text });
+    const cached = getCachedStructure(cacheKey);
+
+    if (cached) {
+      return NextResponse.json({
+        ...cached,
+        cached: true,
+        reused: true,
+        source: "memory",
+      });
+    }
+
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
@@ -75,11 +168,14 @@ Return JSON only:
       };
     }
 
-    return NextResponse.json({
+    const response = {
       side_a: parsed.side_a ?? "",
       side_b: parsed.side_b ?? "",
       core_conflict: parsed.core_conflict ?? "",
-    });
+    };
+    setCachedStructure(cacheKey, response);
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error("issue-structure route error:", error);
 
