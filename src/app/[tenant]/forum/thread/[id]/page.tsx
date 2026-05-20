@@ -681,6 +681,10 @@ const handleGenerateSummary = async () => {
       throw new Error(data?.error || "AIまとめ生成失敗");
     }
 
+    if (data && typeof data === "object" && "saved" in data && data.saved === false) {
+      console.error("[thread-summary save failed]", data.save_error);
+    }
+
     setSummary(data?.summary || null);
     setConflicts(Array.isArray(data?.conflict_pairs) ? data.conflict_pairs : []);
   } catch (e) {

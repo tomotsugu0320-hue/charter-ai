@@ -38,6 +38,18 @@ type ThreadSummaryResponse = {
   conflict_pairs: ConflictPair[];
 };
 
+type SaveThreadSummaryResult = {
+  saved: boolean;
+  save_error?: string;
+};
+
+type ThreadForSummarySave = {
+  id: string;
+  title: string | null;
+  original_post: string | null;
+  created_at: string | null;
+};
+
 type CachedThreadSummary = {
   value: ThreadSummaryResponse;
   expiresAt: number;
@@ -608,24 +620,101 @@ async function saveThreadSummary(
   supabase: any,
   threadId: string,
   summary: ReturnType<typeof buildSimpleSummary>
-) {
-  const { error } = await supabase.from("thread_ai_structures").upsert(
-    {
-      thread_id: threadId,
-      summary_text: summary.summary_text,
-      issues: summary.key_points.issues,
-      opinions: summary.key_points.opinions,
-      rebuttals: summary.key_points.rebuttals,
-      supplements: summary.key_points.supplements,
-      explanations: summary.key_points.explanations,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "thread_id" }
-  );
+) : Promise<SaveThreadSummaryResult> {
+  const { data: thread, error: threadError } = await supabase
+    .from("forum_threads")
+    .select("id, title, original_post, created_at")
+    .eq("id", threadId)
+    .maybeSingle();
 
-  if (error) {
-    console.warn("[thread-summary save skipped]", error.message);
+  if (threadError) {
+    const message = threadError.message || "Failed to load thread for summary save";
+    console.error("[thread-summary save thread load failed]", message);
+    return { saved: false, save_error: message };
   }
+
+  const threadRow = (thread ?? null) as ThreadForSummarySave | null;
+  const originalPost =
+    threadRow?.original_post?.trim() ||
+    threadRow?.title?.trim() ||
+    summary.summary_text?.trim() ||
+    "保存済みAIまとめ";
+  const normalizedTheme =
+    threadRow?.title?.trim() ||
+    shortText(summary.summary_text, 80) ||
+    "forum-thread-summary";
+  const keyPoints = {
+    issues: summary.key_points.issues,
+    opinions: summary.key_points.opinions,
+    rebuttals: summary.key_points.rebuttals,
+    supplements: summary.key_points.supplements,
+    explanations: summary.key_points.explanations,
+  };
+  const payload = {
+    thread_id: threadId,
+    original_post: originalPost,
+    normalized_theme: normalizedTheme,
+    summary_text: summary.summary_text,
+    easy_summary_text:
+      summary.easy_summary_text || shortText(summary.summary_text, 160),
+    key_points: keyPoints,
+    issues: summary.key_points.issues,
+    opinions: summary.key_points.opinions,
+    rebuttals: summary.key_points.rebuttals,
+    supplements: summary.key_points.supplements,
+    explanations: summary.key_points.explanations,
+    trust_status: "trusted",
+    status: "active",
+    summary_type: "thread_summary",
+    source_post_count: summary.counts.total,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data: existingRow, error: selectError } = await supabase
+    .from("thread_ai_structures")
+    .select("thread_id")
+    .eq("thread_id", threadId)
+    .maybeSingle();
+
+  if (selectError) {
+    const message = selectError.message || "Failed to check existing summary";
+    console.error("[thread-summary save check failed]", message);
+    return { saved: false, save_error: message };
+  }
+
+  const saveQuery = existingRow
+    ? supabase
+        .from("thread_ai_structures")
+        .update(payload)
+        .eq("thread_id", threadId)
+    : supabase.from("thread_ai_structures").insert(payload);
+
+  const { error: saveError } = await saveQuery.select("thread_id").maybeSingle();
+
+  if (!saveError) {
+    return { saved: true };
+  }
+
+  if (!existingRow && saveError.code === "23505") {
+    const { error: retryError } = await supabase
+      .from("thread_ai_structures")
+      .update(payload)
+      .eq("thread_id", threadId)
+      .select("thread_id")
+      .maybeSingle();
+
+    if (!retryError) {
+      return { saved: true };
+    }
+
+    const retryMessage = retryError.message || "Failed to update summary";
+    console.error("[thread-summary save retry failed]", retryMessage);
+    return { saved: false, save_error: retryMessage };
+  }
+
+  const message = saveError.message || "Failed to save summary";
+  console.error("[thread-summary save failed]", message);
+  return { saved: false, save_error: message };
 }
 
 export async function GET(req: NextRequest) {
@@ -711,24 +800,30 @@ export async function GET(req: NextRequest) {
         };
 
         const response = buildSummaryResponse(summary, safePosts);
-        await saveThreadSummary(supabase, threadId, summary);
+        const saveResult = await saveThreadSummary(supabase, threadId, summary);
 
         return NextResponse.json({
           ...response,
           reused: true,
           source: "existing",
+          ...saveResult,
         });
       }
 
       const cached = getCachedSummary(cacheKey);
       if (cached) {
-        await saveThreadSummary(supabase, threadId, cached.summary);
+        const saveResult = await saveThreadSummary(
+          supabase,
+          threadId,
+          cached.summary
+        );
 
         return NextResponse.json({
           ...cached,
           cached: true,
           reused: true,
           source: "memory",
+          ...saveResult,
         });
       }
     }
@@ -745,10 +840,13 @@ export async function GET(req: NextRequest) {
     }
 
     const response = buildSummaryResponse(summary, safePosts);
-    await saveThreadSummary(supabase, threadId, summary);
+    const saveResult = await saveThreadSummary(supabase, threadId, summary);
     setCachedSummary(cacheKey, response);
 
-    return NextResponse.json(response);
+    return NextResponse.json({
+      ...response,
+      ...saveResult,
+    });
 
 
   } catch (e: any) {
