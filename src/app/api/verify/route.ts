@@ -6,9 +6,113 @@ type VerifyResponse = {
   note?: string;
 };
 
+type CachedVerify = {
+  value: VerifyResponse;
+  expiresAt: number;
+};
+
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const MAX_CACHE_SIZE = 100;
+const verifyCache = new Map<string, CachedVerify>();
+
+function normalizeCacheText(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function getCacheKey(input: {
+  tenantSlug: string;
+  targetId: string;
+  issueId: string;
+  postId: string;
+  title: string;
+  text: string;
+}) {
+  return [
+    input.tenantSlug || "default",
+    input.targetId || input.issueId || input.postId || "no-target",
+    normalizeCacheText(input.title),
+    normalizeCacheText(input.text),
+  ].join(":");
+}
+
+function getCachedVerify(cacheKey: string) {
+  const cached = verifyCache.get(cacheKey);
+  if (!cached) return null;
+
+  if (cached.expiresAt <= Date.now()) {
+    verifyCache.delete(cacheKey);
+    return null;
+  }
+
+  return cached.value;
+}
+
+function setCachedVerify(cacheKey: string, value: VerifyResponse) {
+  const now = Date.now();
+
+  for (const [key, entry] of verifyCache.entries()) {
+    if (entry.expiresAt <= now) {
+      verifyCache.delete(key);
+    }
+  }
+
+  while (verifyCache.size >= MAX_CACHE_SIZE) {
+    const oldestKey = verifyCache.keys().next().value;
+    if (!oldestKey) break;
+    verifyCache.delete(oldestKey);
+  }
+
+  verifyCache.set(cacheKey, {
+    value,
+    expiresAt: now + CACHE_TTL_MS,
+  });
+}
+
 export async function POST(req: Request) {
   try {
-    const { text } = await req.json();
+    const body = await req.json();
+    const tenantSlug =
+      typeof body.tenantSlug === "string"
+        ? body.tenantSlug
+        : typeof body.tenant_slug === "string"
+          ? body.tenant_slug
+          : "";
+    const targetId = typeof body.targetId === "string" ? body.targetId : "";
+    const issueId = typeof body.issueId === "string" ? body.issueId : "";
+    const postId = typeof body.postId === "string" ? body.postId : "";
+    const title =
+      typeof body.title === "string"
+        ? body.title
+        : typeof body.issueTitle === "string"
+          ? body.issueTitle
+          : "";
+    const text =
+      typeof body.text === "string"
+        ? body.text
+        : typeof body.content === "string"
+          ? body.content
+          : typeof body.claim === "string"
+            ? body.claim
+            : "";
+    const cacheKey = getCacheKey({
+      tenantSlug,
+      targetId,
+      issueId,
+      postId,
+      title,
+      text,
+    });
+    const cached = getCachedVerify(cacheKey);
+
+    if (cached) {
+      return NextResponse.json({
+        ...cached,
+        cached: true,
+        reused: true,
+        source: "memory",
+      });
+    }
+
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
@@ -109,6 +213,13 @@ Return JSON only.
         normalizedReasonType = [parsed.reason_type];
       }
     }
+
+    const response = {
+      status: newStatus,
+      reason_type: normalizedReasonType,
+      note: parsed.note ?? "",
+    };
+    setCachedVerify(cacheKey, response);
 
     return NextResponse.json({
       status: newStatus,
