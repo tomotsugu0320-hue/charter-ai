@@ -27,6 +27,26 @@ type ConflictPair = {
   quality_score?: number;
 };
 
+type ThreadSummaryPayload = ReturnType<typeof buildSimpleSummary> & {
+  provisional_answer: string;
+};
+
+type ThreadSummaryResponse = {
+  success: true;
+  summary: ThreadSummaryPayload;
+  structure_type: string;
+  conflict_pairs: ConflictPair[];
+};
+
+type CachedThreadSummary = {
+  value: ThreadSummaryResponse;
+  expiresAt: number;
+};
+
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const MAX_CACHE_SIZE = 100;
+const threadSummaryCache = new Map<string, CachedThreadSummary>();
+
 function uniqTexts(values: string[]) {
   return Array.from(new Set(values.map((v) => v.trim()).filter(Boolean)));
 }
@@ -43,6 +63,49 @@ function shortText(value: string, max = 70) {
   const text = value.replace(/\s+/g, " ").trim();
   if (!text) return "";
   return text.length > max ? `${text.slice(0, max)}...` : text;
+}
+
+function getCacheKey(threadId: string, posts: ForumPost[]) {
+  const latestPost = posts[posts.length - 1];
+  return [
+    threadId,
+    posts.length,
+    latestPost?.id ?? "",
+    latestPost?.created_at ?? "",
+  ].join(":");
+}
+
+function getCachedSummary(cacheKey: string) {
+  const cached = threadSummaryCache.get(cacheKey);
+  if (!cached) return null;
+
+  if (cached.expiresAt <= Date.now()) {
+    threadSummaryCache.delete(cacheKey);
+    return null;
+  }
+
+  return cached.value;
+}
+
+function setCachedSummary(cacheKey: string, value: ThreadSummaryResponse) {
+  const now = Date.now();
+
+  for (const [key, entry] of threadSummaryCache.entries()) {
+    if (entry.expiresAt <= now) {
+      threadSummaryCache.delete(key);
+    }
+  }
+
+  while (threadSummaryCache.size >= MAX_CACHE_SIZE) {
+    const oldestKey = threadSummaryCache.keys().next().value;
+    if (!oldestKey) break;
+    threadSummaryCache.delete(oldestKey);
+  }
+
+  threadSummaryCache.set(cacheKey, {
+    value,
+    expiresAt: now + CACHE_TTL_MS,
+  });
 }
 
 function clampQualityScore(value: number) {
@@ -494,6 +557,53 @@ function buildProvisionalAnswer(
   return "現時点では、投稿内容と論点整理をもとに、どの見方が論理的に強いかを確認している段階です。";
 }
 
+function asStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function buildStructureType(summary: ReturnType<typeof buildSimpleSummary>) {
+  if (summary.counts.rebuttal > 0 && summary.counts.opinion > 0) {
+    return "対立あり（意見 vs 反論が衝突中）";
+  }
+
+  if (summary.counts.supplement + summary.counts.explanation >= 2) {
+    return "整理・解説フェーズ";
+  }
+
+  if (summary.counts.opinion >= 2) {
+    return "意見集約中";
+  }
+
+  return "初期議論";
+}
+
+function buildSummaryResponse(
+  summary: ReturnType<typeof buildSimpleSummary>,
+  posts: ForumPost[]
+): ThreadSummaryResponse {
+  const conflict_pairs = ensureConflictPairs(
+    summary.key_points.opinions,
+    summary.key_points.rebuttals,
+      summary.key_points.issues[0] ||
+      summary.key_points.opinions[0] ||
+      posts[0]?.content ||
+      "この主張"
+  );
+  const provisional_answer = buildProvisionalAnswer(summary, conflict_pairs);
+
+  return {
+    success: true,
+    summary: {
+      ...summary,
+      provisional_answer,
+    },
+    structure_type: buildStructureType(summary),
+    conflict_pairs,
+  };
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -535,6 +645,64 @@ export async function GET(req: NextRequest) {
 
     const safePosts = (posts ?? []) as ForumPost[];
     let summary = buildSimpleSummary(safePosts);
+    const force = ["true", "1"].includes(
+      (searchParams.get("force") ?? "").toLowerCase()
+    );
+    const cacheKey = getCacheKey(threadId, safePosts);
+
+    if (!force) {
+      const { data: existingSummary, error: existingSummaryError } = await supabase
+        .from("thread_ai_structures")
+        .select("summary_text, issues, opinions, rebuttals, supplements, explanations")
+        .eq("thread_id", threadId)
+        .maybeSingle();
+
+      if (existingSummaryError) {
+        console.warn("[thread-summary existing summary skipped]", existingSummaryError.message);
+      }
+
+      if (
+        typeof existingSummary?.summary_text === "string" &&
+        existingSummary.summary_text.trim()
+      ) {
+        const issues = asStringArray(existingSummary.issues);
+        const opinions = asStringArray(existingSummary.opinions);
+        const rebuttals = asStringArray(existingSummary.rebuttals);
+        const supplements = asStringArray(existingSummary.supplements);
+        const explanations = asStringArray(existingSummary.explanations);
+
+        summary = {
+          ...summary,
+          summary_text: existingSummary.summary_text,
+          key_points: {
+            ...summary.key_points,
+            issues: issues.length > 0 ? issues : summary.key_points.issues,
+            opinions: opinions.length > 0 ? opinions : summary.key_points.opinions,
+            rebuttals: rebuttals.length > 0 ? rebuttals : summary.key_points.rebuttals,
+            supplements:
+              supplements.length > 0 ? supplements : summary.key_points.supplements,
+            explanations:
+              explanations.length > 0 ? explanations : summary.key_points.explanations,
+          },
+        };
+
+        return NextResponse.json({
+          ...buildSummaryResponse(summary, safePosts),
+          reused: true,
+          source: "existing",
+        });
+      }
+
+      const cached = getCachedSummary(cacheKey);
+      if (cached) {
+        return NextResponse.json({
+          ...cached,
+          cached: true,
+          reused: true,
+          source: "memory",
+        });
+      }
+    }
 
     try {
       const normalAiText = await generateNormalSummaryWithAI(safePosts);
@@ -547,35 +715,12 @@ export async function GET(req: NextRequest) {
       console.error("[thread-summary ai fallback]", aiError);
     }
 
-    const conflict_pairs = ensureConflictPairs(
-      summary.key_points.opinions,
-      summary.key_points.rebuttals,
-      summary.key_points.issues[0] ||
-        summary.key_points.opinions[0] ||
-        safePosts[0]?.content ||
-        "この主張"
-    );
-    const provisional_answer = buildProvisionalAnswer(summary, conflict_pairs);
+    const response = buildSummaryResponse(summary, safePosts);
+    setCachedSummary(cacheKey, response);
 
-    let structure_type = "初期議論";
+    return NextResponse.json(response);
 
-    if (summary.counts.rebuttal > 0 && summary.counts.opinion > 0) {
-      structure_type = "対立あり（意見 vs 反論が衝突中）";
-    } else if (summary.counts.supplement + summary.counts.explanation >= 2) {
-      structure_type = "整理・解説フェーズ";
-    } else if (summary.counts.opinion >= 2) {
-      structure_type = "意見集約中";
-    }
 
-    return NextResponse.json({
-      success: true,
-      summary: {
-        ...summary,
-        provisional_answer,
-      },
-      structure_type,
-      conflict_pairs,
-    });
   } catch (e: any) {
     console.error("[thread-summary error]", e);
 
