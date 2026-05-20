@@ -163,10 +163,41 @@ const treeStyle: CSSProperties = {
 export default function ForumGuideTree({ tenant }: { tenant: string }) {
   return (
     <section aria-labelledby="forum-guide-tree-title" style={cardStyle}>
-      <h2 id="forum-guide-tree-title" style={titleStyle}>
-        この掲示板でできること
-      </h2>
-      <div style={treeStyle}>{renderGuideTree(guideTreeRoot, tenant)}</div>
+      <details>
+        <summary
+          style={{
+            cursor: "pointer",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+            padding: "12px 14px",
+            border: "1px solid #d7dde8",
+            borderRadius: 8,
+            background: "#ffffff",
+            color: "#111827",
+            fontWeight: 800,
+            lineHeight: 1.5,
+            minHeight: 44,
+          }}
+        >
+          <span id="forum-guide-tree-title">この掲示板でできることを見る</span>
+          <span
+            style={{
+              color: "#64748b",
+              fontSize: 13,
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+            }}
+          >
+            議論の進め方・使い方のヒント
+          </span>
+        </summary>
+        <div style={{ marginTop: 14 }}>
+          <h2 style={titleStyle}>この掲示板でできること</h2>
+          <div style={treeStyle}>{renderGuideTree(guideTreeRoot, tenant)}</div>
+        </div>
+      </details>
     </section>
   );
 }
