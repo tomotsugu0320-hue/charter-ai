@@ -507,6 +507,7 @@ useEffect(() => {
 
 
 const [summaryLoading, setSummaryLoading] = useState(false);
+const [summaryNotice, setSummaryNotice] = useState<string | null>(null);
 
 
   const [thread, setThread] = useState<ThreadRow | null>(null);
@@ -667,6 +668,7 @@ useEffect(() => {
 const handleGenerateSummary = async () => {
   try {
     setSummaryLoading(true);
+    setSummaryNotice(null);
 
     const res = await fetch(
       `/api/forum/thread-summary?threadId=${threadId}`,
@@ -685,11 +687,23 @@ const handleGenerateSummary = async () => {
       console.error("[thread-summary save failed]", data.save_error);
     }
 
+    if (
+      data &&
+      typeof data === "object" &&
+      "skipped_generation" in data &&
+      data.skipped_generation === true
+    ) {
+      setSummaryNotice(
+        "保存済みのAIまとめを表示しています。AI再生成は週1回を目安にしています。"
+      );
+    }
+
     setSummary(data?.summary || null);
     setConflicts(Array.isArray(data?.conflict_pairs) ? data.conflict_pairs : []);
   } catch (e) {
     console.error(e);
     setSummary(null);
+    setSummaryNotice(null);
   } finally {
     setSummaryLoading(false);
   }
@@ -1718,6 +1732,12 @@ function jumpToMainIssues() {
         {summaryLoading && (
           <div style={{ color: "#666", marginTop: 8 }}>
             AIが議論を分析中...
+          </div>
+        )}
+
+        {summaryNotice && (
+          <div style={{ color: "#666", marginTop: 8, fontSize: currentFont.base * 0.9 }}>
+            {summaryNotice}
           </div>
         )}
 

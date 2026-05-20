@@ -57,6 +57,9 @@ type CachedThreadSummary = {
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const MAX_CACHE_SIZE = 100;
+const SUMMARY_REFRESH_INTERVAL_DAYS = 7;
+const SUMMARY_REFRESH_INTERVAL_MS =
+  SUMMARY_REFRESH_INTERVAL_DAYS * 24 * 60 * 60 * 1000;
 const threadSummaryCache = new Map<string, CachedThreadSummary>();
 
 function uniqTexts(values: string[]) {
@@ -758,15 +761,16 @@ export async function GET(req: NextRequest) {
 
     const safePosts = (posts ?? []) as ForumPost[];
     let summary = buildSimpleSummary(safePosts);
-    const force = ["true", "1"].includes(
-      (searchParams.get("force") ?? "").toLowerCase()
-    );
+    const forceParam = (searchParams.get("force") ?? "").toLowerCase();
+    const hardForce = forceParam === "hard";
     const cacheKey = getCacheKey(threadId, safePosts);
 
-    if (!force) {
+    if (!hardForce) {
       const { data: existingSummary, error: existingSummaryError } = await supabase
         .from("thread_ai_structures")
-        .select("summary_text, issues, opinions, rebuttals, supplements, explanations")
+        .select(
+          "summary_text, issues, opinions, rebuttals, supplements, explanations, updated_at, source_post_count"
+        )
         .eq("thread_id", threadId)
         .maybeSingle();
 
@@ -799,15 +803,27 @@ export async function GET(req: NextRequest) {
           },
         };
 
-        const response = buildSummaryResponse(summary, safePosts);
-        const saveResult = await saveThreadSummary(supabase, threadId, summary);
+        const updatedAtMs = new Date(existingSummary.updated_at ?? "").getTime();
+        const nextRefreshAtMs = updatedAtMs + SUMMARY_REFRESH_INTERVAL_MS;
+        const savedPostCount = Number(existingSummary.source_post_count);
+        const isFresh =
+          Number.isFinite(updatedAtMs) && Date.now() < nextRefreshAtMs;
+        const isSamePostCount =
+          Number.isFinite(savedPostCount) && savedPostCount === safePosts.length;
 
-        return NextResponse.json({
-          ...response,
-          reused: true,
-          source: "existing",
-          ...saveResult,
-        });
+        if (isFresh && isSamePostCount) {
+          const response = buildSummaryResponse(summary, safePosts);
+
+          return NextResponse.json({
+            ...response,
+            reused: true,
+            source: "existing",
+            skipped_generation: true,
+            next_refresh_at: new Date(nextRefreshAtMs).toISOString(),
+            refresh_interval_days: SUMMARY_REFRESH_INTERVAL_DAYS,
+            saved: true,
+          });
+        }
       }
 
       const cached = getCachedSummary(cacheKey);
