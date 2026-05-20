@@ -1193,11 +1193,26 @@ export default function ForumPage() {
               border: "1px solid #3d4657",
               borderRadius: 8,
               padding: 14,
-              marginTop: 12,
+              marginTop: 20,
+              paddingTop: 16,
+              borderTop: "3px solid #60a5fa",
               background: "#10141d",
+              color: "#f9fafb",
             }}
           >
-            <div style={{ fontWeight: 800, marginBottom: 8 }}>2. 整えた内容を確認</div>
+            <div style={{ fontWeight: 800, marginBottom: 6 }}>
+              STEP2：整えた内容を確認
+            </div>
+            <div
+              style={{
+                color: "#cbd5e1",
+                fontSize: currentFontSize - 2,
+                lineHeight: 1.6,
+                marginBottom: 10,
+              }}
+            >
+              内容を確認して、問題なければ論点整理へ進めます。
+            </div>
             <div
               style={{
                 whiteSpace: "pre-wrap",
