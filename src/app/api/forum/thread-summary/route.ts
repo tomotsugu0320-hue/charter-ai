@@ -604,6 +604,30 @@ function buildSummaryResponse(
   };
 }
 
+async function saveThreadSummary(
+  supabase: any,
+  threadId: string,
+  summary: ReturnType<typeof buildSimpleSummary>
+) {
+  const { error } = await supabase.from("thread_ai_structures").upsert(
+    {
+      thread_id: threadId,
+      summary_text: summary.summary_text,
+      issues: summary.key_points.issues,
+      opinions: summary.key_points.opinions,
+      rebuttals: summary.key_points.rebuttals,
+      supplements: summary.key_points.supplements,
+      explanations: summary.key_points.explanations,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "thread_id" }
+  );
+
+  if (error) {
+    console.warn("[thread-summary save skipped]", error.message);
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -686,8 +710,11 @@ export async function GET(req: NextRequest) {
           },
         };
 
+        const response = buildSummaryResponse(summary, safePosts);
+        await saveThreadSummary(supabase, threadId, summary);
+
         return NextResponse.json({
-          ...buildSummaryResponse(summary, safePosts),
+          ...response,
           reused: true,
           source: "existing",
         });
@@ -695,6 +722,8 @@ export async function GET(req: NextRequest) {
 
       const cached = getCachedSummary(cacheKey);
       if (cached) {
+        await saveThreadSummary(supabase, threadId, cached.summary);
+
         return NextResponse.json({
           ...cached,
           cached: true,
@@ -716,6 +745,7 @@ export async function GET(req: NextRequest) {
     }
 
     const response = buildSummaryResponse(summary, safePosts);
+    await saveThreadSummary(supabase, threadId, summary);
     setCachedSummary(cacheKey, response);
 
     return NextResponse.json(response);

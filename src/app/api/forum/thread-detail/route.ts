@@ -4,6 +4,227 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+type ForumPostForSummary = {
+  id: string;
+  post_role: string;
+  content: string;
+  created_at?: string;
+};
+
+type SourceItem = {
+  text: string;
+  source_type: "extracted" | "inferred";
+  quality_score: number;
+};
+
+type ConflictPair = {
+  opinion: string;
+  rebuttal: string;
+  source_type?: "extracted" | "inferred";
+  quality_score?: number;
+};
+
+type StoredSummaryRow = {
+  summary_text?: string | null;
+  issues?: unknown;
+  opinions?: unknown;
+  rebuttals?: unknown;
+  supplements?: unknown;
+  explanations?: unknown;
+};
+
+function shortText(value: string, max = 120) {
+  const text = value.replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  return text.length > max ? `${text.slice(0, max)}...` : text;
+}
+
+function asStringArray(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string");
+  }
+
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (!text) return [];
+
+    if (text.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(text);
+        return Array.isArray(parsed)
+          ? parsed.filter((item): item is string => typeof item === "string")
+          : [];
+      } catch {
+        return [];
+      }
+    }
+
+    return [text];
+  }
+
+  return [];
+}
+
+function buildCounts(posts: ForumPostForSummary[]) {
+  const counts = {
+    total: posts.length,
+    issue_raise: 0,
+    opinion: 0,
+    rebuttal: 0,
+    supplement: 0,
+    explanation: 0,
+  };
+
+  posts.forEach((post) => {
+    if (post.post_role in counts && post.post_role !== "total") {
+      counts[post.post_role as keyof Omit<typeof counts, "total">] += 1;
+    }
+  });
+
+  return counts;
+}
+
+function toSourceItems(values: string[]): SourceItem[] {
+  return values.slice(0, 3).map((text) => ({
+    text: shortText(text, 90),
+    source_type: "extracted",
+    quality_score: 60,
+  }));
+}
+
+function ensureConflictPairs(
+  opinions: string[],
+  rebuttals: string[],
+  context: string
+): ConflictPair[] {
+  if (opinions.length > 0 && rebuttals.length > 0) {
+    return opinions.slice(0, Math.min(opinions.length, rebuttals.length, 3)).map(
+      (opinion, index) => ({
+        opinion: shortText(opinion, 90),
+        rebuttal: shortText(rebuttals[index], 90),
+        source_type: "extracted",
+        quality_score: 60,
+      })
+    );
+  }
+
+  if (rebuttals.length > 0) {
+    return [
+      {
+        opinion: shortText(opinions[0] || context, 90),
+        rebuttal: shortText(rebuttals[0], 90),
+        source_type: "extracted",
+        quality_score: 55,
+      },
+    ];
+  }
+
+  return [];
+}
+
+function isImmatureSummaryText(text: string) {
+  const normalized = text.replace(/\s+/g, "");
+  return [
+    "まだ議論の整理が十分に進んでいません",
+    "まだAIまとめはありません",
+    "議論の整理が十分に進んでいません",
+  ].some((phrase) => normalized.includes(phrase.replace(/\s+/g, "")));
+}
+
+function buildProvisionalAnswerFromStored(
+  summaryText: string,
+  keyPoints: {
+    issues: string[];
+    opinions: string[];
+    rebuttals: string[];
+    supplements: string[];
+    explanations: string[];
+  },
+  conflictPairs: ConflictPair[]
+) {
+  const wholeSummary = isImmatureSummaryText(summaryText)
+    ? ""
+    : shortText(summaryText, 140);
+  const focusText =
+    keyPoints.issues[0] ||
+    keyPoints.explanations[0] ||
+    keyPoints.supplements[0] ||
+    keyPoints.opinions[0] ||
+    "";
+  const remainingConcern = conflictPairs[0]?.rebuttal || keyPoints.rebuttals[0] || "";
+
+  if (wholeSummary && remainingConcern) {
+    return `現時点では、「${wholeSummary}」という全体整理をもとに、前提・根拠・反論リスクを見比べる段階です。ただし、「${shortText(
+      remainingConcern,
+      70
+    )}」という反論・リスクも残ります。論理性の目安として確認してください。`;
+  }
+
+  if (wholeSummary) {
+    return `現時点では、「${wholeSummary}」という全体整理をもとに確認できます。断定ではなく、論理性の目安として見てください。`;
+  }
+
+  if (focusText && remainingConcern) {
+    return `現時点では、「${shortText(
+      focusText,
+      70
+    )}」を軸に、主張・根拠・反論リスクを分けて確認する段階です。ただし、「${shortText(
+      remainingConcern,
+      70
+    )}」という反論・リスクも残ります。`;
+  }
+
+  return "現時点では、投稿内容と論点整理をもとに、どの見方が論理的に強いかを確認している段階です。";
+}
+
+function buildStoredSummaryPayload(
+  storedSummary: StoredSummaryRow | null,
+  posts: ForumPostForSummary[]
+) {
+  const summaryText =
+    typeof storedSummary?.summary_text === "string"
+      ? storedSummary.summary_text.trim()
+      : "";
+  const keyPoints = {
+    issues: asStringArray(storedSummary?.issues),
+    opinions: asStringArray(storedSummary?.opinions),
+    rebuttals: asStringArray(storedSummary?.rebuttals),
+    supplements: asStringArray(storedSummary?.supplements),
+    explanations: asStringArray(storedSummary?.explanations),
+  };
+  const hasKeyPoints = Object.values(keyPoints).some((items) => items.length > 0);
+
+  if (!summaryText && !hasKeyPoints) return null;
+
+  const conflictPairs = ensureConflictPairs(
+    keyPoints.opinions,
+    keyPoints.rebuttals,
+    keyPoints.issues[0] || keyPoints.opinions[0] || posts[0]?.content || "この主張"
+  );
+  const summary_text =
+    summaryText || "保存済みの論点整理をもとに、この議論を確認できます。";
+
+  return {
+    summary: {
+      counts: buildCounts(posts),
+      summary_text,
+      easy_summary_text: shortText(summary_text, 160),
+      provisional_answer: buildProvisionalAnswerFromStored(
+        summary_text,
+        keyPoints,
+        conflictPairs
+      ),
+      key_points: {
+        ...keyPoints,
+        premises: toSourceItems(keyPoints.issues),
+        reasons: toSourceItems([...keyPoints.explanations, ...keyPoints.opinions]),
+        counterpoints: toSourceItems(keyPoints.rebuttals),
+      },
+    },
+    conflict_pairs: conflictPairs,
+  };
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -95,6 +316,21 @@ if (!thread) {
       );
     }
 
+    const { data: storedSummary, error: storedSummaryError } = await supabase
+      .from("thread_ai_structures")
+      .select("summary_text, issues, opinions, rebuttals, supplements, explanations")
+      .eq("thread_id", threadId)
+      .maybeSingle();
+
+    if (storedSummaryError) {
+      console.warn("[thread-detail summary skipped]", storedSummaryError.message);
+    }
+
+    const storedSummaryPayload = buildStoredSummaryPayload(
+      (storedSummary ?? null) as StoredSummaryRow | null,
+      (posts ?? []) as ForumPostForSummary[]
+    );
+
 
     const { data: feedbackRows, error: feedbackError } = await supabase
       .from("forum_post_feedback")
@@ -169,6 +405,8 @@ if (!thread) {
       thread,
       posts: postsWithFeedback,
       feedback_summary: feedbackSummary,
+      summary: storedSummaryPayload?.summary ?? null,
+      conflict_pairs: storedSummaryPayload?.conflict_pairs ?? [],
     });
   } catch (e: any) {
     console.error("[thread-detail error]", e);

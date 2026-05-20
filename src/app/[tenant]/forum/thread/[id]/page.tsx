@@ -682,6 +682,7 @@ const handleGenerateSummary = async () => {
     }
 
     setSummary(data?.summary || null);
+    setConflicts(Array.isArray(data?.conflict_pairs) ? data.conflict_pairs : []);
   } catch (e) {
     console.error(e);
     setSummary(null);
@@ -1157,6 +1158,10 @@ setTimeout(() => {
 
       setThread(result.thread ?? null);
       setPosts(result.posts ?? []);
+      setSummary(result.summary ?? null);
+      setConflicts(
+        Array.isArray(result.conflict_pairs) ? result.conflict_pairs : []
+      );
     } catch (e: any) {
       console.error(e);
       setError(e?.message || "読込失敗");
