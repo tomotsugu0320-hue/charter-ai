@@ -1106,7 +1106,7 @@ export default function ForumPage() {
                 lineHeight: 1.7,
               }}
             >
-              書きかけの考えを、投稿しやすい議論の形に整えます。
+              まず考えを書きます。必要ならAIで読みやすく整えてから、論点整理へ進めます。
             </p>
           </div>
 
@@ -1258,14 +1258,28 @@ export default function ForumPage() {
           </div>
         )}
 
+        <div
+          style={{
+            marginTop: 10,
+            color: "#cbd5e1",
+            fontSize: currentFontSize - 2,
+            lineHeight: 1.6,
+          }}
+        >
+          任意：文章を整えたい時だけ使えます。
+        </div>
+
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
-          <PrimaryButton onClick={handleOrganizePost} disabled={organizing || loading}>
+          <PrimaryButton
+            onClick={handleOrganizePost}
+            disabled={organizing || loading}
+            variant="secondary"
+          >
             {organizing ? "整えています..." : "投稿文を読みやすく整える"}
           </PrimaryButton>
           <PrimaryButton
             onClick={() => analyzeText(text)}
             disabled={loading || organizing}
-            variant="secondary"
           >
             {loading ? "整理中..." : "論点を整理して次へ"}
           </PrimaryButton>
