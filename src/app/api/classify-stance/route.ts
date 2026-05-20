@@ -1,13 +1,161 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 type StanceResponse = {
   stance_label?: string | null;
   note?: string;
 };
 
+type CachedStance = {
+  value: StanceResponse;
+  expiresAt: number;
+};
+
+const ALLOWED_STANCE_LABELS = new Set(["side_a", "side_b", "neutral", "unknown"]);
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const MAX_CACHE_SIZE = 100;
+const stanceCache = new Map<string, CachedStance>();
+
+function normalizeCacheText(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function normalizeStanceLabel(value: unknown) {
+  return typeof value === "string" && ALLOWED_STANCE_LABELS.has(value)
+    ? value
+    : "unknown";
+}
+
+function getCacheKey(input: {
+  postId?: string;
+  issueId?: string;
+  issueTitle: string;
+  sideA: string;
+  sideB: string;
+  postContent: string;
+}) {
+  if (input.postId && input.issueId) {
+    return `ids:${input.postId}:${input.issueId}`;
+  }
+
+  return [
+    "content",
+    normalizeCacheText(input.issueTitle),
+    normalizeCacheText(input.sideA),
+    normalizeCacheText(input.sideB),
+    normalizeCacheText(input.postContent),
+  ].join(":");
+}
+
+function getCachedStance(cacheKey: string) {
+  const cached = stanceCache.get(cacheKey);
+  if (!cached) return null;
+
+  if (cached.expiresAt <= Date.now()) {
+    stanceCache.delete(cacheKey);
+    return null;
+  }
+
+  return cached.value;
+}
+
+function setCachedStance(cacheKey: string, value: StanceResponse) {
+  const now = Date.now();
+
+  for (const [key, entry] of stanceCache.entries()) {
+    if (entry.expiresAt <= now) {
+      stanceCache.delete(key);
+    }
+  }
+
+  while (stanceCache.size >= MAX_CACHE_SIZE) {
+    const oldestKey = stanceCache.keys().next().value;
+    if (!oldestKey) break;
+    stanceCache.delete(oldestKey);
+  }
+
+  stanceCache.set(cacheKey, {
+    value,
+    expiresAt: now + CACHE_TTL_MS,
+  });
+}
+
+async function findExistingStance(postId: string, issueId: string) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) return null;
+
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  const { data: linkedRow, error: linkedError } = await supabase
+    .from("post_issues")
+    .select("post_id")
+    .eq("post_id", postId)
+    .eq("issue_id", issueId)
+    .maybeSingle();
+
+  if (linkedError) {
+    console.warn("classify-stance existing link skipped:", linkedError.message);
+    return null;
+  }
+
+  if (!linkedRow) return null;
+
+  const { data: entryRow, error: entryError } = await supabase
+    .from("entries")
+    .select("stance_label")
+    .eq("id", postId)
+    .maybeSingle();
+
+  if (entryError) {
+    console.warn("classify-stance existing stance skipped:", entryError.message);
+    return null;
+  }
+
+  if (!entryRow?.stance_label) return null;
+
+  return normalizeStanceLabel(entryRow.stance_label);
+}
+
 export async function POST(req: Request) {
   try {
-    const { issueTitle, sideA, sideB, postContent } = await req.json();
+    const body = await req.json();
+    const issueTitle = typeof body.issueTitle === "string" ? body.issueTitle : "";
+    const sideA = typeof body.sideA === "string" ? body.sideA : "";
+    const sideB = typeof body.sideB === "string" ? body.sideB : "";
+    const postContent = typeof body.postContent === "string" ? body.postContent : "";
+    const postId = typeof body.postId === "string" ? body.postId : "";
+    const issueId = typeof body.issueId === "string" ? body.issueId : "";
+    const force = body.force === true;
+    const cacheKey = getCacheKey({ postId, issueId, issueTitle, sideA, sideB, postContent });
+
+    if (!force && postId && issueId) {
+      const existingStance = await findExistingStance(postId, issueId);
+
+      if (existingStance) {
+        return NextResponse.json({
+          stance_label: existingStance,
+          note: "",
+          reused: true,
+          source: "existing",
+        });
+      }
+    }
+
+    if (!force) {
+      const cached = getCachedStance(cacheKey);
+
+      if (cached) {
+        return NextResponse.json({
+          ...cached,
+          reused: true,
+          source: "memory",
+        });
+      }
+    }
+
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
@@ -95,16 +243,14 @@ ${postContent}
       };
     }
 
-    const allowed = new Set(["side_a", "side_b", "neutral", "unknown"]);
-    const stanceLabel =
-      parsed.stance_label && allowed.has(parsed.stance_label)
-        ? parsed.stance_label
-        : "unknown";
-
-    return NextResponse.json({
+    const stanceLabel = normalizeStanceLabel(parsed.stance_label);
+    const response = {
       stance_label: stanceLabel,
       note: parsed.note ?? "",
-    });
+    };
+    setCachedStance(cacheKey, response);
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error("classify-stance route error:", error);
 
