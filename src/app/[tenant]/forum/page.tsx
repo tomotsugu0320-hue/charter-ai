@@ -1426,6 +1426,7 @@ export default function ForumPage() {
                       padding: 12,
                       background:
                         selectedThreadId === thread.id ? "#eff6ff" : "#ffffff",
+                      color: "#111827",
                       cursor: "pointer",
                     }}
                   >
@@ -1439,7 +1440,24 @@ export default function ForumPage() {
                       }}
                     >
                       <span style={smallMetaStyle}>{thread.category ?? "未分類"}</span>
-                      <StanceLabel stance={thread.stance} />
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {selectedThreadId === thread.id && (
+                          <span
+                            style={{
+                              border: "1px solid #2563eb",
+                              borderRadius: 8,
+                              padding: "2px 7px",
+                              background: "#dbeafe",
+                              color: "#1d4ed8",
+                              fontSize: 12,
+                              fontWeight: 800,
+                            }}
+                          >
+                            選択中
+                          </span>
+                        )}
+                        <StanceLabel stance={thread.stance} />
+                      </div>
                     </div>
                     <div
                       style={{
@@ -1465,32 +1483,50 @@ export default function ForumPage() {
                         {thread.reason}
                       </div>
                     )}
+                    {selectedThreadId === thread.id && (
+                      <div
+                        style={{
+                          marginTop: 8,
+                          color: "#1d4ed8",
+                          fontSize: currentFontSize - 2,
+                          lineHeight: 1.6,
+                          fontWeight: 700,
+                        }}
+                      >
+                        このスレッドを選択中です。内容を確認してから参加できます。
+                      </div>
+                    )}
                   </button>
                 ))
               ) : (
                 <div style={{ ...smallMetaStyle, marginTop: 8 }}>
-                  関連する既存スレッドはまだ見つかっていません。
+                  近いスレッドはまだありません。新しく作成できます。
                 </div>
               )}
             </div>
 
             <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
               {selectedThreadId ? (
-                <Link
-                  href={`/${tenant}/forum/thread/${selectedThreadId}`}
-                  style={{
-                    display: "block",
-                    textAlign: "center",
-                    padding: "12px 14px",
-                    borderRadius: 8,
-                    background: "#2563eb",
-                    color: "#ffffff",
-                    textDecoration: "none",
-                    fontWeight: 900,
-                  }}
-                >
-                  このスレッドに参加する
-                </Link>
+                <>
+                  <div style={{ ...smallMetaStyle }}>
+                    選択したスレッドの詳細画面へ移動します。
+                  </div>
+                  <Link
+                    href={`/${tenant}/forum/thread/${selectedThreadId}`}
+                    style={{
+                      display: "block",
+                      textAlign: "center",
+                      padding: "12px 14px",
+                      borderRadius: 8,
+                      background: "#2563eb",
+                      color: "#ffffff",
+                      textDecoration: "none",
+                      fontWeight: 900,
+                    }}
+                  >
+                    このスレッドに参加する
+                  </Link>
+                </>
               ) : (
                 <PrimaryButton
                   onClick={handleCreateThread}
