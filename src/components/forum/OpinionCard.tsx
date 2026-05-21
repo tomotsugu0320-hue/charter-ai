@@ -58,6 +58,64 @@ function roleColor(role: string) {
   }
 }
 
+function roleBadgeStyle(role: string) {
+  const base = {
+    display: "inline-flex",
+    alignItems: "center",
+    borderRadius: 999,
+    padding: "2px 8px",
+    fontSize: 12,
+    fontWeight: 800,
+    lineHeight: 1.4,
+    whiteSpace: "nowrap" as const,
+  };
+
+  switch (role) {
+    case "issue_raise":
+      return {
+        ...base,
+        border: "1px solid #ddd6fe",
+        background: "#f5f3ff",
+        color: "#5b21b6",
+      };
+    case "rebuttal":
+      return {
+        ...base,
+        border: "1px solid #fecaca",
+        background: "#fef2f2",
+        color: "#991b1b",
+      };
+    case "supplement":
+      return {
+        ...base,
+        border: "1px solid #bfdbfe",
+        background: "#eff6ff",
+        color: "#1d4ed8",
+      };
+    case "explanation":
+      return {
+        ...base,
+        border: "1px solid #bbf7d0",
+        background: "#f0fdf4",
+        color: "#166534",
+      };
+    case "opinion":
+      return {
+        ...base,
+        border: "1px solid #d1d5db",
+        background: "#f9fafb",
+        color: "#111827",
+      };
+    default:
+      return {
+        ...base,
+        border: "1px solid #d1d5db",
+        background: "#f9fafb",
+        color: "#374151",
+      };
+  }
+}
+
 function stanceLabelText(stance?: string | null) {
   switch (stance) {
     case "support":
@@ -159,7 +217,9 @@ const feedbackActions = [
             color: roleColor(op.opinion.post_role),
           }}
         >
-          💬 {roleLabel(op.opinion.post_role)}
+          <span style={roleBadgeStyle(op.opinion.post_role)}>
+            {roleLabel(op.opinion.post_role)}
+          </span>
 <span style={{ marginLeft: 8, color: scoreColor(score) }}>
   {score === null || score === undefined ? "未評価" : score}
 </span>
