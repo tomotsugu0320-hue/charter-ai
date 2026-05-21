@@ -1074,7 +1074,7 @@ const initialPostCount = summary?.counts?.total ?? posts.length;
 const showInitialDiscussionNote = initialPostCount <= 3;
 const provisionalAnswerText =
   summary?.provisional_answer?.trim() ||
-  "現時点では、投稿内容と論点整理をもとに、どの見方が論理的に強いかを確認している段階です。";
+  "まだAIの暫定回答はありません。AIまとめを確認・更新すると表示されます。";
 
 /*
 const oldPremiseSectionTitle = hasInferred(displayPremiseItems)
@@ -1724,10 +1724,14 @@ function jumpToMainIssues() {
   }}
 >
             {summary?.summary_text
-              ? "AIまとめを更新する"
-              : "AIでこの議論をまとめる"}
+              ? "AIまとめを確認・更新する"
+              : "AIまとめを作成する"}
           </PrimaryButton>
         )}
+
+        <div style={{ color: "#666", marginTop: 8, fontSize: currentFont.base * 0.9 }}>
+          AI再生成は週1回を目安にしています。通常は保存済みのAIまとめを表示します。
+        </div>
 
         {summaryLoading && (
           <div style={{ color: "#666", marginTop: 8 }}>
