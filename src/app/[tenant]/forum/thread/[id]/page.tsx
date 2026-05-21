@@ -1565,9 +1565,42 @@ function jumpToMainIssues() {
   </div>
 </div>
 
+<details style={{ marginTop: 16 }}>
+  <summary
+    style={{
+      cursor: "pointer",
+      display: "flex",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 12,
+      padding: "12px 14px",
+      border: "1px solid #d7dde8",
+      borderRadius: 8,
+      background: "#f8fafc",
+      color: "#111",
+      fontSize: currentFont.title,
+      fontWeight: 800,
+      lineHeight: 1.4,
+      minHeight: 44,
+    }}
+  >
+    <span>AIの初期整理を見る</span>
+    <span
+      style={{
+        fontSize: currentFont.base * 0.85,
+        color: "#64748b",
+        fontWeight: 700,
+        whiteSpace: "normal",
+      }}
+    >
+      前提・根拠・反論リスクを確認できます
+    </span>
+  </summary>
+
 <div
   style={{
-    marginTop: 16,
+    marginTop: 10,
     padding: 14,
     border: "1px solid #dbe3ef",
     borderRadius: 10,
@@ -1673,6 +1706,7 @@ function jumpToMainIssues() {
     </div>
   </div>
 </div>
+</details>
 
 <div
   style={{
