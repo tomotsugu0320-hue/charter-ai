@@ -465,6 +465,23 @@ function roleLabel(role: string) {
   }
 }
 
+function postSubmitLabel(role: PostRoleOption["value"]) {
+  switch (role) {
+    case "issue_raise":
+      return "論点を投稿する";
+    case "opinion":
+      return "意見を投稿する";
+    case "rebuttal":
+      return "反論を投稿する";
+    case "supplement":
+      return "補足を投稿する";
+    case "explanation":
+      return "解説を投稿する";
+    default:
+      return "投稿する";
+  }
+}
+
 function trustBonus(label?: string) {
   if (label === "A") return 8;
   if (label === "B") return 3;
@@ -2710,6 +2727,17 @@ function jumpToMainIssues() {
 
 {postRole === "rebuttal" ? (
   <div style={{ display: "grid", gap: 10 }}>
+    <div
+      style={{
+        marginBottom: 2,
+        fontSize: currentFont.base * 0.9,
+        color: "#475569",
+        lineHeight: 1.6,
+      }}
+    >
+      反論は、相手の主張・前提・根拠を分けて書くと伝わりやすくなります。
+    </div>
+
     <textarea
       value={rebuttalClaim}
       onChange={(e) => setRebuttalClaim(e.target.value)}
@@ -2783,7 +2811,7 @@ function jumpToMainIssues() {
 
             <div style={{ marginTop: 12, display: "flex", gap: 12, flexWrap: "wrap" }}>
               <PrimaryButton onClick={handlePost} disabled={posting}>
-                {posting ? "投稿中..." : "この内容について意見を書く"}
+                {posting ? "投稿中..." : postSubmitLabel(postRole)}
               </PrimaryButton>
 
               <PrimaryButton
