@@ -281,7 +281,7 @@ const feedbackActions = [
             {roleLabel(op.opinion.post_role)}
           </span>
 <span style={scoreBadgeStyle(score)}>
-  {score === null || score === undefined ? "読みやすさ 未評価" : `読みやすさ ${score}点`}
+  {score === null || score === undefined ? "AI論理スコア 未評価" : `AI論理スコア ${score}点`}
 </span>
           {stanceText && (
             <span

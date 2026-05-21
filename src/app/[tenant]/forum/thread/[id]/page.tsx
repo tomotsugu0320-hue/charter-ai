@@ -1504,7 +1504,7 @@ function jumpToMainIssues() {
 >
   {averageLogicScore > 0 ? (
     <>
-      平均の読みやすさ: {averageLogicScore}
+      AI論理スコア平均: {averageLogicScore}
       <span
         style={{
           marginLeft: 8,
@@ -1521,7 +1521,7 @@ function jumpToMainIssues() {
       </span>
     </>
   ) : (
-    <>平均の読みやすさ: 未評価</>
+    <>AI論理スコア平均: 未評価</>
   )}
 </div>
 
@@ -1533,7 +1533,7 @@ function jumpToMainIssues() {
     fontWeight: maxLogicScore && maxLogicScore >= 80 ? 700 : 500,
   }}
 >
-  最も読みやすい投稿: {maxLogicScore ?? "未評価"}
+  最高AI論理スコア: {maxLogicScore ?? "未評価"}
 </div>
 
   <div>
@@ -1929,7 +1929,7 @@ function jumpToMainIssues() {
                   color: sortType === "score" ? "#fff" : "#333",
                 }}
               >
-                読みやすい順
+                AI論理スコア順
               </PrimaryButton>
 
               <PrimaryButton

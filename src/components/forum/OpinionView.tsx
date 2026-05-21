@@ -117,7 +117,7 @@ export default function OpinionView({
                     fontSize: currentFont.base * 0.85,
                   }}
                 >
-                  読みやすさの目安
+                  AI論理スコアの目安
                 </span>
               </div>
               <span
@@ -137,7 +137,7 @@ export default function OpinionView({
                 fontSize: currentFont.base,
               }}
             >
-              意見・読みやすさ {op.opinion.logic_score ?? "-"}
+              意見・AI論理スコア {op.opinion.logic_score ?? "-"}
             </div>
           )}
         </div>
