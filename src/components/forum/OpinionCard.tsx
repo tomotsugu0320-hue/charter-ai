@@ -230,6 +230,11 @@ const savedCounterargumentExplanation = String(
   op.opinion.ai_counterargument_explanation ?? ""
 ).trim();
 const stanceText = stanceLabelText(op.opinion.stance_label);
+const logicScoreReason = String(op.opinion.logic_score_reason ?? "").trim();
+const logicBreakType = String(op.opinion.logic_break_type ?? "").trim();
+const logicBreakNote = String(op.opinion.logic_break_note ?? "").trim();
+const shouldShowLogicBreakNote =
+  logicBreakType && logicBreakType !== "none" && logicBreakNote;
 const feedbackActions = [
   ["conclusion_unknown", "AIで結論を解説"],
   ["counterargument_unknown", "AIで反対意見を解説"],
@@ -390,6 +395,44 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
         </div>
 
       </div>
+
+      {logicScoreReason && (
+        <details
+          style={{
+            marginTop: 10,
+            marginBottom: 10,
+            border: "1px solid #e2e8f0",
+            borderRadius: 8,
+            background: "#f8fafc",
+            color: "#334155",
+            padding: "8px 10px",
+            fontSize: currentFont?.base ? currentFont.base * 0.9 : 13,
+            lineHeight: 1.6,
+          }}
+        >
+          <summary
+            style={{
+              cursor: "pointer",
+              color: "#0f172a",
+              fontWeight: 800,
+            }}
+          >
+            AI論理スコアの理由を見る
+          </summary>
+          <div style={{ marginTop: 8 }}>{logicScoreReason}</div>
+          {shouldShowLogicBreakNote && (
+            <div
+              style={{
+                marginTop: 8,
+                color: "#475569",
+                fontWeight: 700,
+              }}
+            >
+              補足: {logicBreakNote}
+            </div>
+          )}
+        </details>
+      )}
 
       {(savedConclusionExplanation || savedCounterargumentExplanation) && (
         <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
