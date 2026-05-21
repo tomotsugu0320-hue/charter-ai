@@ -142,6 +142,26 @@ function scoreColor(score?: number) {
   return "#b71c1c";
 }
 
+function logicScoreReasonText(reason: string) {
+  const text = reason.trim();
+  const isFallbackReason =
+    text.startsWith("fallback") ||
+    text.includes("fallback +") ||
+    text.includes("fallback strict");
+
+  if (!isFallbackReason) return text;
+
+  if (text.includes("主張のみ") || text.includes("根拠不足")) {
+    return "簡易判定：主張はありますが、理由・根拠・因果関係がまだ十分ではありません。";
+  }
+
+  if (text.includes("因果・根拠が弱い")) {
+    return "簡易判定：理由はありますが、因果関係や根拠の説明がまだ弱い状態です。";
+  }
+
+  return "簡易判定：この投稿はまだAI詳細評価前です。前提・根拠・因果関係をもとに仮判定しています。";
+}
+
 function scoreBadgeStyle(score?: number | null) {
   const base = {
     display: "inline-flex",
@@ -231,6 +251,7 @@ const savedCounterargumentExplanation = String(
 ).trim();
 const stanceText = stanceLabelText(op.opinion.stance_label);
 const logicScoreReason = String(op.opinion.logic_score_reason ?? "").trim();
+const displayLogicScoreReason = logicScoreReasonText(logicScoreReason);
 const logicBreakType = String(op.opinion.logic_break_type ?? "").trim();
 const logicBreakNote = String(op.opinion.logic_break_note ?? "").trim();
 const shouldShowLogicBreakNote =
@@ -396,7 +417,7 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
 
       </div>
 
-      {logicScoreReason && (
+      {displayLogicScoreReason && (
         <details
           style={{
             marginTop: 10,
@@ -419,7 +440,7 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
           >
             AI論理スコアの理由を見る
           </summary>
-          <div style={{ marginTop: 8 }}>{logicScoreReason}</div>
+          <div style={{ marginTop: 8 }}>{displayLogicScoreReason}</div>
           {shouldShowLogicBreakNote && (
             <div
               style={{
