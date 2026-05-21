@@ -142,6 +142,62 @@ function scoreColor(score?: number) {
   return "#b71c1c";
 }
 
+function scoreBadgeStyle(score?: number | null) {
+  const base = {
+    display: "inline-flex",
+    alignItems: "center",
+    borderRadius: 999,
+    padding: "2px 8px",
+    fontSize: 12,
+    fontWeight: 700,
+    lineHeight: 1.4,
+    whiteSpace: "nowrap" as const,
+  };
+
+  if (score === null || score === undefined) {
+    return {
+      ...base,
+      border: "1px solid #e2e8f0",
+      background: "#f8fafc",
+      color: "#64748b",
+    };
+  }
+
+  if (score >= 80) {
+    return {
+      ...base,
+      border: "1px solid #bbf7d0",
+      background: "#f0fdf4",
+      color: scoreColor(score),
+    };
+  }
+
+  if (score >= 60) {
+    return {
+      ...base,
+      border: "1px solid #bfdbfe",
+      background: "#eff6ff",
+      color: scoreColor(score),
+    };
+  }
+
+  if (score >= 40) {
+    return {
+      ...base,
+      border: "1px solid #fed7aa",
+      background: "#fff7ed",
+      color: scoreColor(score),
+    };
+  }
+
+  return {
+    ...base,
+    border: "1px solid #fecaca",
+    background: "#fef2f2",
+    color: scoreColor(score),
+  };
+}
+
 export default function OpinionCard({
   op,
   hideLowScore,
@@ -213,6 +269,10 @@ const feedbackActions = [
       >
         <div
           style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 8,
             fontWeight: 700,
             color: roleColor(op.opinion.post_role),
           }}
@@ -220,8 +280,8 @@ const feedbackActions = [
           <span style={roleBadgeStyle(op.opinion.post_role)}>
             {roleLabel(op.opinion.post_role)}
           </span>
-<span style={{ marginLeft: 8, color: scoreColor(score) }}>
-  {score === null || score === undefined ? "未評価" : score}
+<span style={scoreBadgeStyle(score)}>
+  {score === null || score === undefined ? "読みやすさ 未評価" : `読みやすさ ${score}点`}
 </span>
           {stanceText && (
             <span
