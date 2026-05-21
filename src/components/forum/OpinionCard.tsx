@@ -418,7 +418,7 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
       </div>
 
       {displayLogicScoreReason && (
-        <details
+        <div
           style={{
             marginTop: 10,
             marginBottom: 10,
@@ -426,21 +426,21 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
             borderRadius: 8,
             background: "#f8fafc",
             color: "#334155",
-            padding: "8px 10px",
-            fontSize: currentFont?.base ? currentFont.base * 0.9 : 13,
-            lineHeight: 1.6,
+            padding: "10px 12px",
+            fontSize: currentFont?.base,
+            lineHeight: 1.7,
           }}
         >
-          <summary
+          <div
             style={{
-              cursor: "pointer",
+              marginBottom: 6,
               color: "#0f172a",
               fontWeight: 800,
             }}
           >
-            AI論理スコアの理由を見る
-          </summary>
-          <div style={{ marginTop: 8 }}>{displayLogicScoreReason}</div>
+            AI論理スコアの理由
+          </div>
+          <div>{displayLogicScoreReason}</div>
           {shouldShowLogicBreakNote && (
             <div
               style={{
@@ -452,7 +452,7 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
               補足: {logicBreakNote}
             </div>
           )}
-        </details>
+        </div>
       )}
 
       {(savedConclusionExplanation || savedCounterargumentExplanation) && (
