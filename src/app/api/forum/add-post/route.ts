@@ -135,6 +135,10 @@ type LogicScoreResult = {
   reason: string;
 };
 
+function includesAny(text: string, words: string[]) {
+  return words.some((word) => text.includes(word));
+}
+
 function calcLogicScoreFallback(
   content: string,
   postRole: AllowedPostRole
@@ -142,6 +146,70 @@ function calcLogicScoreFallback(
   let score = 50;
 
   const text = content.trim();
+  const compactText = text.replace(/\s+/g, "");
+
+  const hasCausalSignal = includesAny(text, [
+    "なぜなら",
+    "だから",
+    "ため",
+    "ので",
+    "結果",
+    "影響",
+    "つまり",
+    "一方で",
+    "したがって",
+    "要因",
+  ]);
+  const hasEvidenceSignal =
+    /[0-9０-９]|%|％/.test(text) ||
+    includesAny(text, ["データ", "統計", "試算", "根拠", "事例", "比較"]);
+  const hasEconomicSignal = includesAny(text, [
+    "需要",
+    "供給",
+    "インセンティブ",
+    "景気",
+    "短期",
+    "長期",
+    "労働移動",
+    "生産性",
+    "金融政策",
+    "財政政策",
+    "制度設計",
+    "代替案",
+    "消費",
+    "投資",
+    "賃金",
+    "雇用",
+    "物価",
+    "税率",
+  ]);
+  const hasCounterpointSignal = includesAny(text, [
+    "ただし",
+    "一方",
+    "反論",
+    "リスク",
+    "弱点",
+    "懸念",
+    "とはいえ",
+  ]);
+  const hasWeakClaimSignal = includesAny(compactText, [
+    "しろ",
+    "やめろ",
+    "かわいそう",
+    "ひどい",
+    "守るべき",
+    "許せない",
+    "最悪",
+    "財源がない",
+    "国の借金",
+    "有名人が言っている",
+    "政府が言っている",
+    "みんなそう思っている",
+  ]);
+  const isShortClaim = compactText.length < 18;
+  const lacksReasoning = !hasCausalSignal && !hasEvidenceSignal;
+  const isClaimOnly =
+    isShortClaim && lacksReasoning && (hasWeakClaimSignal || !hasCounterpointSignal);
 
   if (text.length >= 40) score += 10;
   if (text.length >= 80) score += 10;
@@ -174,6 +242,16 @@ function calcLogicScoreFallback(
     if (text.includes(word)) score -= 8;
   }
 
+  if (!hasCausalSignal) score -= 12;
+  if (!hasEvidenceSignal && !hasEconomicSignal) score -= 8;
+  if (hasCounterpointSignal) score += 6;
+
+  if (isClaimOnly) {
+    score = Math.min(score, hasWeakClaimSignal ? 18 : 25);
+  } else if (lacksReasoning && !hasCounterpointSignal) {
+    score = Math.min(score, 35);
+  }
+
   if (postRole === "issue_raise") score += 5;
   if (postRole === "rebuttal") score += 5;
   if (postRole === "explanation") score += 8;
@@ -199,10 +277,17 @@ switch (postRole) {
 }
 
 const finalScore = Math.max(0, Math.min(100, score + weight));
+const reasonParts = [`fallback strict + weight(${weight})`];
+
+if (isClaimOnly) {
+  reasonParts.push("主張のみ・根拠不足");
+} else if (lacksReasoning) {
+  reasonParts.push("因果・根拠が弱い");
+}
 
 return {
   score: finalScore,
-  reason: `fallback + weight(${weight})`,
+  reason: reasonParts.join(" / "),
 };
 }
 
