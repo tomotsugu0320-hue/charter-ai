@@ -15,6 +15,7 @@ export async function GET(req: Request) {
     .from("forum_posts")
     .select(`
       id, thread_id, post_role, content, created_at,
+      logic_score, logic_score_reason, logic_break_type, logic_break_note,
       forum_threads (title)
     `)
     .order("created_at", { ascending: false })
