@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useState } from "react";
 
 type LogicScorePost = {
@@ -177,6 +179,11 @@ function scoreBadgeStyle(score?: number | null) {
 }
 
 export default function ReEvaluateLogicScorePage() {
+  const params = useParams();
+  const tenantParam = params?.tenant;
+  const tenant = Array.isArray(tenantParam)
+    ? tenantParam[0] ?? "dev"
+    : tenantParam ?? "dev";
   const [adminKey, setAdminKey] = useState("");
   const [postId, setPostId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -396,6 +403,20 @@ export default function ReEvaluateLogicScorePage() {
         color: "#111827",
       }}
     >
+      <Link
+        href={`/${tenant}/forum/admin`}
+        style={{
+          display: "inline-block",
+          color: "#1d4ed8",
+          fontWeight: 800,
+          marginBottom: 14,
+          padding: "6px 0",
+          textDecoration: "underline",
+        }}
+      >
+        ← forum管理トップへ戻る
+      </Link>
+
       <h1 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 800 }}>
         単一投稿AI論理スコア再評価
       </h1>

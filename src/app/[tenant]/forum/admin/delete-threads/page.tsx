@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type Mode = "visible" | "hidden" | "all";
@@ -20,6 +22,11 @@ const modeLabels: Record<Mode, string> = {
 };
 
 export default function DeleteThreadsPage() {
+  const params = useParams();
+  const tenantParam = params?.tenant;
+  const tenant = Array.isArray(tenantParam)
+    ? tenantParam[0] ?? "dev"
+    : tenantParam ?? "dev";
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [mode, setMode] = useState<Mode>("visible");
   const [adminKey, setAdminKey] = useState("");
@@ -198,6 +205,20 @@ export default function DeleteThreadsPage() {
 
   return (
     <main style={{ padding: 20 }}>
+      <Link
+        href={`/${tenant}/forum/admin`}
+        style={{
+          display: "inline-block",
+          color: "#1d4ed8",
+          fontWeight: 800,
+          marginBottom: 14,
+          padding: "6px 0",
+          textDecoration: "underline",
+        }}
+      >
+        ← forum管理トップへ戻る
+      </Link>
+
       <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
         スレッド非表示管理
       </h1>
