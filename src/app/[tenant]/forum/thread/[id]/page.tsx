@@ -1918,7 +1918,7 @@ function jumpToMainIssues() {
                 checked={hideLowScore}
                 onChange={(e) => setHideLowScore(e.target.checked)}
               />
-              読みづらい投稿を薄く表示する
+              AI論理スコアが低い投稿を薄く表示する
             </label>
 
             <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1941,6 +1941,18 @@ function jumpToMainIssues() {
               >
                 新着順
               </PrimaryButton>
+            </div>
+
+            <div
+              style={{
+                marginTop: 4,
+                marginBottom: 12,
+                color: "#475569",
+                fontSize: currentFont.base - 2,
+                lineHeight: 1.6,
+              }}
+            >
+              AI論理スコアは正解判定ではなく、前提・根拠・因果関係・反論耐性を見るための目安です。
             </div>
 
 
