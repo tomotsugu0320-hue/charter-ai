@@ -16,6 +16,7 @@ export default function robots(): MetadataRoute.Robots {
           `/${defaultTenant}/forum/thread/*`,
         ],
         disallow: [
+          `/${defaultTenant}/forum/admin`,
           `/${defaultTenant}/forum/admin/*`,
           "/api/*",
           "/_next/*",
