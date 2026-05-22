@@ -55,6 +55,102 @@ function threadTitle(post: AdminPostRow) {
   return thread?.title || "無題のスレッド";
 }
 
+function evaluationLabel(reason?: string | null) {
+  const normalizedReason = String(reason ?? "").trim();
+
+  if (!normalizedReason) return "理由なし";
+  if (normalizedReason.includes("fallback")) return "簡易判定";
+
+  return "AI詳細評価済み";
+}
+
+function evaluationBadgeStyle(reason?: string | null) {
+  const label = evaluationLabel(reason);
+  const base = {
+    display: "inline-flex",
+    alignItems: "center",
+    borderRadius: 999,
+    border: "1px solid #cbd5e1",
+    padding: "3px 8px",
+    fontSize: 12,
+    fontWeight: 800,
+    lineHeight: 1.4,
+    whiteSpace: "nowrap" as const,
+  };
+
+  if (label === "簡易判定") {
+    return {
+      ...base,
+      border: "1px solid #fde68a",
+      background: "#fffbeb",
+      color: "#92400e",
+    };
+  }
+
+  if (label === "AI詳細評価済み") {
+    return {
+      ...base,
+      border: "1px solid #bbf7d0",
+      background: "#f0fdf4",
+      color: "#166534",
+    };
+  }
+
+  return {
+    ...base,
+    border: "1px solid #e2e8f0",
+    background: "#f8fafc",
+    color: "#475569",
+  };
+}
+
+function scoreBadgeStyle(score?: number | null) {
+  const base = {
+    display: "inline-flex",
+    alignItems: "center",
+    borderRadius: 999,
+    padding: "3px 9px",
+    fontSize: 12,
+    fontWeight: 900,
+    lineHeight: 1.4,
+    whiteSpace: "nowrap" as const,
+  };
+
+  if (score === null || score === undefined) {
+    return {
+      ...base,
+      border: "1px solid #e2e8f0",
+      background: "#f8fafc",
+      color: "#475569",
+    };
+  }
+
+  if (score >= 80) {
+    return {
+      ...base,
+      border: "1px solid #86efac",
+      background: "#dcfce7",
+      color: "#166534",
+    };
+  }
+
+  if (score >= 50) {
+    return {
+      ...base,
+      border: "1px solid #bfdbfe",
+      background: "#eff6ff",
+      color: "#1d4ed8",
+    };
+  }
+
+  return {
+    ...base,
+    border: "1px solid #fecaca",
+    background: "#fef2f2",
+    color: "#991b1b",
+  };
+}
+
 export default function ReEvaluateLogicScorePage() {
   const [adminKey, setAdminKey] = useState("");
   const [postId, setPostId] = useState("");
@@ -423,6 +519,25 @@ export default function ReEvaluateLogicScorePage() {
                     }}
                   >
                     <div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          alignItems: "center",
+                          gap: 8,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <span style={evaluationBadgeStyle(post.logic_score_reason)}>
+                          {evaluationLabel(post.logic_score_reason)}
+                        </span>
+                        <span style={scoreBadgeStyle(post.logic_score)}>
+                          {post.logic_score === null || post.logic_score === undefined
+                            ? "AI論理スコア 未評価"
+                            : `AI論理スコア ${post.logic_score}`}
+                        </span>
+                      </div>
+
                       <div
                         style={{
                           fontSize: 12,
