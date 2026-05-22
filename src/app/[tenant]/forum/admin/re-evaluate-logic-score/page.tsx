@@ -38,6 +38,16 @@ type AdminPostsResponse = {
   posts?: AdminPostRow[];
 };
 
+type PostFilter = "all" | "fallback" | "ai" | "no_reason" | "low_score";
+
+const postFilters: { value: PostFilter; label: string }[] = [
+  { value: "all", label: "すべて" },
+  { value: "fallback", label: "簡易判定" },
+  { value: "ai", label: "AI詳細評価済み" },
+  { value: "no_reason", label: "理由なし" },
+  { value: "low_score", label: "低スコア" },
+];
+
 function formatDate(value?: string | null) {
   if (!value) return "-";
 
@@ -164,6 +174,24 @@ export default function ReEvaluateLogicScorePage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ReEvaluateResponse | null>(null);
   const [recentPosts, setRecentPosts] = useState<AdminPostRow[]>([]);
+  const [postFilter, setPostFilter] = useState<PostFilter>("all");
+
+  const filteredPosts = recentPosts.filter((post) => {
+    const label = evaluationLabel(post.logic_score_reason);
+
+    switch (postFilter) {
+      case "fallback":
+        return label === "簡易判定";
+      case "ai":
+        return label === "AI詳細評価済み";
+      case "no_reason":
+        return label === "理由なし";
+      case "low_score":
+        return typeof post.logic_score === "number" && post.logic_score < 50;
+      default:
+        return true;
+    }
+  });
 
   function updateRecentPost(updatedPost?: LogicScorePost | null) {
     if (!updatedPost?.id) return;
@@ -494,8 +522,57 @@ export default function ReEvaluateLogicScorePage() {
         )}
 
         {recentPosts.length > 0 && (
+          <>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 8,
+                marginTop: 14,
+              }}
+            >
+              {postFilters.map((filter) => {
+                const selected = postFilter === filter.value;
+
+                return (
+                  <button
+                    key={filter.value}
+                    type="button"
+                    onClick={() => setPostFilter(filter.value)}
+                    style={{
+                      border: selected
+                        ? "1px solid #111827"
+                        : "1px solid #cbd5e1",
+                      borderRadius: 999,
+                      background: selected ? "#111827" : "#fff",
+                      color: selected ? "#fff" : "#111827",
+                      cursor: "pointer",
+                      fontWeight: 800,
+                      padding: "6px 10px",
+                    }}
+                  >
+                    {filter.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div
+              style={{
+                marginTop: 8,
+                color: "#475569",
+                fontSize: 13,
+                fontWeight: 700,
+              }}
+            >
+              表示中: {filteredPosts.length}件
+            </div>
+          </>
+        )}
+
+        {recentPosts.length > 0 && (
           <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
-            {recentPosts.map((post) => {
+            {filteredPosts.map((post) => {
               const postLoading = reEvaluatingPostId === post.id;
 
               return (
