@@ -23,110 +23,173 @@ export default function DeleteThreadsPage() {
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [mode, setMode] = useState<Mode>("visible");
   const [adminKey, setAdminKey] = useState("");
-  const requestAdminKey = adminKey || process.env.NEXT_PUBLIC_ADMIN_KEY || "";
+  const [error, setError] = useState<string | null>(null);
+  const [listLoading, setListLoading] = useState(false);
+  const [operatingThreadId, setOperatingThreadId] = useState<string | null>(
+    null
+  );
+  const requestAdminKey = adminKey.trim();
+
+  function titleOf(thread: ThreadRow) {
+    return thread.title?.trim() || "無題のスレッド";
+  }
+
+  function requireAdminKey() {
+    if (requestAdminKey) return true;
+
+    setError("管理者キーを入力してください。");
+    return false;
+  }
 
   async function load() {
-    const res = await fetch(`/api/forum/admin-threads?mode=${mode}`, {
-      headers: { "x-admin-key": requestAdminKey },
-    });
-    const json = await res.json().catch(() => ({}));
+    if (!requireAdminKey()) return;
 
-    if (!res.ok) {
-      alert(json?.error || "スレッド一覧の取得に失敗しました");
+    setListLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/forum/admin-threads?mode=${mode}`, {
+        headers: { "x-admin-key": requestAdminKey },
+      });
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError(json?.error || "スレッド一覧の取得に失敗しました。");
+        return;
+      }
+
+      setThreads(json.threads ?? []);
+    } finally {
+      setListLoading(false);
+    }
+  }
+
+  async function del(thread: ThreadRow) {
+    if (!requireAdminKey()) return;
+    if (!confirm(`このスレッドを非表示にします。対象: ${titleOf(thread)}`)) {
       return;
     }
 
-    setThreads(json.threads ?? []);
-  }
+    setOperatingThreadId(thread.id);
+    setError(null);
 
-  async function del(id: string) {
-    if (!confirm("このスレッドをトップ一覧から非表示にする？")) return;
+    try {
+      const res = await fetch("/api/forum/delete-thread", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": requestAdminKey,
+        },
+        body: JSON.stringify({ threadId: thread.id }),
+      });
 
-    const res = await fetch("/api/forum/delete-thread", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-key": requestAdminKey,
-      },
-      body: JSON.stringify({ threadId: id }),
-    });
+      const json = await res.json().catch(() => ({}));
 
-    const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json?.error || "スレッド非表示に失敗しました。");
+        return;
+      }
 
-    if (!res.ok) {
-      alert(json?.error || "スレッド非表示に失敗しました");
-      return;
+      setThreads((current) =>
+        mode === "all"
+          ? current.map((currentThread) =>
+              currentThread.id === thread.id
+                ? {
+                    ...currentThread,
+                    is_deleted: true,
+                    deleted_at: new Date().toISOString(),
+                  }
+                : currentThread
+            )
+          : current.filter((currentThread) => currentThread.id !== thread.id)
+      );
+    } finally {
+      setOperatingThreadId(null);
     }
-
-    setThreads((current) =>
-      mode === "all"
-        ? current.map((thread) =>
-            thread.id === id
-              ? {
-                  ...thread,
-                  is_deleted: true,
-                  deleted_at: new Date().toISOString(),
-                }
-              : thread
-          )
-        : current.filter((thread) => thread.id !== id)
-    );
   }
 
-  async function restore(id: string) {
-    const res = await fetch("/api/forum/restore-thread", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-key": requestAdminKey,
-      },
-      body: JSON.stringify({ threadId: id }),
-    });
-
-    const json = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      alert(json?.error || "スレッド復元に失敗しました");
-      return;
-    }
-
-    setThreads((current) =>
-      mode === "all"
-        ? current.map((thread) =>
-            thread.id === id
-              ? { ...thread, is_deleted: false, deleted_at: null }
-              : thread
-          )
-        : current.filter((thread) => thread.id !== id)
-    );
-  }
-
-  async function hardDelete(id: string) {
+  async function restore(thread: ThreadRow) {
+    if (!requireAdminKey()) return;
     if (
       !confirm(
-        "このスレッドを完全削除しますか？\nこの操作は元に戻せません。"
+        `このスレッドを公開状態に戻します。対象: ${titleOf(thread)}`
       )
     ) {
       return;
     }
 
-    const res = await fetch("/api/forum/hard-delete-thread", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-key": requestAdminKey,
-      },
-      body: JSON.stringify({ threadId: id }),
-    });
+    setOperatingThreadId(thread.id);
+    setError(null);
 
-    const json = await res.json().catch(() => ({}));
+    try {
+      const res = await fetch("/api/forum/restore-thread", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": requestAdminKey,
+        },
+        body: JSON.stringify({ threadId: thread.id }),
+      });
 
-    if (!res.ok) {
-      alert(json?.error || "スレッドの完全削除に失敗しました");
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError(json?.error || "スレッド復元に失敗しました。");
+        return;
+      }
+
+      setThreads((current) =>
+        mode === "all"
+          ? current.map((currentThread) =>
+              currentThread.id === thread.id
+                ? { ...currentThread, is_deleted: false, deleted_at: null }
+                : currentThread
+            )
+          : current.filter((currentThread) => currentThread.id !== thread.id)
+      );
+    } finally {
+      setOperatingThreadId(null);
+    }
+  }
+
+  async function hardDelete(thread: ThreadRow) {
+    if (!requireAdminKey()) return;
+    if (
+      !confirm(
+        `完全削除します。元に戻せません。対象: ${titleOf(
+          thread
+        )}。本当に削除しますか？`
+      )
+    ) {
       return;
     }
 
-    setThreads((current) => current.filter((thread) => thread.id !== id));
+    setOperatingThreadId(thread.id);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/forum/hard-delete-thread", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": requestAdminKey,
+        },
+        body: JSON.stringify({ threadId: thread.id }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError(json?.error || "スレッドの完全削除に失敗しました。");
+        return;
+      }
+
+      setThreads((current) =>
+        current.filter((currentThread) => currentThread.id !== thread.id)
+      );
+    } finally {
+      setOperatingThreadId(null);
+    }
   }
 
   useEffect(() => {
@@ -170,7 +233,48 @@ export default function DeleteThreadsPage() {
         />
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+      <button
+        type="button"
+        onClick={() => void load()}
+        disabled={listLoading}
+        style={{
+          border: "1px solid #111827",
+          borderRadius: 6,
+          background: listLoading ? "#cbd5e1" : "#111827",
+          color: listLoading ? "#334155" : "#fff",
+          cursor: listLoading ? "wait" : "pointer",
+          fontWeight: 800,
+          marginBottom: 16,
+          padding: "8px 12px",
+        }}
+      >
+        {listLoading ? "読み込み中..." : "一覧を読み込む"}
+      </button>
+
+      {error && (
+        <div
+          style={{
+            border: "1px solid #fecaca",
+            borderRadius: 8,
+            background: "#fef2f2",
+            color: "#991b1b",
+            lineHeight: 1.6,
+            marginBottom: 16,
+            padding: "10px 12px",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 8,
+          marginBottom: 16,
+        }}
+      >
         {(["visible", "hidden", "all"] as Mode[]).map((nextMode) => (
           <button
             key={nextMode}
@@ -196,20 +300,45 @@ export default function DeleteThreadsPage() {
         <div style={{ display: "grid", gap: 12 }}>
           {threads.map((thread) => {
             const hidden = thread.is_deleted === true;
+            const operating = operatingThreadId === thread.id;
 
             return (
               <section
                 key={thread.id}
                 style={{
-                  position: "relative",
                   border: "1px solid #ddd",
                   borderRadius: 8,
-                  padding: "48px 12px 12px",
+                  padding: 12,
                   background: "#fff",
+                  color: "#111827",
                 }}
               >
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>
-                  {thread.title || "無題のスレッド"}
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 6,
+                  }}
+                >
+                  <span
+                    style={{
+                      border: hidden
+                        ? "1px solid #fcd34d"
+                        : "1px solid #86efac",
+                      borderRadius: 999,
+                      background: hidden ? "#fffbeb" : "#f0fdf4",
+                      color: hidden ? "#92400e" : "#166534",
+                      fontSize: 12,
+                      fontWeight: 800,
+                      padding: "2px 8px",
+                    }}
+                  >
+                    {hidden ? "非表示中" : "公開中"}
+                  </span>
+
+                  <div style={{ fontWeight: 700 }}>{titleOf(thread)}</div>
                 </div>
 
                 <div
@@ -237,53 +366,71 @@ export default function DeleteThreadsPage() {
                 {hidden ? (
                   <button
                     type="button"
-                    onClick={() => void restore(thread.id)}
+                    onClick={() => void restore(thread)}
+                    disabled={operating}
                     style={{
                       color: "#166534",
                       border: "1px solid #86efac",
                       borderRadius: 6,
                       background: "#fff",
                       padding: "6px 10px",
-                      cursor: "pointer",
+                      cursor: operating ? "wait" : "pointer",
+                      opacity: operating ? 0.65 : 1,
                     }}
                   >
-                    復元
+                    {operating ? "処理中..." : "復元"}
                   </button>
                 ) : (
                   <button
                     type="button"
-                    onClick={() => void del(thread.id)}
+                    onClick={() => void del(thread)}
+                    disabled={operating}
                     style={{
-                      color: "red",
+                      color: "#991b1b",
                       border: "1px solid #fca5a5",
                       borderRadius: 6,
                       background: "#fff",
                       padding: "6px 10px",
-                      cursor: "pointer",
+                      cursor: operating ? "wait" : "pointer",
+                      opacity: operating ? 0.65 : 1,
                     }}
                   >
-                    非表示
+                    {operating ? "処理中..." : "非表示"}
                   </button>
                 )}
 
-                <button
-                  type="button"
-                  onClick={() => void hardDelete(thread.id)}
+                <div
                   style={{
-                    position: "absolute",
-                    top: 12,
-                    right: 12,
-                    color: "#991b1b",
-                    border: "1px solid #ef4444",
-                    borderRadius: 6,
+                    border: "1px solid #fecaca",
+                    borderRadius: 8,
                     background: "#fef2f2",
-                    padding: "6px 10px",
-                    cursor: "pointer",
-                    fontWeight: 700,
+                    color: "#7f1d1d",
+                    marginTop: 12,
+                    padding: "10px 12px",
                   }}
                 >
-                  完全削除（復元不可）
-                </button>
+                  <div style={{ fontWeight: 800, marginBottom: 8 }}>
+                    危険操作
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => void hardDelete(thread)}
+                    disabled={operating}
+                    style={{
+                      color: "#991b1b",
+                      border: "1px solid #ef4444",
+                      borderRadius: 6,
+                      background: "#fff",
+                      padding: "6px 10px",
+                      cursor: operating ? "wait" : "pointer",
+                      fontWeight: 700,
+                      opacity: operating ? 0.65 : 1,
+                    }}
+                  >
+                    {operating ? "処理中..." : "完全削除（復元不可）"}
+                  </button>
+                </div>
               </section>
             );
           })}
