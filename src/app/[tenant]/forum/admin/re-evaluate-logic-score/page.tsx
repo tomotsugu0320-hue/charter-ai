@@ -39,6 +39,7 @@ type AdminPostsResponse = {
 };
 
 type PostFilter = "all" | "fallback" | "ai" | "no_reason" | "low_score";
+type PostSort = "new" | "score_low" | "score_high" | "no_reason_first";
 
 const postFilters: { value: PostFilter; label: string }[] = [
   { value: "all", label: "すべて" },
@@ -48,6 +49,13 @@ const postFilters: { value: PostFilter; label: string }[] = [
   { value: "low_score", label: "低スコア" },
 ];
 
+const postSorts: { value: PostSort; label: string }[] = [
+  { value: "new", label: "新しい順" },
+  { value: "score_low", label: "低スコア順" },
+  { value: "score_high", label: "高スコア順" },
+  { value: "no_reason_first", label: "理由なし優先" },
+];
+
 function formatDate(value?: string | null) {
   if (!value) return "-";
 
@@ -55,6 +63,13 @@ function formatDate(value?: string | null) {
   if (Number.isNaN(date.getTime())) return value;
 
   return date.toLocaleString("ja-JP");
+}
+
+function createdAtTime(value?: string | null) {
+  if (!value) return 0;
+
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
 }
 
 function threadTitle(post: AdminPostRow) {
@@ -175,6 +190,7 @@ export default function ReEvaluateLogicScorePage() {
   const [result, setResult] = useState<ReEvaluateResponse | null>(null);
   const [recentPosts, setRecentPosts] = useState<AdminPostRow[]>([]);
   const [postFilter, setPostFilter] = useState<PostFilter>("all");
+  const [postSort, setPostSort] = useState<PostSort>("new");
 
   const filteredPosts = recentPosts.filter((post) => {
     const label = evaluationLabel(post.logic_score_reason);
@@ -190,6 +206,37 @@ export default function ReEvaluateLogicScorePage() {
         return typeof post.logic_score === "number" && post.logic_score < 50;
       default:
         return true;
+    }
+  });
+
+  const sortedPosts = [...filteredPosts].sort((a, b) => {
+    const newestFirst = createdAtTime(b.created_at) - createdAtTime(a.created_at);
+    const aScore = typeof a.logic_score === "number" ? a.logic_score : null;
+    const bScore = typeof b.logic_score === "number" ? b.logic_score : null;
+
+    switch (postSort) {
+      case "score_low":
+        if (aScore === null && bScore === null) return newestFirst;
+        if (aScore === null) return 1;
+        if (bScore === null) return -1;
+        return aScore - bScore || newestFirst;
+      case "score_high":
+        if (aScore === null && bScore === null) return newestFirst;
+        if (aScore === null) return 1;
+        if (bScore === null) return -1;
+        return bScore - aScore || newestFirst;
+      case "no_reason_first": {
+        const aHasNoReason = !String(a.logic_score_reason ?? "").trim();
+        const bHasNoReason = !String(b.logic_score_reason ?? "").trim();
+
+        if (aHasNoReason !== bHasNoReason) {
+          return aHasNoReason ? -1 : 1;
+        }
+
+        return newestFirst;
+      }
+      default:
+        return newestFirst;
     }
   });
 
@@ -560,6 +607,51 @@ export default function ReEvaluateLogicScorePage() {
             <div
               style={{
                 marginTop: 8,
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <span
+                style={{
+                  color: "#475569",
+                  fontSize: 13,
+                  fontWeight: 800,
+                }}
+              >
+                並び替え
+              </span>
+
+              {postSorts.map((sort) => {
+                const selected = postSort === sort.value;
+
+                return (
+                  <button
+                    key={sort.value}
+                    type="button"
+                    onClick={() => setPostSort(sort.value)}
+                    style={{
+                      border: selected
+                        ? "1px solid #1d4ed8"
+                        : "1px solid #cbd5e1",
+                      borderRadius: 999,
+                      background: selected ? "#dbeafe" : "#fff",
+                      color: selected ? "#1e3a8a" : "#111827",
+                      cursor: "pointer",
+                      fontWeight: 800,
+                      padding: "6px 10px",
+                    }}
+                  >
+                    {sort.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div
+              style={{
+                marginTop: 8,
                 color: "#475569",
                 fontSize: 13,
                 fontWeight: 700,
@@ -572,7 +664,7 @@ export default function ReEvaluateLogicScorePage() {
 
         {recentPosts.length > 0 && (
           <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
-            {filteredPosts.map((post) => {
+            {sortedPosts.map((post) => {
               const postLoading = reEvaluatingPostId === post.id;
 
               return (
