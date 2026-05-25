@@ -20,6 +20,32 @@ type LogicScoreResult = {
   logic_break_note: string;
 };
 
+type EvaluationContext = {
+  currentLogicScore?: number | null;
+  currentLogicScoreReason?: string | null;
+  currentLogicBreakType?: string | null;
+  currentLogicBreakNote?: string | null;
+  objection?: {
+    id: string;
+    content: string;
+    logic_score?: number | null;
+    logic_score_reason?: string | null;
+    logic_break_type?: string | null;
+    logic_break_note?: string | null;
+  } | null;
+};
+
+type ObjectionPostRow = {
+  id: string;
+  content: string | null;
+  post_role: string | null;
+  parent_opinion_id: string | null;
+  logic_score: number | null;
+  logic_score_reason: string | null;
+  logic_break_type: string | null;
+  logic_break_note: string | null;
+};
+
 function clampScore(value: unknown) {
   const score = Number(value);
   if (!Number.isFinite(score)) return 50;
@@ -43,13 +69,46 @@ function extractOutputText(json: any) {
 
 async function evaluateLogicScore(
   content: string,
-  postRole: string
+  postRole: string,
+  context?: EvaluationContext
 ): Promise<LogicScoreResult> {
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not set");
   }
+
+  const currentEvaluationText =
+    context?.currentLogicScore !== undefined ||
+    context?.currentLogicScoreReason ||
+    context?.currentLogicBreakType ||
+    context?.currentLogicBreakNote
+      ? `
+現在のAI論理スコア:
+- score: ${context?.currentLogicScore ?? "未評価"}
+- reason: ${context?.currentLogicScoreReason || "なし"}
+- break_type: ${context?.currentLogicBreakType || "なし"}
+- break_note: ${context?.currentLogicBreakNote || "なし"}
+      `.trim()
+      : "";
+
+  const objectionText = context?.objection
+    ? `
+高スコア反論投稿:
+- objectionPostId: ${context.objection.id}
+- logic_score: ${context.objection.logic_score ?? "未評価"}
+- logic_score_reason: ${context.objection.logic_score_reason || "なし"}
+- logic_break_type: ${context.objection.logic_break_type || "なし"}
+- logic_break_note: ${context.objection.logic_break_note || "なし"}
+
+反論本文:
+${context.objection.content}
+
+注意:
+この反論投稿を無条件に正しいものとして扱わないでください。
+元投稿の前提・根拠・因果関係を見直すための材料として扱い、反論自体の論理性も検討してください。
+      `.trim()
+    : "";
 
   const res = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -110,6 +169,10 @@ none, emotional, authority_based, weak_causality, unclear_premise, off_topic, ot
 
 投稿本文:
 ${content}
+
+${currentEvaluationText}
+
+${objectionText}
       `.trim(),
       temperature: 0,
       text: {
@@ -185,6 +248,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const postId = String(body?.postId ?? "").trim();
+    const objectionPostId =
+      String(body?.objectionPostId ?? "").trim() || null;
 
     if (!postId) {
       return NextResponse.json(
@@ -201,7 +266,9 @@ export async function POST(req: NextRequest) {
 
     const { data: post, error: postError } = await supabase
       .from("forum_posts")
-      .select("id, content, post_role")
+      .select(
+        "id, content, post_role, logic_score, logic_score_reason, logic_break_type, logic_break_note"
+      )
       .eq("id", postId)
       .maybeSingle();
 
@@ -228,9 +295,80 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    let objection: ObjectionPostRow | null = null;
+
+    if (objectionPostId) {
+      const { data: objectionRow, error: objectionError } = await supabase
+        .from("forum_posts")
+        .select(
+          "id, content, post_role, parent_opinion_id, logic_score, logic_score_reason, logic_break_type, logic_break_note"
+        )
+        .eq("id", objectionPostId)
+        .maybeSingle();
+
+      if (objectionError) {
+        return NextResponse.json(
+          { success: false, error: objectionError.message },
+          { status: 500 }
+        );
+      }
+
+      if (!objectionRow) {
+        return NextResponse.json(
+          { success: false, error: "objection post not found" },
+          { status: 404 }
+        );
+      }
+
+      objection = objectionRow as ObjectionPostRow;
+
+      if (String(objection.parent_opinion_id ?? "") !== postId) {
+        return NextResponse.json(
+          { success: false, error: "objection post is not linked to postId" },
+          { status: 400 }
+        );
+      }
+
+      if (objection.post_role !== "supplement") {
+        return NextResponse.json(
+          { success: false, error: "objection post must be supplement" },
+          { status: 400 }
+        );
+      }
+
+      if (!String(objection.content ?? "").includes("AI評価への反論:")) {
+        return NextResponse.json(
+          { success: false, error: "objection post marker is missing" },
+          { status: 400 }
+        );
+      }
+    }
+
     const result = await evaluateLogicScore(
       content,
-      String(post.post_role ?? "opinion")
+      String(post.post_role ?? "opinion"),
+      {
+        currentLogicScore:
+          typeof post.logic_score === "number" ? post.logic_score : null,
+        currentLogicScoreReason: String(post.logic_score_reason ?? "").trim(),
+        currentLogicBreakType: String(post.logic_break_type ?? "").trim(),
+        currentLogicBreakNote: String(post.logic_break_note ?? "").trim(),
+        objection: objection
+          ? {
+              id: objection.id,
+              content: String(objection.content ?? "").trim(),
+              logic_score:
+                typeof objection.logic_score === "number"
+                  ? objection.logic_score
+                  : null,
+              logic_score_reason: String(
+                objection.logic_score_reason ?? ""
+              ).trim(),
+              logic_break_type: String(objection.logic_break_type ?? "").trim(),
+              logic_break_note: String(objection.logic_break_note ?? "").trim(),
+            }
+          : null,
+      }
     );
 
     const { data: updatedPost, error: updateError } = await supabase
@@ -257,6 +395,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       post: updatedPost,
+      objectionPostId,
       evaluated: true,
       source: "openai",
     });

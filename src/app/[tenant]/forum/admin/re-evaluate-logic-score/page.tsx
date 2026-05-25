@@ -16,6 +16,7 @@ type ReEvaluateResponse = {
   success?: boolean;
   error?: string;
   post?: LogicScorePost | null;
+  objectionPostId?: string | null;
 };
 
 type AdminThreadRef = {
@@ -325,14 +326,17 @@ export default function ReEvaluateLogicScorePage() {
     );
   }
 
-  async function reEvaluatePost(targetPostId: string) {
+  async function reEvaluatePost(targetPostId: string, objectionPostId?: string) {
     const res = await fetch("/api/forum/re-evaluate-logic-score", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-admin-key": adminKey,
       },
-      body: JSON.stringify({ postId: targetPostId }),
+      body: JSON.stringify({
+        postId: targetPostId,
+        ...(objectionPostId ? { objectionPostId } : {}),
+      }),
     });
 
     const raw = await res.text();
@@ -431,7 +435,8 @@ export default function ReEvaluateLogicScorePage() {
 
   async function handleRecentPostReEvaluate(
     targetPostId: string,
-    confirmMessage = "この投稿をAI再評価します。OpenAI API費用が発生します。実行しますか？"
+    confirmMessage = "この投稿をAI再評価します。OpenAI API費用が発生します。実行しますか？",
+    objectionPostId?: string
   ) {
     if (!confirm(confirmMessage)) {
       return;
@@ -443,7 +448,7 @@ export default function ReEvaluateLogicScorePage() {
     setResult(null);
 
     try {
-      const json = await reEvaluatePost(targetPostId);
+      const json = await reEvaluatePost(targetPostId, objectionPostId);
       setResult(json);
       updateRecentPost(json.post);
     } catch (e: any) {
@@ -920,7 +925,8 @@ export default function ReEvaluateLogicScorePage() {
                           onClick={() =>
                             void handleRecentPostReEvaluate(
                               parentPostId,
-                              "この高スコア反論を踏まえて、元投稿をAI再評価します。OpenAI API費用が発生します。実行しますか？"
+                              "この高スコア反論を踏まえて、元投稿をAI再評価します。OpenAI API費用が発生します。実行しますか？",
+                              post.id
                             )
                           }
                           disabled={parentPostLoading}
