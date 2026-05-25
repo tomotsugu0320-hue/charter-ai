@@ -232,6 +232,17 @@ export default function OpinionCard({
   currentAuthorKey,
 }: any) {
 const score = op.opinion.logic_score;
+const numericScore =
+  typeof score === "number"
+    ? score
+    : typeof score === "string" && score.trim() !== ""
+    ? Number(score)
+    : null;
+const isLowScore =
+  typeof numericScore === "number" &&
+  Number.isFinite(numericScore) &&
+  numericScore > 0 &&
+  numericScore < 60;
   const canHideOpinion =
     !!onHidePost &&
     !!currentAuthorKey &&
@@ -272,13 +283,7 @@ const feedbackActions = [
         background: "#fff",
         color: "#111",
         border: "1px solid #ddd",
-        opacity:
-          hideLowScore &&
-          typeof score === "number" &&
-          score > 0 &&
-          score < 60
-            ? 0.65
-            : 1,
+        opacity: hideLowScore && isLowScore ? 0.65 : 1,
       }}
     >
       <div
