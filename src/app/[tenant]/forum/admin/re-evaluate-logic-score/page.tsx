@@ -429,12 +429,11 @@ export default function ReEvaluateLogicScorePage() {
     }
   }
 
-  async function handleRecentPostReEvaluate(targetPostId: string) {
-    if (
-      !confirm(
-        "この投稿をAI再評価します。OpenAI API費用が発生します。実行しますか？"
-      )
-    ) {
+  async function handleRecentPostReEvaluate(
+    targetPostId: string,
+    confirmMessage = "この投稿をAI再評価します。OpenAI API費用が発生します。実行しますか？"
+  ) {
+    if (!confirm(confirmMessage)) {
       return;
     }
 
@@ -751,6 +750,9 @@ export default function ReEvaluateLogicScorePage() {
               const scoreObjection = isScoreObjectionPost(post);
               const highScoreObjection =
                 scoreObjection && numericScore !== null && numericScore >= 60;
+              const parentPostId = String(post.parent_opinion_id ?? "").trim();
+              const parentPostLoading =
+                parentPostId !== "" && reEvaluatingPostId === parentPostId;
 
               return (
                 <article
@@ -886,23 +888,59 @@ export default function ReEvaluateLogicScorePage() {
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => void handleRecentPostReEvaluate(post.id)}
-                      disabled={postLoading}
+                    <div
                       style={{
-                        width: "fit-content",
-                        border: "1px solid #111827",
-                        borderRadius: 8,
-                        background: postLoading ? "#cbd5e1" : "#111827",
-                        color: postLoading ? "#334155" : "#fff",
-                        cursor: postLoading ? "wait" : "pointer",
-                        fontWeight: 800,
-                        padding: "9px 12px",
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 8,
+                        alignItems: "center",
                       }}
                     >
-                      {postLoading ? "再評価中..." : "この投稿をAI再評価"}
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleRecentPostReEvaluate(post.id)}
+                        disabled={postLoading}
+                        style={{
+                          width: "fit-content",
+                          border: "1px solid #111827",
+                          borderRadius: 8,
+                          background: postLoading ? "#cbd5e1" : "#111827",
+                          color: postLoading ? "#334155" : "#fff",
+                          cursor: postLoading ? "wait" : "pointer",
+                          fontWeight: 800,
+                          padding: "9px 12px",
+                        }}
+                      >
+                        {postLoading ? "再評価中..." : "この投稿をAI再評価"}
+                      </button>
+
+                      {highScoreObjection && parentPostId && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleRecentPostReEvaluate(
+                              parentPostId,
+                              "この高スコア反論を踏まえて、元投稿をAI再評価します。OpenAI API費用が発生します。実行しますか？"
+                            )
+                          }
+                          disabled={parentPostLoading}
+                          style={{
+                            width: "fit-content",
+                            border: "1px solid #166534",
+                            borderRadius: 8,
+                            background: parentPostLoading ? "#bbf7d0" : "#dcfce7",
+                            color: parentPostLoading ? "#166534" : "#14532d",
+                            cursor: parentPostLoading ? "wait" : "pointer",
+                            fontWeight: 900,
+                            padding: "9px 12px",
+                          }}
+                        >
+                          {parentPostLoading
+                            ? "元投稿を再評価中..."
+                            : "この反論を踏まえて元投稿をAI再評価"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </article>
               );
