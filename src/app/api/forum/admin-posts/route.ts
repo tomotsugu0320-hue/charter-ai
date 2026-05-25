@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   const { data, error } = await supabase
     .from("forum_posts")
     .select(`
-      id, thread_id, post_role, content, created_at,
+      id, thread_id, post_role, parent_opinion_id, content, created_at,
       logic_score, logic_score_reason, logic_break_type, logic_break_note,
       forum_threads (title)
     `)

@@ -26,9 +26,10 @@ type AdminPostRow = {
   id: string;
   thread_id?: string | null;
   post_role?: string | null;
+  parent_opinion_id?: string | null;
   content?: string | null;
   created_at?: string | null;
-  logic_score?: number | null;
+  logic_score?: number | string | null;
   logic_score_reason?: string | null;
   logic_break_type?: string | null;
   logic_break_note?: string | null;
@@ -40,7 +41,14 @@ type AdminPostsResponse = {
   posts?: AdminPostRow[];
 };
 
-type PostFilter = "all" | "fallback" | "ai" | "no_reason" | "low_score";
+type PostFilter =
+  | "all"
+  | "fallback"
+  | "ai"
+  | "no_reason"
+  | "low_score"
+  | "score_objection"
+  | "high_score_objection";
 type PostSort = "new" | "score_low" | "score_high" | "no_reason_first";
 
 const postFilters: { value: PostFilter; label: string }[] = [
@@ -49,6 +57,8 @@ const postFilters: { value: PostFilter; label: string }[] = [
   { value: "ai", label: "AI詳細評価済み" },
   { value: "no_reason", label: "理由なし" },
   { value: "low_score", label: "低スコア" },
+  { value: "score_objection", label: "AI評価への反論" },
+  { value: "high_score_objection", label: "高スコア反論" },
 ];
 
 const postSorts: { value: PostSort; label: string }[] = [
@@ -131,7 +141,34 @@ function evaluationBadgeStyle(reason?: string | null) {
   };
 }
 
-function scoreBadgeStyle(score?: number | null) {
+function numericLogicScore(score?: number | string | null) {
+  if (typeof score === "number") {
+    return Number.isFinite(score) ? score : null;
+  }
+
+  if (typeof score === "string" && score.trim() !== "") {
+    const parsedScore = Number(score);
+    return Number.isFinite(parsedScore) ? parsedScore : null;
+  }
+
+  return null;
+}
+
+function isScoreObjectionPost(post: AdminPostRow) {
+  return (
+    post.post_role === "supplement" &&
+    Boolean(post.parent_opinion_id) &&
+    String(post.content ?? "").includes("AI評価への反論:")
+  );
+}
+
+function isHighScoreObjectionPost(post: AdminPostRow) {
+  const score = numericLogicScore(post.logic_score);
+  return isScoreObjectionPost(post) && score !== null && score >= 60;
+}
+
+function scoreBadgeStyle(score?: number | string | null) {
+  const numericScore = numericLogicScore(score);
   const base = {
     display: "inline-flex",
     alignItems: "center",
@@ -143,7 +180,7 @@ function scoreBadgeStyle(score?: number | null) {
     whiteSpace: "nowrap" as const,
   };
 
-  if (score === null || score === undefined) {
+  if (numericScore === null) {
     return {
       ...base,
       border: "1px solid #e2e8f0",
@@ -152,7 +189,7 @@ function scoreBadgeStyle(score?: number | null) {
     };
   }
 
-  if (score >= 80) {
+  if (numericScore >= 80) {
     return {
       ...base,
       border: "1px solid #86efac",
@@ -161,7 +198,7 @@ function scoreBadgeStyle(score?: number | null) {
     };
   }
 
-  if (score >= 50) {
+  if (numericScore >= 50) {
     return {
       ...base,
       border: "1px solid #bfdbfe",
@@ -175,6 +212,22 @@ function scoreBadgeStyle(score?: number | null) {
     border: "1px solid #fecaca",
     background: "#fef2f2",
     color: "#991b1b",
+  };
+}
+
+function scoreObjectionBadgeStyle(highScore: boolean) {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    borderRadius: 999,
+    border: highScore ? "1px solid #86efac" : "1px solid #fed7aa",
+    background: highScore ? "#dcfce7" : "#fff7ed",
+    color: highScore ? "#166534" : "#9a3412",
+    padding: "3px 8px",
+    fontSize: 12,
+    fontWeight: 900,
+    lineHeight: 1.4,
+    whiteSpace: "nowrap" as const,
   };
 }
 
@@ -210,7 +263,14 @@ export default function ReEvaluateLogicScorePage() {
       case "no_reason":
         return label === "理由なし";
       case "low_score":
-        return typeof post.logic_score === "number" && post.logic_score < 50;
+        return (
+          numericLogicScore(post.logic_score) !== null &&
+          numericLogicScore(post.logic_score)! < 50
+        );
+      case "score_objection":
+        return isScoreObjectionPost(post);
+      case "high_score_objection":
+        return isHighScoreObjectionPost(post);
       default:
         return true;
     }
@@ -218,8 +278,8 @@ export default function ReEvaluateLogicScorePage() {
 
   const sortedPosts = [...filteredPosts].sort((a, b) => {
     const newestFirst = createdAtTime(b.created_at) - createdAtTime(a.created_at);
-    const aScore = typeof a.logic_score === "number" ? a.logic_score : null;
-    const bScore = typeof b.logic_score === "number" ? b.logic_score : null;
+    const aScore = numericLogicScore(a.logic_score);
+    const bScore = numericLogicScore(b.logic_score);
 
     switch (postSort) {
       case "score_low":
@@ -687,6 +747,10 @@ export default function ReEvaluateLogicScorePage() {
           <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
             {sortedPosts.map((post) => {
               const postLoading = reEvaluatingPostId === post.id;
+              const numericScore = numericLogicScore(post.logic_score);
+              const scoreObjection = isScoreObjectionPost(post);
+              const highScoreObjection =
+                scoreObjection && numericScore !== null && numericScore >= 60;
 
               return (
                 <article
@@ -722,10 +786,20 @@ export default function ReEvaluateLogicScorePage() {
                           {evaluationLabel(post.logic_score_reason)}
                         </span>
                         <span style={scoreBadgeStyle(post.logic_score)}>
-                          {post.logic_score === null || post.logic_score === undefined
+                          {numericScore === null
                             ? "AI論理スコア 未評価"
-                            : `AI論理スコア ${post.logic_score}`}
+                            : `AI論理スコア ${numericScore}`}
                         </span>
+                        {scoreObjection && (
+                          <span style={scoreObjectionBadgeStyle(false)}>
+                            AI評価への反論
+                          </span>
+                        )}
+                        {highScoreObjection && (
+                          <span style={scoreObjectionBadgeStyle(true)}>
+                            高スコア反論
+                          </span>
+                        )}
                       </div>
 
                       <div
@@ -761,13 +835,17 @@ export default function ReEvaluateLogicScorePage() {
                       <strong>post_role:</strong> {post.post_role || "-"}
                     </div>
                     <div>
+                      <strong>parent_opinion_id:</strong>{" "}
+                      {post.parent_opinion_id || "-"}
+                    </div>
+                    <div>
                       <strong>created_at:</strong> {formatDate(post.created_at)}
                     </div>
                     <div>
                       <strong>logic_score:</strong>{" "}
-                      {post.logic_score === null || post.logic_score === undefined
+                      {numericScore === null
                         ? "-"
-                        : post.logic_score}
+                        : numericScore}
                     </div>
                     <div>
                       <strong>logic_break_type:</strong>{" "}
