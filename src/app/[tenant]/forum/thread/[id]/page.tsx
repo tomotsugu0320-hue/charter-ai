@@ -100,6 +100,35 @@ type ThreadSummary = {
   };
 };
 
+function postCreatedTime(post?: PostRow | null) {
+  const time = new Date(post?.created_at ?? "").getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function postLogicScore(post?: PostRow | null) {
+  const score = post?.logic_score;
+  return typeof score === "number" && Number.isFinite(score) ? score : null;
+}
+
+function comparePostsByNew(a?: PostRow | null, b?: PostRow | null) {
+  return postCreatedTime(b) - postCreatedTime(a);
+}
+
+function comparePostsByLogicScore(a?: PostRow | null, b?: PostRow | null) {
+  const aScore = postLogicScore(a);
+  const bScore = postLogicScore(b);
+
+  if (aScore === null && bScore === null) {
+    return comparePostsByNew(a, b);
+  }
+
+  if (aScore === null) return 1;
+  if (bScore === null) return -1;
+  if (bScore !== aScore) return bScore - aScore;
+
+  return comparePostsByNew(a, b);
+}
+
 
 type PageProps = {
   params: Promise<{
@@ -793,7 +822,20 @@ const groupedByIssue = useMemo(() => {
 
 
 const groupedByOpinion = useMemo(() => {
-  return groupedByIssue.map((group) => {
+  const sortOpinionGroups = (
+    opinionGroups: {
+      opinion: PostRow;
+      children: PostRow[];
+    }[]
+  ) => {
+    return [...opinionGroups].sort((a, b) => {
+      return sortType === "score"
+        ? comparePostsByLogicScore(a.opinion, b.opinion)
+        : comparePostsByNew(a.opinion, b.opinion);
+    });
+  };
+
+  const groups = groupedByIssue.map((group) => {
     const opinionPosts = group.items.filter((p) => p.post_role === "opinion");
     const childPosts = group.items.filter(
       (p) =>
@@ -821,7 +863,7 @@ const groupedByOpinion = useMemo(() => {
 
       return {
         issue: group.issue,
-        opinions: opinionGroups,
+        opinions: sortOpinionGroups(opinionGroups),
       };
     }
 
@@ -855,10 +897,19 @@ const groupedByOpinion = useMemo(() => {
 
     return {
       issue: group.issue,
-      opinions: opinionGroups,
+      opinions: sortOpinionGroups(opinionGroups),
     };
   });
-}, [groupedByIssue]);
+
+  return [...groups].sort((a, b) => {
+    const aTopPost = a.opinions[0]?.opinion ?? a.issue;
+    const bTopPost = b.opinions[0]?.opinion ?? b.issue;
+
+    return sortType === "score"
+      ? comparePostsByLogicScore(aTopPost, bTopPost)
+      : comparePostsByNew(aTopPost, bTopPost);
+  });
+}, [groupedByIssue, sortType]);
 
 
   const authorTrustMap = useMemo(() => {
