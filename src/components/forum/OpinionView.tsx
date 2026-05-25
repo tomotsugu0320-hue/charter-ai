@@ -26,13 +26,23 @@ function getShortSummary(content: string) {
 }
 
 async function copyPostLink(postId: string) {
-  if (typeof window === "undefined" || !navigator?.clipboard) return;
+  if (typeof window === "undefined" || typeof navigator === "undefined") return;
 
   const postUrl = `${window.location.origin}${window.location.pathname}#post-${postId}`;
 
   try {
+    if (navigator.share) {
+      await navigator.share({
+        title: document.title,
+        text: "この意見を共有",
+        url: postUrl,
+      });
+      return;
+    }
+
+    if (!navigator.clipboard) return;
     await navigator.clipboard.writeText(postUrl);
-    alert("この意見のリンクをコピーしました。");
+    alert("この意見のURLをコピーしました。");
   } catch (e) {
     console.error(e);
   }
@@ -266,7 +276,7 @@ export default function OpinionView({
               whiteSpace: "nowrap",
             }}
           >
-            リンクをコピー
+            共有
           </button>
 
         </div>
