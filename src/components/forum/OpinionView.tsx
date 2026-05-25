@@ -3,7 +3,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import SectionCard from "@/components/forum/SectionCard";
 import PostCard from "@/components/forum/PostCard";
 import OpinionCard from "@/components/forum/OpinionCard";
@@ -54,6 +54,43 @@ export default function OpinionView({
   currentAuthorKey,
 }: any) {
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
+  const [highlightedPostId, setHighlightedPostId] = useState<string | null>(
+    null
+  );
+
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const applyHashHighlight = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      const hash = window.location.hash;
+
+      if (!hash.startsWith("#post-")) {
+        setHighlightedPostId(null);
+        return;
+      }
+
+      const postId = decodeURIComponent(hash.slice("#post-".length));
+      setHighlightedPostId(postId);
+
+      timeoutId = setTimeout(() => {
+        setHighlightedPostId((current) => (current === postId ? null : current));
+      }, 3200);
+    };
+
+    applyHashHighlight();
+    window.addEventListener("hashchange", applyHashHighlight);
+
+    return () => {
+      window.removeEventListener("hashchange", applyHashHighlight);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [groupedByOpinion]);
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
@@ -102,6 +139,7 @@ export default function OpinionView({
     numericScore > 0 &&
     numericScore < 60;
   const cardOpacity = hideLowScore && isLowScore ? 0.5 : 1;
+  const isHighlighted = highlightedPostId === String(op.opinion.id);
 
   return (
     <div
@@ -111,9 +149,16 @@ export default function OpinionView({
     >
       <PostCard
         style={{
-          border: isBest ? "2px solid #2e7d32" : "1px solid #ddd",
-          background: isBest ? "#e8f5e9" : "#fff",
+          border: isHighlighted
+            ? "2px solid #f59e0b"
+            : isBest
+            ? "2px solid #2e7d32"
+            : "1px solid #ddd",
+          background: isHighlighted ? "#fffbeb" : isBest ? "#e8f5e9" : "#fff",
           color: "#111",
+          boxShadow: isHighlighted
+            ? "0 0 0 3px rgba(245, 158, 11, 0.18)"
+            : undefined,
           opacity: cardOpacity,
         }}
       >
