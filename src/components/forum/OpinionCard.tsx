@@ -454,6 +454,25 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
               補足: {logicBreakNote}
             </div>
           )}
+          <PrimaryButton
+            onClick={() => {
+              setSelectedGuide({
+                type: "根拠",
+                text: `AI評価への反論: ${displayLogicScoreReason}`,
+              });
+              setPostRole("supplement");
+              setReplyToOpinionId(op.opinion.id);
+              window.dispatchEvent(new Event("scroll-to-post-form"));
+            }}
+            style={{
+              marginTop: 10,
+              padding: "6px 10px",
+              borderRadius: 6,
+              fontSize: currentFont?.base,
+            }}
+          >
+            このAI評価に反論する
+          </PrimaryButton>
         </div>
       )}
 
