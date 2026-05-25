@@ -76,6 +76,19 @@ export default function OpinionView({
   const isExpanded = isBest || expandedMap[op.opinion.id] === true;
   const short = getShortSummary(op.opinion.content);
   const replyCount = op.children?.length ?? 0;
+  const rawScore = op.opinion.logic_score;
+  const numericScore =
+    typeof rawScore === "number"
+      ? rawScore
+      : typeof rawScore === "string" && rawScore.trim() !== ""
+      ? Number(rawScore)
+      : null;
+  const isLowScore =
+    typeof numericScore === "number" &&
+    Number.isFinite(numericScore) &&
+    numericScore > 0 &&
+    numericScore < 60;
+  const cardOpacity = hideLowScore && isLowScore ? 0.65 : 1;
 
   return (
     <PostCard
@@ -84,6 +97,7 @@ export default function OpinionView({
         border: isBest ? "2px solid #2e7d32" : "1px solid #ddd",
         background: isBest ? "#e8f5e9" : "#fff",
         color: "#111",
+        opacity: cardOpacity,
       }}
     >
       <div
