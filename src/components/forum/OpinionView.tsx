@@ -25,6 +25,19 @@ function getShortSummary(content: string) {
   return claim.replace(/^主張:\s*/, "").replace(/^論点:\s*/, "");
 }
 
+async function copyPostLink(postId: string) {
+  if (typeof window === "undefined" || !navigator?.clipboard) return;
+
+  const postUrl = `${window.location.origin}${window.location.pathname}#post-${postId}`;
+
+  try {
+    await navigator.clipboard.writeText(postUrl);
+    alert("この意見のリンクをコピーしました。");
+  } catch (e) {
+    console.error(e);
+  }
+}
+
 export default function OpinionView({
   groupedByOpinion,
   bestOpinionsByIssue,
@@ -91,15 +104,19 @@ export default function OpinionView({
   const cardOpacity = hideLowScore && isLowScore ? 0.5 : 1;
 
   return (
-    <PostCard
+    <div
       key={op.opinion.id}
-      style={{
-        border: isBest ? "2px solid #2e7d32" : "1px solid #ddd",
-        background: isBest ? "#e8f5e9" : "#fff",
-        color: "#111",
-        opacity: cardOpacity,
-      }}
+      id={`post-${op.opinion.id}`}
+      style={{ scrollMarginTop: 96 }}
     >
+      <PostCard
+        style={{
+          border: isBest ? "2px solid #2e7d32" : "1px solid #ddd",
+          background: isBest ? "#e8f5e9" : "#fff",
+          color: "#111",
+          opacity: cardOpacity,
+        }}
+      >
       <div
         style={{
           display: "flex",
@@ -186,6 +203,26 @@ export default function OpinionView({
               {isExpanded ? "閉じる" : "意見と返信を見る"}
             </button>
           )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              void copyPostLink(op.opinion.id);
+            }}
+            style={{
+              border: "1px solid #cbd5e1",
+              borderRadius: 999,
+              background: "#f8fafc",
+              color: "#334155",
+              cursor: "pointer",
+              fontSize: currentFont.base * 0.85,
+              fontWeight: 700,
+              padding: "4px 8px",
+              whiteSpace: "nowrap",
+            }}
+          >
+            リンクをコピー
+          </button>
 
         </div>
       </div>
@@ -269,7 +306,8 @@ export default function OpinionView({
       >
         この意見に反論する
       </button>
-    </PostCard>
+      </PostCard>
+    </div>
       );
     })}
   </div>
