@@ -88,7 +88,7 @@ export default function OpinionView({
     Number.isFinite(numericScore) &&
     numericScore > 0 &&
     numericScore < 60;
-  const cardOpacity = hideLowScore && isLowScore ? 0.65 : 1;
+  const cardOpacity = hideLowScore && isLowScore ? 0.5 : 1;
 
   return (
     <PostCard

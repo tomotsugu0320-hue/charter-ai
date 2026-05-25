@@ -283,7 +283,7 @@ const feedbackActions = [
         background: "#fff",
         color: "#111",
         border: "1px solid #ddd",
-        opacity: hideLowScore && isLowScore ? 0.65 : 1,
+        opacity: hideLowScore && isLowScore ? 0.5 : 1,
       }}
     >
       <div
