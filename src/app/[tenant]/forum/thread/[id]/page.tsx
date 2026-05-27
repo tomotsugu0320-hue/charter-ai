@@ -1143,6 +1143,11 @@ const overviewReasons = visibleReasons.slice(0, 3);
 const overviewConflicts = visibleConflicts.slice(0, 3);
 const compactText = (value: string, max = 120) =>
   value.length > max ? `${value.slice(0, max)}...` : value;
+const normalizeQuestionText = (value?: string | null) =>
+  (value ?? "").replace(/[。、．.！？!?「」『』【】（）()[\]\s]/g, "");
+const shouldShowQuestionCard =
+  Boolean(thread?.original_post?.trim()) &&
+  normalizeQuestionText(thread?.original_post) !== normalizeQuestionText(thread?.title);
 const initialPostCount = summary?.counts?.total ?? posts.length;
 const showInitialDiscussionNote = initialPostCount <= 3;
 const provisionalAnswerText =
@@ -1594,40 +1599,29 @@ function jumpToMainIssues() {
 
   <div>
 
-<div
-  style={{
-    marginTop: 16,
-    padding: 14,
-    border: "1px solid #dbe3ef",
-    borderRadius: 10,
-    background: "#f8fafc",
-    color: "#111",
-  }}
->
+{shouldShowQuestionCard && (
   <div
     style={{
-      fontSize: currentFont.base * 0.9,
-      color: "#475569",
-      fontWeight: 800,
-      marginBottom: 6,
-    }}
-  >
-    起：この議論の問い
-  </div>
-  <div
-    style={{
-      fontSize: currentFont.title,
+      marginTop: 16,
+      padding: 14,
+      border: "1px solid #dbe3ef",
+      borderRadius: 10,
+      background: "#f8fafc",
       color: "#111",
-      fontWeight: 900,
-      lineHeight: 1.45,
     }}
   >
-    {thread.title}
-  </div>
-  {thread.original_post && (
     <div
       style={{
-        marginTop: 8,
+        fontSize: currentFont.base * 0.9,
+        color: "#475569",
+        fontWeight: 800,
+        marginBottom: 6,
+      }}
+    >
+      起：この議論の問い
+    </div>
+    <div
+      style={{
         color: "#334155",
         fontSize: currentFont.base,
         lineHeight: 1.7,
@@ -1635,8 +1629,8 @@ function jumpToMainIssues() {
     >
       {compactText(thread.original_post, 150)}
     </div>
-  )}
-</div>
+  </div>
+)}
 
 <div
   style={{
