@@ -1138,6 +1138,11 @@ const visibleConflicts =
 const initialPremises = visiblePremises.slice(0, 2);
 const initialReasons = visibleReasons.slice(0, 2);
 const initialConflicts = visibleConflicts.slice(0, 2);
+const overviewPremises = visiblePremises.slice(0, 3);
+const overviewReasons = visibleReasons.slice(0, 3);
+const overviewConflicts = visibleConflicts.slice(0, 3);
+const compactText = (value: string, max = 120) =>
+  value.length > max ? `${value.slice(0, max)}...` : value;
 const initialPostCount = summary?.counts?.total ?? posts.length;
 const showInitialDiscussionNote = initialPostCount <= 3;
 const provisionalAnswerText =
@@ -1592,6 +1597,50 @@ function jumpToMainIssues() {
 <div
   style={{
     marginTop: 16,
+    padding: 14,
+    border: "1px solid #dbe3ef",
+    borderRadius: 10,
+    background: "#f8fafc",
+    color: "#111",
+  }}
+>
+  <div
+    style={{
+      fontSize: currentFont.base * 0.9,
+      color: "#475569",
+      fontWeight: 800,
+      marginBottom: 6,
+    }}
+  >
+    起：この議論の問い
+  </div>
+  <div
+    style={{
+      fontSize: currentFont.title,
+      color: "#111",
+      fontWeight: 900,
+      lineHeight: 1.45,
+    }}
+  >
+    {thread.title}
+  </div>
+  {thread.original_post && (
+    <div
+      style={{
+        marginTop: 8,
+        color: "#334155",
+        fontSize: currentFont.base,
+        lineHeight: 1.7,
+      }}
+    >
+      {compactText(thread.original_post, 150)}
+    </div>
+  )}
+</div>
+
+<div
+  style={{
+    marginTop: 16,
     padding: 16,
     border: "1px solid #fb923c",
     borderRadius: 12,
@@ -1608,8 +1657,20 @@ function jumpToMainIssues() {
       color: "#9a3412",
     }}
   >
-    AIの暫定回答
+    結：現時点の答え
   </h2>
+
+  <div
+    style={{
+      marginTop: 8,
+      color: "#7c2d12",
+      fontSize: currentFont.base * 0.9,
+      lineHeight: 1.6,
+      fontWeight: 700,
+    }}
+  >
+    投稿内容とAI整理をもとにした、現時点での答えです。今後の反論や補足で更新される可能性があります。
+  </div>
 
   <p
     style={{
@@ -1622,16 +1683,204 @@ function jumpToMainIssues() {
     {provisionalAnswerText}
   </p>
 
+</div>
+
+{(overviewPremises.length > 0 || overviewReasons.length > 0) && (
   <div
     style={{
-      color: "#7c2d12",
-      fontSize: currentFont.base * 0.9,
-      lineHeight: 1.6,
+      marginTop: 16,
+      padding: 14,
+      border: "1px solid #dbe3ef",
+      borderRadius: 10,
+      background: "#fff",
+      color: "#111",
     }}
   >
-    この回答は投稿と議論に応じて更新されます。
+    <h2
+      style={{
+        margin: 0,
+        fontSize: currentFont.title,
+        fontWeight: 800,
+        lineHeight: 1.4,
+        color: "#111",
+      }}
+    >
+      承：主な理由・根拠
+    </h2>
+    <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+      {overviewPremises.length > 0 && (
+        <div>
+          <div style={{ fontWeight: 800, marginBottom: 4, color: "#334155" }}>
+            前提
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 20, color: "#333", lineHeight: 1.7 }}>
+            {overviewPremises.map((premise, index) => (
+              <li key={`overview-premise-${index}`}>{compactText(premise, 110)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {overviewReasons.length > 0 && (
+        <div>
+          <div style={{ fontWeight: 800, marginBottom: 4, color: "#334155" }}>
+            根拠
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 20, color: "#333", lineHeight: 1.7 }}>
+            {overviewReasons.map((reason, index) => (
+              <li key={`overview-reason-${index}`}>{compactText(reason, 110)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   </div>
+)}
+
+{overviewConflicts.length > 0 && (
+  <div
+    style={{
+      marginTop: 16,
+      padding: 14,
+      border: "1px solid #fee2e2",
+      borderRadius: 10,
+      background: "#fff7f7",
+      color: "#111",
+    }}
+  >
+    <h2
+      style={{
+        margin: 0,
+        fontSize: currentFont.title,
+        fontWeight: 800,
+        lineHeight: 1.4,
+        color: "#7f1d1d",
+      }}
+    >
+      転：反論・リスク
+    </h2>
+    <ul style={{ margin: "10px 0 0", paddingLeft: 20, color: "#333", lineHeight: 1.7 }}>
+      {overviewConflicts.map((conflict, index) => (
+        <li key={`overview-conflict-${index}`}>
+          {compactText(conflict.rebuttal || conflict.opinion, 110)}
+        </li>
+      ))}
+    </ul>
+  </div>
+)}
+
 </div>
+
+</SectionCard>
+{/* ←ここで完全に閉じる */}
+
+
+<SectionCard variant="white" style={{ marginTop: 24 }}>
+            <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
+              まず意見を読む
+            </SectionTitle>
+
+            <div style={{ marginBottom: 12 }}>
+              <input
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                placeholder="投稿を検索"
+                style={{
+                  width: "100%",
+                  border: "1px solid #ccc",
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                  fontSize: currentFont.base,
+                  background: "#fff",
+                  color: "#000",
+                }}
+              />
+            </div>
+
+            <label
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 12,
+                fontSize: currentFont.base,
+                color: "#444",
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={hideLowScore}
+                onChange={(e) => setHideLowScore(e.target.checked)}
+              />
+              AI論理スコアが低い投稿を薄く表示する
+            </label>
+
+            <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <PrimaryButton
+                onClick={() => setSortType("score")}
+                style={{
+                  background: sortType === "score" ? "#111" : "#eee",
+                  color: sortType === "score" ? "#fff" : "#333",
+                }}
+              >
+                AI論理スコア順
+              </PrimaryButton>
+
+              <PrimaryButton
+                onClick={() => setSortType("new")}
+                style={{
+                  background: sortType === "new" ? "#111" : "#eee",
+                  color: sortType === "new" ? "#fff" : "#333",
+                }}
+              >
+                新着順
+              </PrimaryButton>
+            </div>
+
+            <div
+              style={{
+                marginTop: 4,
+                marginBottom: 12,
+                color: "#475569",
+                fontSize: currentFont.base - 2,
+                lineHeight: 1.6,
+              }}
+            >
+              AI論理スコアは正解判定ではなく、前提・根拠・因果関係・反論耐性を見るための目安です。
+            </div>
+
+
+
+            {visiblePosts.length === 0 ? (
+              <div style={{ color: "#666" }}>まだ投稿がない。</div>
+            ) : (
+              <div style={{ display: "grid", gap: 14 }}>
+
+
+
+<OpinionView
+  groupedByOpinion={groupedByOpinion}
+  bestOpinionsByIssue={bestOpinionsByIssue}
+  hideLowScore={hideLowScore}
+  currentFont={currentFont}
+  thread={thread}
+  setSelectedGuide={setSelectedGuide}
+  setPostRole={setPostRole}
+  setReplyToOpinionId={setReplyToOpinionId}
+  explanations={explanations}
+  feedbackLoadingPostId={feedbackLoadingPostId}
+  handleFeedback={handleFeedback}
+  onHidePost={handleHidePost}
+  currentAuthorKey={currentAuthorKey}
+/>
+
+</div>
+            )}
+          </SectionCard>
+
+
+<SectionCard variant="white" style={{ marginTop: 24 }}>
+  <div>
 
 <details style={{ marginTop: 16 }}>
   <summary
@@ -1929,112 +2178,6 @@ function jumpToMainIssues() {
 
 </SectionCard>
 {/* ←ここで完全に閉じる */}
-
-
-          <SectionCard variant="white" style={{ marginTop: 24 }}>
-            <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
-              まず意見を読む
-            </SectionTitle>
-
-            <div style={{ marginBottom: 12 }}>
-              <input
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                placeholder="投稿を検索"
-                style={{
-                  width: "100%",
-                  border: "1px solid #ccc",
-                  borderRadius: 10,
-                  padding: "12px 14px",
-                  fontSize: currentFont.base,
-                  background: "#fff",
-                  color: "#000",
-                }}
-              />
-            </div>
-
-            <label
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 12,
-                fontSize: currentFont.base,
-                color: "#444",
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={hideLowScore}
-                onChange={(e) => setHideLowScore(e.target.checked)}
-              />
-              AI論理スコアが低い投稿を薄く表示する
-            </label>
-
-            <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <PrimaryButton
-                onClick={() => setSortType("score")}
-                style={{
-                  background: sortType === "score" ? "#111" : "#eee",
-                  color: sortType === "score" ? "#fff" : "#333",
-                }}
-              >
-                AI論理スコア順
-              </PrimaryButton>
-
-              <PrimaryButton
-                onClick={() => setSortType("new")}
-                style={{
-                  background: sortType === "new" ? "#111" : "#eee",
-                  color: sortType === "new" ? "#fff" : "#333",
-                }}
-              >
-                新着順
-              </PrimaryButton>
-            </div>
-
-            <div
-              style={{
-                marginTop: 4,
-                marginBottom: 12,
-                color: "#475569",
-                fontSize: currentFont.base - 2,
-                lineHeight: 1.6,
-              }}
-            >
-              AI論理スコアは正解判定ではなく、前提・根拠・因果関係・反論耐性を見るための目安です。
-            </div>
-
-
-
-            {visiblePosts.length === 0 ? (
-              <div style={{ color: "#666" }}>まだ投稿がない。</div>
-            ) : (
-              <div style={{ display: "grid", gap: 14 }}>
-
-
-
-<OpinionView
-  groupedByOpinion={groupedByOpinion}
-  bestOpinionsByIssue={bestOpinionsByIssue}
-  hideLowScore={hideLowScore}
-  currentFont={currentFont}
-  thread={thread}
-  setSelectedGuide={setSelectedGuide}
-  setPostRole={setPostRole}
-  setReplyToOpinionId={setReplyToOpinionId}
-  explanations={explanations}
-  feedbackLoadingPostId={feedbackLoadingPostId}
-  handleFeedback={handleFeedback}
-  onHidePost={handleHidePost}
-  currentAuthorKey={currentAuthorKey}
-/>
-
-</div>
-            )}
-          </SectionCard>
-
 
 <SectionCard variant="white" style={{ marginTop: 24 }}>
   <div id="main-issues" style={{ scrollMarginTop: 80 }} />
