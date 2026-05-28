@@ -6,6 +6,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import ExternalAiImportModal from "@/components/forum/ExternalAiImportModal";
 import ForumGuideTree from "@/components/forum/ForumGuideTree";
 import PrimaryButton from "@/components/forum/PrimaryButton";
 
@@ -663,6 +664,7 @@ export default function ForumPage() {
   const [organizedResult, setOrganizedResult] = useState<OrganizedResult | null>(null);
   const [actionError, setActionError] = useState("");
   const [topError, setTopError] = useState("");
+  const [isExternalAiImportOpen, setIsExternalAiImportOpen] = useState(false);
 
   const [popularThreads, setPopularThreads] = useState<ThreadRow[]>([]);
   const [activeThreads, setActiveThreads] = useState<ThreadRow[]>([]);
@@ -996,6 +998,11 @@ export default function ForumPage() {
 
   return (
     <main style={pageStyle}>
+      <ExternalAiImportModal
+        isOpen={isExternalAiImportOpen}
+        onClose={() => setIsExternalAiImportOpen(false)}
+      />
+
       <header style={{ ...darkPanelStyle, marginBottom: 18 }}>
         <div
           style={{
@@ -1120,6 +1127,45 @@ export default function ForumPage() {
               ))}
             </select>
           </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: 16,
+            border: "1px solid #3d4657",
+            borderRadius: 8,
+            padding: 12,
+            background: "#10141d",
+            color: "#f9fafb",
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          <div
+            style={{
+              color: "#cbd5e1",
+              fontSize: currentFontSize - 2,
+              lineHeight: 1.6,
+            }}
+          >
+            自分のChatGPTや外部AIで整理した内容から、複数の投稿候補を確認できます。
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsExternalAiImportOpen(true)}
+            style={{
+              ...ghostButtonStyle,
+              background: "#f8fafc",
+              color: "#111827",
+              borderColor: "#e5e7eb",
+              flexShrink: 0,
+            }}
+          >
+            外部AIで整理した内容を取り込む
+          </button>
         </div>
 
         <div

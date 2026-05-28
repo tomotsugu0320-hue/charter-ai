@@ -1,0 +1,682 @@
+"use client";
+
+import type { CSSProperties } from "react";
+import { useMemo, useState } from "react";
+
+type CandidateStatus = "unselected" | "post" | "skip";
+
+type ExternalAiCandidate = {
+  title: string;
+  question: string;
+  ai_answer: string;
+  premises: string[];
+  reasons: string[];
+  risks: string[];
+  supplements: string[];
+  category: string;
+  node: string;
+  status: CandidateStatus;
+  isEditing: boolean;
+};
+
+type ExternalAiImportModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+};
+
+const MAX_CANDIDATES = 20;
+
+const EXTERNAL_AI_PROMPT = `以下の会話ログを、AI知恵袋の掲示板投稿用に整理してください。
+
+目的：
+雑多な会話ログから、複数の問題・質問・回答・論点・反論・補足を抽出し、掲示板に投稿しやすい形に整理することです。
+
+ルール：
+- 個人情報、住所、電話番号、氏名、メールアドレス、個人的すぎる内容は除去または匿名化してください。
+- 雑談や投稿に不要な内容は除外してください。
+- 複数の論点がある場合は、論点ごとに分けてください。
+- 事実と推測を混同しないでください。
+- 断定しすぎず、必要に応じて「可能性がある」と表現してください。
+- 出力は必ずJSON配列にしてください。
+- JSON以外の説明文は出力しないでください。
+
+出力形式：
+[
+  {
+    "title": "投稿タイトル案",
+    "question": "問題・質問",
+    "ai_answer": "AI回答・整理",
+    "premises": ["前提1", "前提2"],
+    "reasons": ["根拠1", "根拠2"],
+    "risks": ["反論・リスク1", "反論・リスク2"],
+    "supplements": ["補足1", "補足2"],
+    "category": "候補カテゴリ",
+    "node": "候補ノード"
+  }
+]`;
+
+const overlayStyle: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 1000,
+  background: "rgba(15, 23, 42, 0.58)",
+  color: "#111827",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 16,
+};
+
+const dialogStyle: CSSProperties = {
+  width: "min(100%, 960px)",
+  maxHeight: "92vh",
+  overflowY: "auto",
+  borderRadius: 12,
+  border: "1px solid #cbd5e1",
+  background: "#ffffff",
+  color: "#111827",
+  boxShadow: "0 24px 70px rgba(15, 23, 42, 0.24)",
+};
+
+const sectionStyle: CSSProperties = {
+  border: "1px solid #e2e8f0",
+  borderRadius: 10,
+  padding: 14,
+  background: "#f8fafc",
+  color: "#111827",
+};
+
+const labelStyle: CSSProperties = {
+  display: "block",
+  marginBottom: 6,
+  color: "#475569",
+  fontSize: 13,
+  fontWeight: 800,
+};
+
+const inputStyle: CSSProperties = {
+  width: "100%",
+  borderRadius: 8,
+  border: "1px solid #cbd5e1",
+  padding: "10px 12px",
+  background: "#ffffff",
+  color: "#111827",
+  fontSize: 15,
+  lineHeight: 1.6,
+};
+
+const buttonStyle: CSSProperties = {
+  border: "1px solid #cbd5e1",
+  borderRadius: 8,
+  padding: "9px 12px",
+  background: "#ffffff",
+  color: "#111827",
+  cursor: "pointer",
+  fontWeight: 800,
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function toText(value: unknown) {
+  if (typeof value === "string") return value.trim();
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+}
+
+function toTextArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.map(toText).filter(Boolean).slice(0, 8);
+}
+
+function linesToArray(value: string) {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function normalizeCandidate(value: unknown): ExternalAiCandidate | null {
+  const record = isRecord(value) ? value : {};
+  const title = toText(record.title);
+  const question = toText(record.question);
+  const aiAnswer = toText(record.ai_answer);
+
+  if (!title && !question && !aiAnswer) {
+    return null;
+  }
+
+  return {
+    title,
+    question,
+    ai_answer: aiAnswer,
+    premises: toTextArray(record.premises),
+    reasons: toTextArray(record.reasons),
+    risks: toTextArray(record.risks),
+    supplements: toTextArray(record.supplements),
+    category: toText(record.category),
+    node: toText(record.node),
+    status: "unselected",
+    isEditing: false,
+  };
+}
+
+function FieldBlock({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div style={{ ...labelStyle, marginBottom: 4 }}>{label}</div>
+      <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{children || "-"}</div>
+    </div>
+  );
+}
+
+function ListBlock({ label, items }: { label: string; items: string[] }) {
+  return (
+    <div>
+      <div style={{ ...labelStyle, marginBottom: 4 }}>{label}</div>
+      {items.length > 0 ? (
+        <ul style={{ margin: 0, paddingLeft: 20, lineHeight: 1.8 }}>
+          {items.map((item, index) => (
+            <li key={`${label}-${index}-${item}`}>{item}</li>
+          ))}
+        </ul>
+      ) : (
+        <div style={{ color: "#64748b" }}>-</div>
+      )}
+    </div>
+  );
+}
+
+export default function ExternalAiImportModal({
+  isOpen,
+  onClose,
+}: ExternalAiImportModalProps) {
+  const [jsonInput, setJsonInput] = useState("");
+  const [candidates, setCandidates] = useState<ExternalAiCandidate[]>([]);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [copyMessage, setCopyMessage] = useState("");
+
+  const selectedCount = useMemo(
+    () => candidates.filter((candidate) => candidate.status === "post").length,
+    [candidates]
+  );
+
+  if (!isOpen) return null;
+
+  const updateCandidate = (
+    index: number,
+    patch: Partial<ExternalAiCandidate>
+  ) => {
+    setCandidates((current) =>
+      current.map((candidate, candidateIndex) =>
+        candidateIndex === index ? { ...candidate, ...patch } : candidate
+      )
+    );
+  };
+
+  const handleCopyPrompt = async () => {
+    setCopyMessage("");
+
+    try {
+      await navigator.clipboard.writeText(EXTERNAL_AI_PROMPT);
+      setCopyMessage("プロンプトをコピーしました。");
+    } catch (copyError) {
+      console.error(copyError);
+      setCopyMessage("コピーできませんでした。手動で選択してコピーしてください。");
+    }
+  };
+
+  const handleParseJson = () => {
+    setError("");
+    setNotice("");
+
+    try {
+      const parsed: unknown = JSON.parse(jsonInput);
+
+      if (!Array.isArray(parsed)) {
+        setCandidates([]);
+        setError("JSONは配列形式で貼り付けてください。");
+        return;
+      }
+
+      const normalized = parsed
+        .slice(0, MAX_CANDIDATES)
+        .map(normalizeCandidate)
+        .filter((candidate): candidate is ExternalAiCandidate =>
+          Boolean(candidate)
+        );
+
+      if (normalized.length === 0) {
+        setCandidates([]);
+        setError("投稿候補として読める項目がありません。title / question / ai_answer のいずれかを含めてください。");
+        return;
+      }
+
+      setCandidates(normalized);
+      if (parsed.length > MAX_CANDIDATES) {
+        setNotice(`最大${MAX_CANDIDATES}件まで読み取りました。`);
+      } else {
+        setNotice(`${normalized.length}件の投稿候補を読み取りました。`);
+      }
+    } catch (parseError) {
+      console.error(parseError);
+      setCandidates([]);
+      setError("JSONを読み取れませんでした。配列形式になっているか確認してください。");
+    }
+  };
+
+  return (
+    <div style={overlayStyle} role="presentation">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="external-ai-import-title"
+        style={dialogStyle}
+      >
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 1,
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            alignItems: "flex-start",
+            borderBottom: "1px solid #e2e8f0",
+            padding: 18,
+            background: "#ffffff",
+            color: "#111827",
+          }}
+        >
+          <div>
+            <h2 id="external-ai-import-title" style={{ margin: 0, fontSize: 22 }}>
+              外部AIで整理した内容を取り込む
+            </h2>
+            <p style={{ margin: "8px 0 0", color: "#475569", lineHeight: 1.7 }}>
+              あなたのChatGPTや外部AIで会話ログを整理し、その結果をここに貼り付けると、複数の投稿候補として確認できます。
+            </p>
+          </div>
+          <button type="button" onClick={onClose} style={buttonStyle}>
+            閉じる
+          </button>
+        </div>
+
+        <div style={{ display: "grid", gap: 16, padding: 18 }}>
+          <div
+            style={{
+              border: "1px solid #fed7aa",
+              borderRadius: 10,
+              padding: 12,
+              background: "#fff7ed",
+              color: "#9a3412",
+              lineHeight: 1.7,
+              fontWeight: 700,
+            }}
+          >
+            個人情報や投稿したくない内容が含まれていないか、投稿前に必ず確認してください。
+          </div>
+
+          <section style={sectionStyle}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 10,
+                flexWrap: "wrap",
+                alignItems: "center",
+                marginBottom: 10,
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: 18 }}>外部AIに貼るプロンプト</h3>
+              <button type="button" onClick={handleCopyPrompt} style={buttonStyle}>
+                プロンプトをコピー
+              </button>
+            </div>
+            {copyMessage && (
+              <div style={{ marginBottom: 8, color: "#475569", fontSize: 13 }}>
+                {copyMessage}
+              </div>
+            )}
+            <textarea
+              readOnly
+              value={EXTERNAL_AI_PROMPT}
+              rows={14}
+              style={{
+                ...inputStyle,
+                resize: "vertical",
+                fontFamily:
+                  "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                fontSize: 13,
+                background: "#ffffff",
+                color: "#0f172a",
+              }}
+            />
+          </section>
+
+          <section style={sectionStyle}>
+            <label htmlFor="external-ai-json-input" style={labelStyle}>
+              外部AIの整理結果を貼り付け
+            </label>
+            <textarea
+              id="external-ai-json-input"
+              value={jsonInput}
+              onChange={(event) => setJsonInput(event.target.value)}
+              placeholder="外部AIが出力したJSON配列をここに貼り付けてください。"
+              rows={10}
+              style={{ ...inputStyle, resize: "vertical", minHeight: 180 }}
+            />
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+              <button type="button" onClick={handleParseJson} style={buttonStyle}>
+                投稿候補を読み取る
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setJsonInput("");
+                  setCandidates([]);
+                  setError("");
+                  setNotice("");
+                }}
+                style={buttonStyle}
+              >
+                クリア
+              </button>
+            </div>
+            {error && (
+              <div
+                style={{
+                  marginTop: 12,
+                  border: "1px solid #fecaca",
+                  borderRadius: 8,
+                  padding: 10,
+                  background: "#fef2f2",
+                  color: "#991b1b",
+                  fontWeight: 700,
+                }}
+              >
+                {error}
+              </div>
+            )}
+            {notice && (
+              <div style={{ marginTop: 12, color: "#475569", fontWeight: 700 }}>
+                {notice}
+              </div>
+            )}
+          </section>
+
+          {candidates.length > 0 && (
+            <section style={sectionStyle}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  marginBottom: 12,
+                }}
+              >
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18 }}>投稿候補プレビュー</h3>
+                  <p style={{ margin: "6px 0 0", color: "#64748b", lineHeight: 1.6 }}>
+                    第1段階では保存しません。投稿する候補を選ぶUIだけ確認できます。
+                  </p>
+                </div>
+                <span
+                  style={{
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 999,
+                    padding: "4px 10px",
+                    background: "#ffffff",
+                    color: "#334155",
+                    fontSize: 13,
+                    fontWeight: 800,
+                  }}
+                >
+                  投稿予定 {selectedCount}件
+                </span>
+              </div>
+
+              <div style={{ display: "grid", gap: 12 }}>
+                {candidates.map((candidate, index) => (
+                  <article
+                    key={`external-ai-candidate-${index}`}
+                    style={{
+                      border: "1px solid #d7dde8",
+                      borderRadius: 10,
+                      padding: 14,
+                      background: "#ffffff",
+                      color: "#111827",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 10,
+                        flexWrap: "wrap",
+                        marginBottom: 12,
+                      }}
+                    >
+                      <strong>候補 {index + 1}</strong>
+                      <span
+                        style={{
+                          border: "1px solid #cbd5e1",
+                          borderRadius: 999,
+                          padding: "2px 9px",
+                          background:
+                            candidate.status === "post"
+                              ? "#dcfce7"
+                              : candidate.status === "skip"
+                              ? "#fee2e2"
+                              : "#f8fafc",
+                          color:
+                            candidate.status === "post"
+                              ? "#166534"
+                              : candidate.status === "skip"
+                              ? "#991b1b"
+                              : "#475569",
+                          fontSize: 12,
+                          fontWeight: 800,
+                        }}
+                      >
+                        {candidate.status === "post"
+                          ? "投稿する"
+                          : candidate.status === "skip"
+                          ? "投稿しない"
+                          : "未選択"}
+                      </span>
+                    </div>
+
+                    {candidate.isEditing ? (
+                      <div style={{ display: "grid", gap: 10 }}>
+                        <label style={labelStyle}>
+                          タイトル
+                          <input
+                            value={candidate.title}
+                            onChange={(event) =>
+                              updateCandidate(index, { title: event.target.value })
+                            }
+                            style={{ ...inputStyle, marginTop: 6 }}
+                          />
+                        </label>
+                        <label style={labelStyle}>
+                          問題・質問
+                          <textarea
+                            value={candidate.question}
+                            onChange={(event) =>
+                              updateCandidate(index, { question: event.target.value })
+                            }
+                            rows={3}
+                            style={{ ...inputStyle, marginTop: 6 }}
+                          />
+                        </label>
+                        <label style={labelStyle}>
+                          AI回答・整理
+                          <textarea
+                            value={candidate.ai_answer}
+                            onChange={(event) =>
+                              updateCandidate(index, { ai_answer: event.target.value })
+                            }
+                            rows={4}
+                            style={{ ...inputStyle, marginTop: 6 }}
+                          />
+                        </label>
+                        {(["premises", "reasons", "risks", "supplements"] as const).map(
+                          (field) => (
+                            <label key={field} style={labelStyle}>
+                              {field === "premises"
+                                ? "前提"
+                                : field === "reasons"
+                                ? "根拠"
+                                : field === "risks"
+                                ? "反論・リスク"
+                                : "補足"}
+                              <textarea
+                                value={candidate[field].join("\n")}
+                                onChange={(event) =>
+                                  updateCandidate(index, {
+                                    [field]: linesToArray(event.target.value),
+                                  })
+                                }
+                                rows={3}
+                                style={{ ...inputStyle, marginTop: 6 }}
+                              />
+                            </label>
+                          )
+                        )}
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                              "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+                            gap: 10,
+                          }}
+                        >
+                          <label style={labelStyle}>
+                            候補カテゴリ
+                            <input
+                              value={candidate.category}
+                              onChange={(event) =>
+                                updateCandidate(index, { category: event.target.value })
+                              }
+                              style={{ ...inputStyle, marginTop: 6 }}
+                            />
+                          </label>
+                          <label style={labelStyle}>
+                            候補ノード
+                            <input
+                              value={candidate.node}
+                              onChange={(event) =>
+                                updateCandidate(index, { node: event.target.value })
+                              }
+                              style={{ ...inputStyle, marginTop: 6 }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: "grid", gap: 12 }}>
+                        <FieldBlock label="タイトル">{candidate.title}</FieldBlock>
+                        <FieldBlock label="問題・質問">{candidate.question}</FieldBlock>
+                        <FieldBlock label="AI回答・整理">
+                          {candidate.ai_answer}
+                        </FieldBlock>
+                        <ListBlock label="前提" items={candidate.premises} />
+                        <ListBlock label="根拠" items={candidate.reasons} />
+                        <ListBlock label="反論・リスク" items={candidate.risks} />
+                        <ListBlock label="補足" items={candidate.supplements} />
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                              "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
+                            gap: 10,
+                          }}
+                        >
+                          <FieldBlock label="候補カテゴリ">
+                            {candidate.category}
+                          </FieldBlock>
+                          <FieldBlock label="候補ノード">{candidate.node}</FieldBlock>
+                        </div>
+                      </div>
+                    )}
+
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 8,
+                        marginTop: 14,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => updateCandidate(index, { status: "post" })}
+                        style={{
+                          ...buttonStyle,
+                          background:
+                            candidate.status === "post" ? "#047857" : "#ffffff",
+                          color: candidate.status === "post" ? "#ffffff" : "#111827",
+                          borderColor:
+                            candidate.status === "post" ? "#047857" : "#cbd5e1",
+                        }}
+                      >
+                        投稿する
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateCandidate(index, { status: "skip" })}
+                        style={{
+                          ...buttonStyle,
+                          background:
+                            candidate.status === "skip" ? "#b91c1c" : "#ffffff",
+                          color: candidate.status === "skip" ? "#ffffff" : "#111827",
+                          borderColor:
+                            candidate.status === "skip" ? "#b91c1c" : "#cbd5e1",
+                        }}
+                      >
+                        投稿しない
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateCandidate(index, {
+                            isEditing: !candidate.isEditing,
+                          })
+                        }
+                        style={buttonStyle}
+                      >
+                        {candidate.isEditing ? "編集を閉じる" : "編集する"}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                disabled
+                style={{
+                  marginTop: 14,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  padding: "10px 14px",
+                  background: "#e5e7eb",
+                  color: "#64748b",
+                  fontWeight: 800,
+                  cursor: "not-allowed",
+                }}
+              >
+                選択した候補を投稿（次の段階で実装）
+              </button>
+            </section>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
