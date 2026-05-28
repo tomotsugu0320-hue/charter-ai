@@ -561,6 +561,13 @@ export default function ForumPage() {
   const visibleActiveThreads = hasFilter
     ? filteredActiveThreads
     : filteredActiveThreads.slice(0, 8);
+  const aiSummaryThreads = useMemo(
+    () =>
+      popularThreads
+        .filter((thread) => thread.summary?.trim())
+        .slice(0, 10),
+    [popularThreads]
+  );
 
   const totalPostCount = allThreads.reduce(
     (total, thread) => total + (thread.post_count ?? 0),
@@ -1030,6 +1037,158 @@ export default function ForumPage() {
           )}
         </section>
       )}
+
+      <section style={{ ...panelStyle, marginBottom: 22 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+            alignItems: "flex-start",
+            marginBottom: 12,
+          }}
+        >
+          <div>
+            <h2 style={{ margin: 0, fontSize: 20 }}>今読むべきAI総括</h2>
+            <p
+              style={{
+                margin: "6px 0 0",
+                color: "#475569",
+                fontSize: currentFontSize - 2,
+                lineHeight: 1.6,
+              }}
+            >
+              投稿が集まっている議論から、AIの要約を先に読めます。
+            </p>
+          </div>
+          <span
+            style={{
+              border: "1px solid #dbeafe",
+              borderRadius: 999,
+              padding: "4px 10px",
+              background: "#eff6ff",
+              color: "#1d4ed8",
+              fontSize: 12,
+              fontWeight: 800,
+              whiteSpace: "nowrap",
+            }}
+          >
+            最大10件
+          </span>
+        </div>
+
+        {aiSummaryThreads.length > 0 ? (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+              gap: 12,
+            }}
+          >
+            {aiSummaryThreads.map((thread) => (
+              <article
+                key={`ai-summary-${thread.id}`}
+                style={{
+                  border: "1px solid #d7dde8",
+                  borderRadius: 8,
+                  padding: 14,
+                  background: "#f8fafc",
+                  color: "#111827",
+                }}
+              >
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                  <span
+                    style={{
+                      border: "1px solid #bfdbfe",
+                      borderRadius: 8,
+                      padding: "2px 7px",
+                      background: "#dbeafe",
+                      color: "#1d4ed8",
+                      fontSize: 12,
+                      fontWeight: 800,
+                    }}
+                  >
+                    AI総括
+                  </span>
+                  {thread.category && (
+                    <span
+                      style={{
+                        border: "1px solid #d1d5db",
+                        borderRadius: 8,
+                        padding: "2px 7px",
+                        background: "#ffffff",
+                        color: "#374151",
+                        fontSize: 12,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {thread.category}
+                    </span>
+                  )}
+                </div>
+
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: currentFontSize + 1,
+                    lineHeight: 1.45,
+                    fontWeight: 900,
+                  }}
+                >
+                  {thread.title}
+                </h3>
+
+                <p
+                  style={{
+                    margin: "8px 0 0",
+                    color: "#334155",
+                    fontSize: currentFontSize - 1,
+                    lineHeight: 1.7,
+                  }}
+                >
+                  {truncate(thread.summary, 120)}
+                </p>
+
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    marginTop: 12,
+                    ...smallMetaStyle,
+                  }}
+                >
+                  <span>投稿数 {thread.post_count ?? 0}</span>
+                  {typeof thread.avg_logic_score === "number" &&
+                    thread.avg_logic_score > 0 && (
+                      <span>AI論理スコア平均 {formatScore(thread.avg_logic_score)}</span>
+                    )}
+                </div>
+
+                <Link
+                  href={`/${tenant}/forum/thread/${thread.id}`}
+                  style={{
+                    display: "inline-flex",
+                    marginTop: 12,
+                    color: "#0d47a1",
+                    fontWeight: 800,
+                    textDecoration: "underline",
+                    textUnderlineOffset: 3,
+                  }}
+                >
+                  詳しく見る
+                </Link>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div style={{ ...smallMetaStyle, color: "#475569" }}>
+            保存済みのAI総括があるスレッドはまだありません。
+          </div>
+        )}
+      </section>
 
       <section
         style={{
