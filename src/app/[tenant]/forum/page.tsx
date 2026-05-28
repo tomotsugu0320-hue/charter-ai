@@ -481,15 +481,40 @@ function ThreadCard({
   currentFontSize: number;
   isFeatured?: boolean;
 }) {
+  const router = useRouter();
+  const [isActive, setIsActive] = useState(false);
   const preview =
     thread.summary || thread.original_post || thread.posts_content || "";
+  const threadHref = `/${tenant}/forum/thread/${thread.id}`;
 
   return (
-    <article style={threadCardStyle(isFeatured)}>
-      <Link
-        href={`/${tenant}/forum/thread/${thread.id}`}
-        style={{ color: "inherit", textDecoration: "none" }}
-      >
+    <article
+      role="link"
+      tabIndex={0}
+      aria-label={`${thread.title}の詳細を見る`}
+      onClick={() => router.push(threadHref)}
+      onKeyDown={(event) => {
+        if (event.currentTarget !== event.target) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          router.push(threadHref);
+        }
+      }}
+      onMouseEnter={() => setIsActive(true)}
+      onMouseLeave={() => setIsActive(false)}
+      onFocus={() => setIsActive(true)}
+      onBlur={() => setIsActive(false)}
+      style={{
+        ...threadCardStyle(isFeatured),
+        border: isActive
+          ? "1px solid #2563eb"
+          : threadCardStyle(isFeatured).border,
+        cursor: "pointer",
+        boxShadow: isActive ? "0 8px 18px rgba(37, 99, 235, 0.14)" : "none",
+        outline: isActive ? "2px solid rgba(37, 99, 235, 0.18)" : "none",
+        outlineOffset: 2,
+      }}
+    >
         <div
           style={{
             display: "flex",
@@ -572,6 +597,19 @@ function ThreadCard({
           <span>投稿数 {thread.post_count ?? 0}</span>
           <span>読みやすさ {formatScore(thread.avg_logic_score)}</span>
         </div>
+      <Link
+        href={threadHref}
+        onClick={(event) => event.stopPropagation()}
+        style={{
+          display: "inline-flex",
+          marginTop: 12,
+          color: "#0d47a1",
+          fontWeight: 800,
+          textDecoration: "underline",
+          textUnderlineOffset: 3,
+        }}
+      >
+        詳しく見る
       </Link>
     </article>
   );
