@@ -555,12 +555,8 @@ export default function ForumPage() {
     [activeThreads, categoryFilter, searchQuery]
   );
 
-  const visiblePopularThreads = hasFilter
-    ? filteredPopularThreads
-    : filteredPopularThreads.slice(0, 8);
-  const visibleActiveThreads = hasFilter
-    ? filteredActiveThreads
-    : filteredActiveThreads.slice(0, 8);
+  const visiblePopularThreads = filteredPopularThreads.slice(0, 10);
+  const visibleActiveThreads = filteredActiveThreads.slice(0, 10);
   const aiSummaryThreads = useMemo(
     () =>
       popularThreads
@@ -1038,7 +1034,15 @@ export default function ForumPage() {
         </section>
       )}
 
-      <section style={{ ...panelStyle, marginBottom: 22 }}>
+      <section
+        style={{
+          ...panelStyle,
+          marginBottom: 22,
+          background: "#eff6ff",
+          color: "#0f172a",
+          border: "1px solid #bfdbfe",
+        }}
+      >
         <div
           style={{
             display: "flex",
@@ -1228,8 +1232,26 @@ export default function ForumPage() {
           marginBottom: 22,
         }}
       >
-        <div>
+        <div
+          style={{
+            ...panelStyle,
+            background: "#f0fdf4",
+            color: "#0f172a",
+            border: "1px solid #bbf7d0",
+          }}
+        >
           <h2 style={{ margin: "0 0 10px", fontSize: 20 }}>評価が高いスレッド</h2>
+          <p
+            style={{
+              margin: "0 0 12px",
+              color: "#166534",
+              fontSize: currentFontSize - 2,
+              lineHeight: 1.6,
+              fontWeight: 700,
+            }}
+          >
+            AI論理スコアが高く、根拠や反論が整理された議論です。
+          </p>
           <div style={{ display: "grid", gap: 10 }}>
             {visiblePopularThreads.length > 0 ? (
               visiblePopularThreads.map((thread, index) => (
@@ -1254,8 +1276,26 @@ export default function ForumPage() {
           </div>
         </div>
 
-        <div>
+        <div
+          style={{
+            ...panelStyle,
+            background: "#fffbeb",
+            color: "#0f172a",
+            border: "1px solid #fde68a",
+          }}
+        >
           <h2 style={{ margin: "0 0 10px", fontSize: 20 }}>投稿が多いスレッド</h2>
+          <p
+            style={{
+              margin: "0 0 12px",
+              color: "#92400e",
+              fontSize: currentFontSize - 2,
+              lineHeight: 1.6,
+              fontWeight: 700,
+            }}
+          >
+            意見・反論・補足が多く集まっている議論です。
+          </p>
           <div style={{ display: "grid", gap: 10 }}>
             {visibleActiveThreads.length > 0 ? (
               visibleActiveThreads.map((thread, index) => (
