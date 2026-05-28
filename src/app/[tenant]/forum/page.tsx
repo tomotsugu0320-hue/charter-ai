@@ -49,6 +49,13 @@ type OrganizedResult = {
   postText: string;
 };
 
+type DiscussionMapNode = {
+  id: string;
+  label: string;
+  nodeId?: string;
+  children?: DiscussionMapNode[];
+};
+
 const ALL_CATEGORIES = "すべて";
 const draftStorageKey = "forum_thread_draft_input";
 const NODE_INFO: Record<string, { label: string; path?: string[] }> = {
@@ -85,6 +92,41 @@ const NODE_INFO: Record<string, { label: string; path?: string[] }> = {
     path: ["政策を検証する", "アベノミクス"],
   },
 };
+
+const discussionMapRoot: DiscussionMapNode = {
+  id: "japan-economy",
+  label: "日本経済",
+};
+
+const discussionMapBranches: DiscussionMapNode[] = [
+  {
+    id: "economic-policy",
+    label: "経済政策",
+    children: [
+      {
+        id: "tax-social-insurance",
+        label: "税金・社会保険料",
+        nodeId: "tax-social-insurance",
+        children: [
+          {
+            id: "consumption-tax",
+            label: "消費税",
+            nodeId: "consumption-tax",
+            children: [
+              { id: "demand-shortage", label: "需要不足", nodeId: "demand-shortage" },
+              { id: "tax-cuts", label: "減税", nodeId: "tax-cuts" },
+              { id: "funding-inflation", label: "財源・インフレ" },
+              { id: "employment-wages-impact", label: "雇用・賃金への影響" },
+            ],
+          },
+        ],
+      },
+      { id: "employment-wages", label: "雇用・賃金" },
+      { id: "fiscal-policy", label: "財政政策", nodeId: "fiscal-policy" },
+      { id: "prices-inflation", label: "物価・インフレ", nodeId: "inflation" },
+    ],
+  },
+];
 
 const pageStyle: CSSProperties = {
   maxWidth: 1080,
@@ -316,6 +358,86 @@ function truncate(value = "", max = 120) {
   const text = value.replace(/\s+/g, " ").trim();
   if (text.length <= max) return text;
   return `${text.slice(0, max)}...`;
+}
+
+function renderDiscussionMapNode(
+  node: DiscussionMapNode,
+  tenant: string,
+  selectedNodeId: string
+) {
+  const isSelected = Boolean(node.nodeId && node.nodeId === selectedNodeId);
+  const content = node.nodeId ? (
+    <Link
+      href={`/${tenant}/forum?node=${node.nodeId}`}
+      style={{
+        color: isSelected ? "#166534" : "#0d47a1",
+        fontWeight: 800,
+        textDecoration: "underline",
+        textUnderlineOffset: 2,
+      }}
+    >
+      {node.label}
+    </Link>
+  ) : (
+    node.label
+  );
+
+  if (!isSelected) return content;
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "2px 8px",
+        borderRadius: 999,
+        background: "#dcfce7",
+        color: "#166534",
+        border: "1px solid #22c55e",
+        fontWeight: 900,
+      }}
+    >
+      {content}
+      <span style={{ color: "#166534", fontSize: 12, fontWeight: 800 }}>
+        選択中
+      </span>
+    </span>
+  );
+}
+
+function renderDiscussionMap(
+  root: DiscussionMapNode,
+  branches: DiscussionMapNode[],
+  tenant: string,
+  selectedNodeId: string
+) {
+  const lines = [
+    <div key={root.id}>{renderDiscussionMapNode(root, tenant, selectedNodeId)}</div>,
+  ];
+
+  const addNodes = (nodes: DiscussionMapNode[], prefix = "") => {
+    nodes.forEach((node, index) => {
+      const isLastNode = index === nodes.length - 1;
+      const branchPrefix = isLastNode ? "└" : "├";
+      const childPrefix = `${prefix}${isLastNode ? "   " : "│  "}`;
+
+      lines.push(
+        <div key={node.id}>
+          {prefix}
+          {branchPrefix} {renderDiscussionMapNode(node, tenant, selectedNodeId)}
+        </div>
+      );
+
+      if (node.children?.length) {
+        addNodes(node.children, childPrefix);
+      }
+    });
+  };
+
+  addNodes(branches);
+
+  return lines;
 }
 
 function matchesThread(thread: ThreadRow, query: string, category: string) {
@@ -1033,6 +1155,46 @@ export default function ForumPage() {
           )}
         </section>
       )}
+
+      <section
+        style={{
+          ...panelStyle,
+          marginBottom: 22,
+          background: "#f8fafc",
+          color: "#0f172a",
+          border: "1px solid #cbd5e1",
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: 20 }}>議論の全体マップ</h2>
+        <p
+          style={{
+            margin: "6px 0 12px",
+            color: "#475569",
+            fontSize: currentFontSize - 2,
+            lineHeight: 1.6,
+          }}
+        >
+          この掲示板では、個別の問題を大きな論点の中で整理していきます。
+        </p>
+        <div
+          style={{
+            margin: 0,
+            whiteSpace: "pre-wrap",
+            overflowX: "auto",
+            background: "#ffffff",
+            color: "#111827",
+            border: "1px solid #e2e8f0",
+            borderRadius: 8,
+            padding: 12,
+            fontSize: currentFontSize - 1,
+            lineHeight: 1.8,
+            fontFamily:
+              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+          }}
+        >
+          {renderDiscussionMap(discussionMapRoot, discussionMapBranches, tenant, node)}
+        </div>
+      </section>
 
       <section
         style={{
