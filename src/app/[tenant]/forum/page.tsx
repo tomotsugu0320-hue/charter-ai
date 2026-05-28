@@ -723,10 +723,10 @@ export default function ForumPage() {
   const visibleActiveThreads = filteredActiveThreads.slice(0, 10);
   const aiSummaryThreads = useMemo(
     () =>
-      popularThreads
+      filteredPopularThreads
         .filter((thread) => thread.summary?.trim())
         .slice(0, 10),
-    [popularThreads]
+    [filteredPopularThreads]
   );
 
   const totalPostCount = allThreads.reduce(
