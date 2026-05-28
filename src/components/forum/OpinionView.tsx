@@ -3,10 +3,13 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import SectionCard from "@/components/forum/SectionCard";
 import PostCard from "@/components/forum/PostCard";
 import OpinionCard from "@/components/forum/OpinionCard";
+
+const INITIAL_VISIBLE_OPINIONS = 5;
+const LOAD_MORE_OPINIONS = 10;
 
 function getShortSummary(content: string) {
   if (!content) return "";
@@ -64,8 +67,57 @@ export default function OpinionView({
   currentAuthorKey,
 }: any) {
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
+  const [visibleOpinionCount, setVisibleOpinionCount] = useState(
+    INITIAL_VISIBLE_OPINIONS
+  );
   const [highlightedPostId, setHighlightedPostId] = useState<string | null>(
     null
+  );
+
+  useEffect(() => {
+    setVisibleOpinionCount(INITIAL_VISIBLE_OPINIONS);
+  }, [groupedByOpinion]);
+
+  const totalOpinionCount = useMemo(
+    () =>
+      groupedByOpinion.reduce(
+        (total: number, group: any) => total + (group.opinions?.length ?? 0),
+        0
+      ),
+    [groupedByOpinion]
+  );
+
+  const visibleGroupedByOpinion = useMemo(() => {
+    let remaining = visibleOpinionCount;
+
+    return groupedByOpinion
+      .map((group: any, sourceIndex: number) => {
+        const opinions = group.opinions ?? [];
+
+        if (opinions.length === 0) {
+          return totalOpinionCount === 0
+            ? { ...group, sourceIndex }
+            : { ...group, opinions: [], sourceIndex };
+        }
+
+        const visibleOpinions = opinions.slice(0, Math.max(remaining, 0));
+        remaining -= visibleOpinions.length;
+
+        return {
+          ...group,
+          opinions: visibleOpinions,
+          sourceIndex,
+        };
+      })
+      .filter(
+        (group: any) => totalOpinionCount === 0 || group.opinions.length > 0
+      );
+  }, [groupedByOpinion, totalOpinionCount, visibleOpinionCount]);
+
+  const hasMoreOpinions = visibleOpinionCount < totalOpinionCount;
+  const remainingOpinionCount = Math.max(
+    totalOpinionCount - visibleOpinionCount,
+    0
   );
 
   useEffect(() => {
@@ -104,7 +156,7 @@ export default function OpinionView({
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      {groupedByOpinion.map((group: any, groupIndex: number) => (
+      {visibleGroupedByOpinion.map((group: any, groupIndex: number) => (
         <SectionCard
           key={group.issue?.id ?? `group-${groupIndex}`}
           variant="soft"
@@ -131,7 +183,9 @@ export default function OpinionView({
 ) : (
   <div>
     {group.opinions.map((op: any) => {
-  const best = bestOpinionsByIssue[groupIndex]?.best;
+  const sourceGroupIndex =
+    typeof group.sourceIndex === "number" ? group.sourceIndex : groupIndex;
+  const best = bestOpinionsByIssue[sourceGroupIndex]?.best;
   const isBest = !!best && best.opinion.id === op.opinion.id;
   const isExpanded = isBest || expandedMap[op.opinion.id] === true;
   const short = getShortSummary(op.opinion.content);
@@ -365,6 +419,33 @@ export default function OpinionView({
     </div>
       );
     })}
+    {hasMoreOpinions && groupIndex === visibleGroupedByOpinion.length - 1 && (
+      <button
+        type="button"
+        onClick={() =>
+          setVisibleOpinionCount((current) =>
+            Math.min(current + LOAD_MORE_OPINIONS, totalOpinionCount)
+          )
+        }
+        style={{
+          marginTop: 14,
+          width: "100%",
+          border: "1px solid #cbd5e1",
+          borderRadius: 10,
+          padding: "12px 14px",
+          background: "#f8fafc",
+          color: "#0f172a",
+          cursor: "pointer",
+          fontSize: currentFont.base,
+          fontWeight: 800,
+        }}
+      >
+        次の10件を見る
+        {remainingOpinionCount > 0
+          ? `（残り${remainingOpinionCount}件）`
+          : ""}
+      </button>
+    )}
   </div>
 )}
             </div>
