@@ -264,7 +264,9 @@ export default function ExternalAiImportModal({
     } catch (parseError) {
       console.error(parseError);
       setCandidates([]);
-      setError("JSONを読み取れませんでした。配列形式になっているか確認してください。");
+      setError(
+        "これはJSON形式ではありません。\nこの欄には、外部AIが出力したJSON配列を貼り付けてください。\n会話ログをそのまま貼る場合は、上のプロンプトをあなたのChatGPTや外部AIに貼り、返ってきたJSONだけをここに貼り付けてください。"
+      );
     }
   };
 
@@ -360,11 +362,21 @@ export default function ExternalAiImportModal({
             <label htmlFor="external-ai-json-input" style={labelStyle}>
               外部AIの整理結果を貼り付け
             </label>
+            <div
+              style={{
+                marginBottom: 8,
+                color: "#64748b",
+                fontSize: 13,
+                lineHeight: 1.6,
+              }}
+            >
+              外部AIが出力したJSON配列だけを貼り付けてください。会話ログそのものはここでは読み取れません。
+            </div>
             <textarea
               id="external-ai-json-input"
               value={jsonInput}
               onChange={(event) => setJsonInput(event.target.value)}
-              placeholder="外部AIが出力したJSON配列をここに貼り付けてください。"
+              placeholder="外部AIが出力したJSON配列だけを貼り付けてください。会話ログそのものはここでは読み取れません。"
               rows={10}
               style={{ ...inputStyle, resize: "vertical", minHeight: 180 }}
             />
@@ -397,7 +409,7 @@ export default function ExternalAiImportModal({
                   fontWeight: 700,
                 }}
               >
-                {error}
+                <span style={{ whiteSpace: "pre-wrap" }}>{error}</span>
               </div>
             )}
             {notice && (
