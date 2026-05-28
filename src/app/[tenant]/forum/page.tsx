@@ -1129,27 +1129,56 @@ export default function ForumPage() {
                   )}
                 </div>
 
-                <h3
+                <div
                   style={{
-                    margin: 0,
-                    fontSize: currentFontSize + 1,
-                    lineHeight: 1.45,
-                    fontWeight: 900,
+                    marginTop: 4,
+                    marginBottom: 12,
                   }}
                 >
-                  {thread.title}
-                </h3>
+                  <div
+                    style={{
+                      color: "#475569",
+                      fontSize: 12,
+                      fontWeight: 900,
+                      marginBottom: 4,
+                    }}
+                  >
+                    問題
+                  </div>
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: currentFontSize + 1,
+                      lineHeight: 1.45,
+                      fontWeight: 900,
+                    }}
+                  >
+                    {truncate(thread.title, 64)}
+                  </h3>
+                </div>
 
-                <p
-                  style={{
-                    margin: "8px 0 0",
-                    color: "#334155",
-                    fontSize: currentFontSize - 1,
-                    lineHeight: 1.7,
-                  }}
-                >
-                  {truncate(thread.summary, 120)}
-                </p>
+                <div>
+                  <div
+                    style={{
+                      color: "#1d4ed8",
+                      fontSize: 12,
+                      fontWeight: 900,
+                      marginBottom: 4,
+                    }}
+                  >
+                    AI総括
+                  </div>
+                  <p
+                    style={{
+                      margin: 0,
+                      color: "#334155",
+                      fontSize: currentFontSize - 1,
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    {truncate(thread.summary, 120)}
+                  </p>
+                </div>
 
                 <div
                   style={{
