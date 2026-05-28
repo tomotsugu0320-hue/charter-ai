@@ -2176,16 +2176,6 @@ function jumpToMainIssues() {
 <SectionCard variant="white" style={{ marginTop: 24 }}>
   <div id="main-issues" style={{ scrollMarginTop: 80 }} />
 
-<div
-  style={{
-    fontSize: currentFont.base * 0.9,
-    color: "#666",
-    marginBottom: 6,
-  }}
->
-  {thread.title}
-</div>
-
   <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
     🧩 論点整理
   </SectionTitle>
@@ -2198,7 +2188,7 @@ function jumpToMainIssues() {
       color: "#666",
     }}
   >
-    気になる項目を押すと、関連する議論を下で確認できます。
+    気になる論点から、関連する意見へ移動できます。
   </p>
 
   <div
@@ -2223,7 +2213,7 @@ function jumpToMainIssues() {
         summary.key_points.issues.map((item, index) => (
           <SelectableCardButton
             key={`issue-${item}-${index}`}
-            title={item}
+            title={compactText(item, 100)}
             onClick={() => handleNodeClick("論点", item)}
             style={{ fontSize: currentFont.base }}
           />
@@ -2253,14 +2243,16 @@ function jumpToMainIssues() {
     </div>
 
     <div style={{ display: "grid", gap: 10 }}>
-      <div style={{ color: "#666", fontSize: currentFont.base * 0.9 }}>
-        {premiseSectionTitle}
-      </div>
+      {premiseSectionTitle !== "主な前提" && (
+        <div style={{ color: "#666", fontSize: currentFont.base * 0.9 }}>
+          {premiseSectionTitle}
+        </div>
+      )}
 {visiblePremises.length ? (
   visiblePremises.map((item, index) => (
           <SelectableCardButton
             key={`premise-${item}-${index}`}
-            title={item}
+            title={compactText(item, 100)}
             onClick={() => handleNodeClick("前提", item)}
             style={{ fontSize: currentFont.base }}
           />
@@ -2304,14 +2296,16 @@ function jumpToMainIssues() {
     </div>
 
     <div style={{ display: "grid", gap: 10 }}>
-      <div style={{ color: "#666", fontSize: currentFont.base * 0.9 }}>
-        {reasonSectionTitle}
-      </div>
+      {reasonSectionTitle !== "主な根拠" && (
+        <div style={{ color: "#666", fontSize: currentFont.base * 0.9 }}>
+          {reasonSectionTitle}
+        </div>
+      )}
 {visibleReasons.length ? (
   visibleReasons.map((item, index) => (
           <SelectableCardButton
             key={`reason-${item}-${index}`}
-            title={item}
+            title={compactText(item, 100)}
             onClick={() => handleNodeClick("根拠", item)}
             style={{ fontSize: currentFont.base }}
           />
@@ -2353,9 +2347,11 @@ function jumpToMainIssues() {
     >
       反論・リスク
     </div>
-<div style={{ color: "#666", fontSize: currentFont.base * 0.9, marginBottom: 10 }}>
-  {conflictSectionTitle}
-</div>
+{conflictSectionTitle !== "主な対立" && (
+  <div style={{ color: "#666", fontSize: currentFont.base * 0.9, marginBottom: 10 }}>
+    {conflictSectionTitle}
+  </div>
+)}
 {conflictQualityDisplay.mode === "empty" ? (
   <div style={{ display: "grid", gap: 8 }}>
     {conflictQualityDisplay.messages.map((msg, i) => (
@@ -2386,14 +2382,14 @@ function jumpToMainIssues() {
             }}
           >
             <SelectableCardButton
-              title={`🔴 A：${c.opinion}`}
+              title={`🔴 A：${compactText(c.opinion, 90)}`}
               variant="danger"
               onClick={() => handleNodeClick("論点", c.opinion)}
               style={{ fontSize: currentFont.base }}
             />
 
             <SelectableCardButton
-              title={`🔵 B：${c.rebuttal}`}
+              title={`🔵 B：${compactText(c.rebuttal, 90)}`}
               variant="info"
               onClick={() => handleNodeClick("論点", c.rebuttal)}
               style={{ fontSize: currentFont.base }}
