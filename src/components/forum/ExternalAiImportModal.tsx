@@ -261,8 +261,7 @@ export default function ExternalAiImportModal({
       } else {
         setNotice(`${normalized.length}件の投稿候補を読み取りました。`);
       }
-    } catch (parseError) {
-      console.error(parseError);
+    } catch {
       setCandidates([]);
       setError(
         "これはJSON形式ではありません。\nこの欄には、外部AIが出力したJSON配列を貼り付けてください。\n会話ログをそのまま貼る場合は、上のプロンプトをあなたのChatGPTや外部AIに貼り、返ってきたJSONだけをここに貼り付けてください。"
