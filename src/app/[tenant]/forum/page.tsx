@@ -5,7 +5,7 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import ForumGuideTree from "@/components/forum/ForumGuideTree";
 import PrimaryButton from "@/components/forum/PrimaryButton";
 
@@ -601,6 +601,7 @@ function StanceLabel({ stance }: { stance?: RelatedThread["stance"] }) {
 
 export default function ForumPage() {
   const params = useParams();
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const tenantParam = params?.tenant;
@@ -635,6 +636,9 @@ export default function ForumPage() {
     fontSizeMode === "small" ? 14 : fontSizeMode === "large" ? 18 : 16;
 
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [activeAiSummaryThreadId, setActiveAiSummaryThreadId] = useState<
+    string | null
+  >(null);
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [analyzeScrollKey, setAnalyzeScrollKey] = useState(0);
@@ -1301,12 +1305,40 @@ export default function ForumPage() {
             {aiSummaryThreads.map((thread) => (
               <article
                 key={`ai-summary-${thread.id}`}
+                role="link"
+                tabIndex={0}
+                aria-label={`${thread.title}の詳細を見る`}
+                onClick={() => router.push(`/${tenant}/forum/thread/${thread.id}`)}
+                onKeyDown={(event) => {
+                  if (event.currentTarget !== event.target) return;
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    router.push(`/${tenant}/forum/thread/${thread.id}`);
+                  }
+                }}
+                onMouseEnter={() => setActiveAiSummaryThreadId(thread.id)}
+                onMouseLeave={() => setActiveAiSummaryThreadId(null)}
+                onFocus={() => setActiveAiSummaryThreadId(thread.id)}
+                onBlur={() => setActiveAiSummaryThreadId(null)}
                 style={{
-                  border: "1px solid #d7dde8",
+                  border:
+                    activeAiSummaryThreadId === thread.id
+                      ? "1px solid #2563eb"
+                      : "1px solid #d7dde8",
                   borderRadius: 8,
                   padding: 14,
                   background: "#f8fafc",
                   color: "#111827",
+                  cursor: "pointer",
+                  boxShadow:
+                    activeAiSummaryThreadId === thread.id
+                      ? "0 8px 18px rgba(37, 99, 235, 0.14)"
+                      : "none",
+                  outline:
+                    activeAiSummaryThreadId === thread.id
+                      ? "2px solid rgba(37, 99, 235, 0.18)"
+                      : "none",
+                  outlineOffset: 2,
                 }}
               >
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
@@ -1409,6 +1441,7 @@ export default function ForumPage() {
 
                 <Link
                   href={`/${tenant}/forum/thread/${thread.id}`}
+                  onClick={(event) => event.stopPropagation()}
                   style={{
                     display: "inline-flex",
                     marginTop: 12,
