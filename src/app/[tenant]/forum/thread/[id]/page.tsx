@@ -167,6 +167,7 @@ type LocationMapNode = {
   id: string;
   label: string;
   nodeId?: string;
+  isCurrent?: boolean;
   children?: LocationMapNode[];
 };
 
@@ -177,46 +178,52 @@ const currentPath: LocationMapNode[] = [
     label: "税金・社会保険料",
     nodeId: "tax-social-insurance",
   },
-  { id: "consumption-tax", label: "消費税", nodeId: "consumption-tax" },
+  { id: "consumption-tax", label: "消費税", nodeId: "consumption-tax", isCurrent: true },
 ];
 
 const mapRoot: LocationMapNode = {
-  id: "consumption-tax",
-  label: "消費税",
-  nodeId: "consumption-tax",
+  id: "tax-social-insurance",
+  label: "税金・社会保険料",
+  nodeId: "tax-social-insurance",
 };
 
 const mapBranches: LocationMapNode[] = [
   {
-    id: "organize-problems",
-    label: "問題を整理する",
-    children: [{ id: "consumption-impact", label: "消費への影響" }],
-  },
-  {
-    id: "consider-causes",
-    label: "原因を考える",
-    children: [{ id: "demand-shortage", label: "需要不足", nodeId: "demand-shortage" }],
-  },
-  {
-    id: "propose-solutions",
-    label: "解決策を出す",
-    children: [{ id: "tax-cuts", label: "減税", nodeId: "tax-cuts" }],
-  },
-  {
-    id: "check-risks",
-    label: "反論・リスクを確認する",
-    children: [{ id: "funding-inflation", label: "財源・インフレ" }],
+    id: "consumption-tax",
+    label: "消費税",
+    nodeId: "consumption-tax",
+    isCurrent: true,
+    children: [
+      {
+        id: "organize-problems",
+        label: "問題を整理する",
+        children: [{ id: "consumption-impact", label: "消費への影響" }],
+      },
+      {
+        id: "consider-causes",
+        label: "原因を考える",
+        children: [{ id: "demand-shortage", label: "需要不足", nodeId: "demand-shortage" }],
+      },
+      {
+        id: "propose-solutions",
+        label: "解決策を出す",
+        children: [{ id: "tax-cuts", label: "減税", nodeId: "tax-cuts" }],
+      },
+      {
+        id: "check-risks",
+        label: "反論・リスクを確認する",
+        children: [{ id: "funding-inflation", label: "財源・インフレ" }],
+      },
+    ],
   },
 ];
 
 function renderLocationNode(node: LocationMapNode, tenant: string) {
-  if (!node.nodeId) return node.label;
-
-  return (
+  const content = node.nodeId ? (
     <Link
       href={`/${tenant}/forum?node=${node.nodeId}`}
       style={{
-        color: "#0d47a1",
+        color: node.isCurrent ? "#166534" : "#0d47a1",
         fontWeight: 700,
         textDecoration: "underline",
         textUnderlineOffset: 2,
@@ -224,6 +231,31 @@ function renderLocationNode(node: LocationMapNode, tenant: string) {
     >
       {node.label}
     </Link>
+  ) : (
+    node.label
+  );
+
+  if (!node.isCurrent) return content;
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "2px 8px",
+        borderRadius: 999,
+        background: "#dcfce7",
+        color: "#166534",
+        border: "1px solid #22c55e",
+        fontWeight: 900,
+      }}
+    >
+      {content}
+      <span style={{ color: "#166534", fontSize: 12, fontWeight: 800 }}>
+        現在地
+      </span>
+    </span>
   );
 }
 
@@ -239,28 +271,26 @@ function renderCurrentPath(path: LocationMapNode[], tenant: string) {
 function renderLocationMap(root: LocationMapNode, branches: LocationMapNode[], tenant: string) {
   const lines: ReactNode[] = [renderLocationNode(root, tenant)];
 
-  branches.forEach((branch, index) => {
-    const isLastBranch = index === branches.length - 1;
-    const branchPrefix = isLastBranch ? "└─" : "├─";
-    const childPrefix = isLastBranch ? "    " : "│   ";
-    const children = branch.children ?? [];
+  const addNodes = (nodes: LocationMapNode[], prefix = "") => {
+    nodes.forEach((node, index) => {
+      const isLastNode = index === nodes.length - 1;
+      const branchPrefix = isLastNode ? "└─" : "├─";
+      const childPrefix = `${prefix}${isLastNode ? "   " : "│  "}`;
 
-    lines.push(
-      <>
-        {branchPrefix} {renderLocationNode(branch, tenant)}
-      </>
-    );
-
-    children.forEach((child, childIndex) => {
-      const isLastChild = childIndex === children.length - 1;
       lines.push(
         <>
-          {childPrefix}
-          {isLastChild ? "└─" : "├─"} {renderLocationNode(child, tenant)}
+          {prefix}
+          {branchPrefix} {renderLocationNode(node, tenant)}
         </>
       );
+
+      if (node.children?.length) {
+        addNodes(node.children, childPrefix);
+      }
     });
-  });
+  };
+
+  addNodes(branches);
 
   return lines.map((line, index) => <div key={index}>{line}</div>);
 }
