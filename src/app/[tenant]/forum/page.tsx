@@ -1110,6 +1110,51 @@ export default function ForumPage() {
         </div>
       </section>
 
+      <section
+        style={{
+          ...panelStyle,
+          marginBottom: 18,
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+          alignItems: "center",
+          background: "#f8fafc",
+          color: "#0f172a",
+          border: "1px solid #cbd5e1",
+        }}
+      >
+        <div style={{ fontWeight: 800, fontSize: currentFontSize }}>
+          表示モード：
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={() => selectMode("normal")}
+            style={{
+              ...ghostButtonStyle,
+              background: defaultMode === "normal" ? "#111827" : "#ffffff",
+              color: defaultMode === "normal" ? "#ffffff" : "#111827",
+              borderColor: defaultMode === "normal" ? "#111827" : "#cbd5e1",
+            }}
+          >
+            標準
+          </button>
+          <button
+            type="button"
+            onClick={() => selectMode("easy")}
+            style={{
+              ...ghostButtonStyle,
+              background: defaultMode === "easy" ? "#111827" : "#ffffff",
+              color: defaultMode === "easy" ? "#ffffff" : "#111827",
+              borderColor: defaultMode === "easy" ? "#111827" : "#cbd5e1",
+            }}
+          >
+            やさしい表示
+          </button>
+        </div>
+      </section>
+
       {topError && (
         <div
           style={{
@@ -1498,33 +1543,6 @@ export default function ForumPage() {
             >
               まず考えを書きます。必要ならAIで読みやすく整えてから、論点整理へ進めます。
             </p>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={() => selectMode("normal")}
-              style={{
-                ...ghostButtonStyle,
-                background: defaultMode === "normal" ? "#ffffff" : "#1f2937",
-                color: defaultMode === "normal" ? "#111827" : "#e5e7eb",
-                borderColor: defaultMode === "normal" ? "#ffffff" : "#475569",
-              }}
-            >
-              標準
-            </button>
-            <button
-              type="button"
-              onClick={() => selectMode("easy")}
-              style={{
-                ...ghostButtonStyle,
-                background: defaultMode === "easy" ? "#ffffff" : "#1f2937",
-                color: defaultMode === "easy" ? "#111827" : "#e5e7eb",
-                borderColor: defaultMode === "easy" ? "#ffffff" : "#475569",
-              }}
-            >
-              やさしい表示
-            </button>
           </div>
         </div>
 
