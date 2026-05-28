@@ -218,6 +218,42 @@ const mapBranches: LocationMapNode[] = [
   },
 ];
 
+const wholeDiscussionMapRoot: LocationMapNode = {
+  id: "japan-economy",
+  label: "日本経済",
+};
+
+const wholeDiscussionMapBranches: LocationMapNode[] = [
+  {
+    id: "economic-policy",
+    label: "経済政策",
+    children: [
+      {
+        id: "tax-social-insurance",
+        label: "税金・社会保険料",
+        nodeId: "tax-social-insurance",
+        children: [
+          {
+            id: "consumption-tax",
+            label: "消費税",
+            nodeId: "consumption-tax",
+            isCurrent: true,
+            children: [
+              { id: "demand-shortage", label: "需要不足", nodeId: "demand-shortage" },
+              { id: "tax-cuts", label: "減税", nodeId: "tax-cuts" },
+              { id: "funding-inflation", label: "財源・インフレ" },
+              { id: "employment-wages-impact", label: "雇用・賃金への影響" },
+            ],
+          },
+        ],
+      },
+      { id: "employment-wages", label: "雇用・賃金" },
+      { id: "fiscal-policy", label: "財政政策", nodeId: "fiscal-policy" },
+      { id: "prices-inflation", label: "物価・インフレ", nodeId: "inflation" },
+    ],
+  },
+];
+
 function renderLocationNode(node: LocationMapNode, tenant: string) {
   const content = node.nodeId ? (
     <Link
@@ -3062,6 +3098,63 @@ function jumpToMainIssues() {
               >
                 クリア
               </PrimaryButton>
+            </div>
+          </SectionCard>
+
+          <SectionCard variant="white" style={{ marginTop: 24 }}>
+            <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
+              議論の全体マップ
+            </SectionTitle>
+
+            <p
+              style={{
+                marginTop: 0,
+                color: "#475569",
+                fontSize: currentFont.base,
+                lineHeight: 1.6,
+              }}
+            >
+              この問題が、他の経済論点とどうつながるかを整理した地図です。
+            </p>
+
+            <div
+              style={{
+                margin: 0,
+                whiteSpace: "pre-wrap",
+                overflowX: "auto",
+                background: "#f7f7f7",
+                color: "#111",
+                border: "1px solid #e0e0e0",
+                borderRadius: 8,
+                padding: 12,
+                fontSize: currentFont.base,
+                lineHeight: 1.7,
+                fontFamily:
+                  'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+              }}
+            >
+              {renderLocationMap(wholeDiscussionMapRoot, wholeDiscussionMapBranches, tenant)}
+            </div>
+
+            <div
+              style={{
+                marginTop: 14,
+                padding: "12px 14px",
+                borderRadius: 8,
+                border: "1px solid #dbeafe",
+                background: "#eff6ff",
+                color: "#1e3a8a",
+                fontSize: currentFont.base,
+                lineHeight: 1.7,
+              }}
+            >
+              <div style={{ fontWeight: 900, marginBottom: 6, color: "#1e3a8a" }}>
+                AIによるつながり整理：
+              </div>
+              <div>
+                消費税の議論は、単なる税率の問題ではなく、需要不足・家計負担・物価・雇用に広がる論点です。
+                減税を選ぶ場合は需要回復の効果を見つつ、インフレや財源への反論も同時に検討する必要があります。
+              </div>
             </div>
           </SectionCard>
         </>
