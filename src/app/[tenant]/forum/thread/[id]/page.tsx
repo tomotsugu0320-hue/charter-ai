@@ -936,7 +936,7 @@ const groupedByOpinion = useMemo(() => {
       opinionGroups.push({
         opinion: {
           ...group.issue,
-          id: `virtual-${group.issue.id}`,
+          id: group.issue.id,
           post_role: "opinion",
           content: group.issue.content,
           logic_score: 50,
