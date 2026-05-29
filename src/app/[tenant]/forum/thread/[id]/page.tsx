@@ -356,6 +356,23 @@ function splitContent(content: string) {
   };
 }
 
+function extractExternalAiAnswer(originalPost?: string | null) {
+  const text = originalPost ?? "";
+  const labels = ["AI回答・整理:", "AI回答・整理："];
+  const matchedLabel = labels.find((label) => text.includes(label));
+
+  if (!matchedLabel) return "";
+
+  const afterLabel = text.slice(text.indexOf(matchedLabel) + matchedLabel.length).trim();
+  if (!afterLabel) return "";
+
+  const nextHeading = afterLabel.search(
+    /\n\s*(補足|前提|根拠|反論|反論・リスク)[:：]/
+  );
+
+  return (nextHeading >= 0 ? afterLabel.slice(0, nextHeading) : afterLabel).trim();
+}
+
 function normalizeSourceItems(values?: (string | SourceItem)[] | null): SourceItem[] {
   if (!Array.isArray(values)) return [];
 
@@ -1080,6 +1097,29 @@ const groupedByOpinion = useMemo(() => {
     return splitContent(thread?.original_post ?? "");
   }, [thread?.original_post]);
 
+const externalAiAnswerFromOriginalPost = extractExternalAiAnswer(thread?.original_post);
+const postPremiseFallbackItems = normalizeSourceItems(
+  posts
+    .filter((post) => post.post_role === "supplement")
+    .map((post) => post.content)
+);
+const postReasonFallbackItems = normalizeSourceItems(
+  posts
+    .filter((post) => post.post_role === "explanation")
+    .map((post) => post.content)
+);
+const postConflictFallbackItems: ConflictItem[] = posts
+  .filter((post) => post.post_role === "rebuttal")
+  .map((post) => post.content.trim())
+  .filter(Boolean)
+  .slice(0, 3)
+  .map((rebuttal) => ({
+    opinion: thread?.title || "この主張",
+    rebuttal,
+    source_type: "extracted" as const,
+    quality_score: 60,
+  }));
+
 
 
 
@@ -1104,7 +1144,9 @@ const groupedByOpinion = useMemo(() => {
 const displayPremiseItemsBase = normalizeSourceItems(
   summary?.key_points?.premises?.length
     ? summary.key_points.premises
-    : thread?.ai_premises ?? []
+    : thread?.ai_premises?.length
+    ? thread.ai_premises
+    : postPremiseFallbackItems
 );
 const displayPremiseItems =
   displayPremiseItemsBase.length > 0
@@ -1121,7 +1163,9 @@ const displayPremises = displayPremiseItems.map((item) => item.text);
 const displayReasonItemsBase = normalizeSourceItems(
   summary?.key_points?.reasons?.length
     ? summary.key_points.reasons
-    : thread?.ai_reasons ?? []
+    : thread?.ai_reasons?.length
+    ? thread.ai_reasons
+    : postReasonFallbackItems
 );
 const displayReasonItems =
   displayReasonItemsBase.length > 0
@@ -1145,11 +1189,13 @@ const displayConflictBase: ConflictItem[] =
         source_type: item.source_type,
         quality_score: item.quality_score,
       }))
-    : (thread?.ai_conflicts ?? []).map((conflict) => ({
+    : thread?.ai_conflicts?.length
+    ? thread.ai_conflicts.map((conflict) => ({
         ...conflict,
         source_type: "extracted" as const,
         quality_score: 60,
-      }));
+      }))
+    : postConflictFallbackItems;
 const displayConflicts: ConflictItem[] =
   displayConflictBase.length > 0
     ? displayConflictBase
@@ -1218,6 +1264,7 @@ const initialPostCount = summary?.counts?.total ?? posts.length;
 const showInitialDiscussionNote = initialPostCount <= 3;
 const provisionalAnswerText =
   summary?.provisional_answer?.trim() ||
+  externalAiAnswerFromOriginalPost ||
   "まだAIの暫定回答はありません。AIまとめを確認・更新すると表示されます。";
 
 /*
