@@ -816,6 +816,8 @@ export default function ExternalAiImportModal({
                             {submitResults[index].url ? (
                               <a
                                 href={submitResults[index].url}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 style={{
                                   color: "#166534",
                                   textDecoration: "underline",
