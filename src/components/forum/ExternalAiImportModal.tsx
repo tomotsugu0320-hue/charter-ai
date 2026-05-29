@@ -455,6 +455,7 @@ export default function ExternalAiImportModal({
           claim: candidate.question || candidate.title,
           premises: safeItems(candidate.premises),
           reasons: safeItems(candidate.reasons),
+          disableFallback: true,
         }),
       });
 

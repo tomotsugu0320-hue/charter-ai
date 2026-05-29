@@ -33,7 +33,8 @@ type ForumPostRow = {
 
 export async function POST(req: Request) {
   try {
-    const { text, claim, premises, reasons, threadId } = await req.json();
+    const { text, claim, premises, reasons, threadId, disableFallback } =
+      await req.json();
 
     const searchTexts = [
       String(text ?? "").trim(),
@@ -116,6 +117,10 @@ export async function POST(req: Request) {
     }
 
     let threads = Array.from(threadMap.values());
+
+    if (threads.length === 0 && disableFallback === true) {
+      return NextResponse.json({ threads: [] });
+    }
 
     // 0件なら保険で新しいスレを返す
     if (threads.length === 0) {
