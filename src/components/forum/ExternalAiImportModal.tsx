@@ -32,6 +32,20 @@ type SubmitResult = {
   error?: string;
 };
 
+type RelatedThread = {
+  id: string;
+  title: string;
+  category?: string | null;
+  ai_summary?: string | null;
+  reason?: string | null;
+};
+
+type RelatedSearchState = {
+  loading: boolean;
+  error?: string;
+  threads: RelatedThread[];
+};
+
 const MAX_CANDIDATES = 20;
 const DEFAULT_EXTRACT_THEME = "全テーマを分類して出す";
 const THEME_PRESETS = [
@@ -210,6 +224,21 @@ function normalizeCandidate(value: unknown): ExternalAiCandidate | null {
   };
 }
 
+function normalizeRelatedThread(value: unknown): RelatedThread | null {
+  if (!isRecord(value)) return null;
+
+  const id = toText(value.id);
+  if (!id) return null;
+
+  return {
+    id,
+    title: toText(value.title) || "無題スレッド",
+    category: toText(value.category) || null,
+    ai_summary: toText(value.ai_summary) || null,
+    reason: toText(value.reason) || null,
+  };
+}
+
 function safeItems(items: string[] | undefined) {
   return Array.isArray(items) ? items.filter(Boolean) : [];
 }
@@ -267,6 +296,9 @@ export default function ExternalAiImportModal({
   const [submitResults, setSubmitResults] = useState<Record<number, SubmitResult>>(
     {}
   );
+  const [relatedByCandidate, setRelatedByCandidate] = useState<
+    Record<number, RelatedSearchState>
+  >({});
 
   const selectedCount = useMemo(
     () => candidates.filter((candidate) => candidate.status === "post").length,
@@ -374,6 +406,71 @@ export default function ExternalAiImportModal({
     setIsSubmitting(false);
   };
 
+  const handleSearchRelatedThreads = async (
+    index: number,
+    candidate: ExternalAiCandidate
+  ) => {
+    setRelatedByCandidate((current) => ({
+      ...current,
+      [index]: {
+        loading: true,
+        threads: current[index]?.threads ?? [],
+      },
+    }));
+
+    try {
+      const response = await fetch("/api/forum/search-related", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: [candidate.title, candidate.question, candidate.ai_answer]
+            .filter(Boolean)
+            .join("\n\n"),
+          claim: candidate.question || candidate.title,
+          premises: safeItems(candidate.premises),
+          reasons: safeItems(candidate.reasons),
+        }),
+      });
+
+      const data: unknown = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message = isRecord(data)
+          ? toText(data.error) || "類似スレッドを確認できませんでした。"
+          : "類似スレッドを確認できませんでした。";
+        throw new Error(message);
+      }
+
+      const threads = isRecord(data) && Array.isArray(data.threads)
+        ? data.threads
+            .map(normalizeRelatedThread)
+            .filter((thread): thread is RelatedThread => Boolean(thread))
+        : [];
+
+      setRelatedByCandidate((current) => ({
+        ...current,
+        [index]: {
+          loading: false,
+          threads,
+        },
+      }));
+    } catch (searchError) {
+      setRelatedByCandidate((current) => ({
+        ...current,
+        [index]: {
+          loading: false,
+          threads: [],
+          error:
+            searchError instanceof Error
+              ? searchError.message
+              : "類似スレッドを確認できませんでした。",
+        },
+      }));
+    }
+  };
+
   const handleCopyPrompt = async () => {
     setCopyMessage("");
 
@@ -396,6 +493,7 @@ export default function ExternalAiImportModal({
       if (!Array.isArray(parsed)) {
         setCandidates([]);
         setSubmitResults({});
+        setRelatedByCandidate({});
         setError("JSONは配列形式で貼り付けてください。");
         return;
       }
@@ -410,12 +508,14 @@ export default function ExternalAiImportModal({
       if (normalized.length === 0) {
         setCandidates([]);
         setSubmitResults({});
+        setRelatedByCandidate({});
         setError("投稿候補として読める項目がありません。title / question / ai_answer のいずれかを含めてください。");
         return;
       }
 
       setCandidates(normalized);
       setSubmitResults({});
+      setRelatedByCandidate({});
       setSubmitError("");
       if (parsed.length > MAX_CANDIDATES) {
         setNotice(`最大${MAX_CANDIDATES}件まで読み取りました。`);
@@ -425,6 +525,7 @@ export default function ExternalAiImportModal({
     } catch {
       setCandidates([]);
       setSubmitResults({});
+      setRelatedByCandidate({});
       setError(
         "これはJSON形式ではありません。\nこの欄には、外部AIが出力したJSON配列を貼り付けてください。\n会話ログをそのまま貼る場合は、上のプロンプトをあなたのChatGPTや外部AIに貼り、返ってきたJSONだけをここに貼り付けてください。"
       );
@@ -611,6 +712,7 @@ export default function ExternalAiImportModal({
                   setNotice("");
                   setSubmitError("");
                   setSubmitResults({});
+                  setRelatedByCandidate({});
                 }}
                 style={buttonStyle}
               >
@@ -887,7 +989,118 @@ export default function ExternalAiImportModal({
                       >
                         {candidate.isEditing ? "編集を閉じる" : "編集する"}
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSearchRelatedThreads(index, candidate)}
+                        disabled={Boolean(relatedByCandidate[index]?.loading)}
+                        style={{
+                          ...buttonStyle,
+                          background: "#f8fafc",
+                          color: "#0f172a",
+                          borderColor: "#cbd5e1",
+                        }}
+                      >
+                        {relatedByCandidate[index]?.loading
+                          ? "確認中..."
+                          : "類似スレッドを確認"}
+                      </button>
                     </div>
+
+                    {relatedByCandidate[index] && (
+                      <div
+                        style={{
+                          marginTop: 12,
+                          border: "1px solid #cbd5e1",
+                          borderRadius: 8,
+                          padding: 12,
+                          background: "#f8fafc",
+                          color: "#111827",
+                          lineHeight: 1.7,
+                        }}
+                      >
+                        <div style={{ fontWeight: 900, marginBottom: 4 }}>
+                          近い可能性がある既存スレッド
+                        </div>
+                        <div
+                          style={{
+                            color: "#64748b",
+                            fontSize: 13,
+                            marginBottom: 10,
+                          }}
+                        >
+                          完全一致とは限りません。内容を確認して、新規投稿するか判断してください。今回は確認のみです。
+                        </div>
+                        {relatedByCandidate[index].error ? (
+                          <div style={{ color: "#991b1b", fontWeight: 800 }}>
+                            {relatedByCandidate[index].error}
+                          </div>
+                        ) : relatedByCandidate[index].loading ? (
+                          <div style={{ color: "#475569", fontWeight: 800 }}>
+                            類似スレッドを確認しています...
+                          </div>
+                        ) : relatedByCandidate[index].threads.length > 0 ? (
+                          <div style={{ display: "grid", gap: 8 }}>
+                            {relatedByCandidate[index].threads.map((thread) => (
+                              <div
+                                key={thread.id}
+                                style={{
+                                  border: "1px solid #e2e8f0",
+                                  borderRadius: 8,
+                                  padding: 10,
+                                  background: "#ffffff",
+                                  color: "#111827",
+                                }}
+                              >
+                                <div style={{ fontWeight: 900 }}>
+                                  {thread.title}
+                                </div>
+                                {thread.category && (
+                                  <div
+                                    style={{
+                                      color: "#64748b",
+                                      fontSize: 13,
+                                      marginTop: 2,
+                                    }}
+                                  >
+                                    {thread.category}
+                                  </div>
+                                )}
+                                {(thread.ai_summary || thread.reason) && (
+                                  <div
+                                    style={{
+                                      marginTop: 6,
+                                      color: "#334155",
+                                      fontSize: 13,
+                                    }}
+                                  >
+                                    {thread.ai_summary || thread.reason}
+                                  </div>
+                                )}
+                                <a
+                                  href={`/${tenant}/forum/thread/${thread.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    display: "inline-block",
+                                    marginTop: 8,
+                                    color: "#0369a1",
+                                    fontWeight: 900,
+                                    textDecoration: "underline",
+                                    textUnderlineOffset: 3,
+                                  }}
+                                >
+                                  開く
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={{ color: "#475569", fontWeight: 800 }}>
+                            近い既存スレッドは見つかりませんでした。必要なら新規投稿してください。
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {submitResults[index] && (
                       <div
