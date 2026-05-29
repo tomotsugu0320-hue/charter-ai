@@ -1001,6 +1001,7 @@ export default function ForumPage() {
       <ExternalAiImportModal
         isOpen={isExternalAiImportOpen}
         onClose={() => setIsExternalAiImportOpen(false)}
+        tenant={tenant}
       />
 
       <header style={{ ...darkPanelStyle, marginBottom: 18 }}>

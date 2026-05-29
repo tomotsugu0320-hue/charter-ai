@@ -22,6 +22,14 @@ type ExternalAiCandidate = {
 type ExternalAiImportModalProps = {
   isOpen: boolean;
   onClose: () => void;
+  tenant: string;
+};
+
+type SubmitResult = {
+  status: "success" | "error";
+  threadId?: string;
+  url?: string;
+  error?: string;
 };
 
 const MAX_CANDIDATES = 20;
@@ -163,6 +171,21 @@ function normalizeCandidate(value: unknown): ExternalAiCandidate | null {
   };
 }
 
+function safeItems(items: string[] | undefined) {
+  return Array.isArray(items) ? items.filter(Boolean) : [];
+}
+
+function buildCandidateClaim(candidate: ExternalAiCandidate) {
+  const supplements = safeItems(candidate.supplements);
+  const parts = [
+    candidate.question,
+    candidate.ai_answer ? `AI回答・整理:\n${candidate.ai_answer}` : "",
+    supplements.length ? `補足:\n${supplements.join("\n")}` : "",
+  ].filter(Boolean);
+
+  return parts.join("\n\n") || candidate.title || "外部AI整理からの投稿";
+}
+
 function FieldBlock({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -192,12 +215,18 @@ function ListBlock({ label, items }: { label: string; items: string[] }) {
 export default function ExternalAiImportModal({
   isOpen,
   onClose,
+  tenant,
 }: ExternalAiImportModalProps) {
   const [jsonInput, setJsonInput] = useState("");
   const [candidates, setCandidates] = useState<ExternalAiCandidate[]>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [copyMessage, setCopyMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [submitResults, setSubmitResults] = useState<Record<number, SubmitResult>>(
+    {}
+  );
 
   const selectedCount = useMemo(
     () => candidates.filter((candidate) => candidate.status === "post").length,
@@ -215,6 +244,90 @@ export default function ExternalAiImportModal({
         candidateIndex === index ? { ...candidate, ...patch } : candidate
       )
     );
+  };
+
+  const submitCandidate = async (
+    candidate: ExternalAiCandidate
+  ): Promise<SubmitResult> => {
+    const risks = safeItems(candidate.risks);
+    const body = {
+      tenantSlug: tenant,
+      title: candidate.title || candidate.question || "外部AI整理からの投稿",
+      claim: buildCandidateClaim(candidate),
+      premises: safeItems(candidate.premises),
+      reasons: safeItems(candidate.reasons),
+      conflicts: risks.map((risk) => ({
+        opinion: "",
+        rebuttal: risk,
+      })),
+      postType: "auto",
+    };
+
+    try {
+      const response = await fetch("/api/forum/create-thread-from-draft", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      const data: unknown = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message = isRecord(data)
+          ? toText(data.error) || "投稿できませんでした。"
+          : "投稿できませんでした。";
+        return { status: "error", error: message };
+      }
+
+      const threadId = isRecord(data)
+        ? toText(data.threadId) || toText(data.id)
+        : "";
+
+      if (!threadId) {
+        return {
+          status: "error",
+          error: "投稿は完了しましたが、スレッドIDを取得できませんでした。",
+        };
+      }
+
+      return {
+        status: "success",
+        threadId,
+        url: `/${tenant}/forum/thread/${threadId}`,
+      };
+    } catch {
+      return {
+        status: "error",
+        error: "投稿中に通信エラーが発生しました。",
+      };
+    }
+  };
+
+  const handleSubmitSelectedCandidates = async () => {
+    const selected = candidates
+      .map((candidate, index) => ({ candidate, index }))
+      .filter(({ candidate }) => candidate.status === "post");
+
+    if (selected.length === 0) {
+      setSubmitError("投稿する候補を選んでください。");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError("");
+    setNotice("");
+
+    for (const { candidate, index } of selected) {
+      const result = await submitCandidate(candidate);
+      setSubmitResults((current) => ({
+        ...current,
+        [index]: result,
+      }));
+    }
+
+    setIsSubmitting(false);
   };
 
   const handleCopyPrompt = async () => {
@@ -238,6 +351,7 @@ export default function ExternalAiImportModal({
 
       if (!Array.isArray(parsed)) {
         setCandidates([]);
+        setSubmitResults({});
         setError("JSONは配列形式で貼り付けてください。");
         return;
       }
@@ -251,11 +365,14 @@ export default function ExternalAiImportModal({
 
       if (normalized.length === 0) {
         setCandidates([]);
+        setSubmitResults({});
         setError("投稿候補として読める項目がありません。title / question / ai_answer のいずれかを含めてください。");
         return;
       }
 
       setCandidates(normalized);
+      setSubmitResults({});
+      setSubmitError("");
       if (parsed.length > MAX_CANDIDATES) {
         setNotice(`最大${MAX_CANDIDATES}件まで読み取りました。`);
       } else {
@@ -263,6 +380,7 @@ export default function ExternalAiImportModal({
       }
     } catch {
       setCandidates([]);
+      setSubmitResults({});
       setError(
         "これはJSON形式ではありません。\nこの欄には、外部AIが出力したJSON配列を貼り付けてください。\n会話ログをそのまま貼る場合は、上のプロンプトをあなたのChatGPTや外部AIに貼り、返ってきたJSONだけをここに貼り付けてください。"
       );
@@ -390,6 +508,8 @@ export default function ExternalAiImportModal({
                   setCandidates([]);
                   setError("");
                   setNotice("");
+                  setSubmitError("");
+                  setSubmitResults({});
                 }}
                 style={buttonStyle}
               >
@@ -627,6 +747,7 @@ export default function ExternalAiImportModal({
                       <button
                         type="button"
                         onClick={() => updateCandidate(index, { status: "post" })}
+                        disabled={isSubmitting}
                         style={{
                           ...buttonStyle,
                           background:
@@ -641,6 +762,7 @@ export default function ExternalAiImportModal({
                       <button
                         type="button"
                         onClick={() => updateCandidate(index, { status: "skip" })}
+                        disabled={isSubmitting}
                         style={{
                           ...buttonStyle,
                           background:
@@ -659,31 +781,102 @@ export default function ExternalAiImportModal({
                             isEditing: !candidate.isEditing,
                           })
                         }
+                        disabled={isSubmitting}
                         style={buttonStyle}
                       >
                         {candidate.isEditing ? "編集を閉じる" : "編集する"}
                       </button>
                     </div>
+
+                    {submitResults[index] && (
+                      <div
+                        style={{
+                          marginTop: 12,
+                          border:
+                            submitResults[index].status === "success"
+                              ? "1px solid #bbf7d0"
+                              : "1px solid #fecaca",
+                          borderRadius: 8,
+                          padding: 10,
+                          background:
+                            submitResults[index].status === "success"
+                              ? "#f0fdf4"
+                              : "#fef2f2",
+                          color:
+                            submitResults[index].status === "success"
+                              ? "#166534"
+                              : "#991b1b",
+                          fontWeight: 700,
+                          lineHeight: 1.7,
+                        }}
+                      >
+                        {submitResults[index].status === "success" ? (
+                          <>
+                            投稿済み：
+                            {submitResults[index].url ? (
+                              <a
+                                href={submitResults[index].url}
+                                style={{
+                                  color: "#166534",
+                                  textDecoration: "underline",
+                                  textUnderlineOffset: 3,
+                                }}
+                              >
+                                詳しく見る
+                              </a>
+                            ) : (
+                              submitResults[index].threadId
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            投稿できませんでした：
+                            {submitResults[index].error ?? "不明なエラー"}
+                          </>
+                        )}
+                      </div>
+                    )}
                   </article>
                 ))}
               </div>
 
+              {submitError && (
+                <div
+                  style={{
+                    marginTop: 14,
+                    border: "1px solid #fecaca",
+                    borderRadius: 8,
+                    padding: 10,
+                    background: "#fef2f2",
+                    color: "#991b1b",
+                    fontWeight: 700,
+                  }}
+                >
+                  {submitError}
+                </div>
+              )}
+
               <button
                 type="button"
-                disabled
+                onClick={handleSubmitSelectedCandidates}
+                disabled={selectedCount === 0 || isSubmitting}
                 style={{
                   marginTop: 14,
                   border: "1px solid #cbd5e1",
                   borderRadius: 8,
                   padding: "10px 14px",
-                  background: "#e5e7eb",
-                  color: "#64748b",
+                  background:
+                    selectedCount === 0 || isSubmitting ? "#e5e7eb" : "#111827",
+                  color: selectedCount === 0 || isSubmitting ? "#64748b" : "#ffffff",
                   fontWeight: 800,
-                  cursor: "not-allowed",
+                  cursor: selectedCount === 0 || isSubmitting ? "not-allowed" : "pointer",
                 }}
               >
-                選択した候補を投稿（次の段階で実装）
+                {isSubmitting ? "投稿中..." : "選択した候補を投稿"}
               </button>
+              <div style={{ marginTop: 8, color: "#64748b", lineHeight: 1.6 }}>
+                category / node は第1実装では保存しません。投稿後のリンクから内容を確認できます。
+              </div>
             </section>
           )}
         </div>
