@@ -46,6 +46,13 @@ type RelatedSearchState = {
   threads: RelatedThread[];
 };
 
+type SaveReferenceState = {
+  loading: boolean;
+  saved?: boolean;
+  logId?: string;
+  error?: string;
+};
+
 const MAX_CANDIDATES = 20;
 const DEFAULT_EXTRACT_THEME = "全テーマを分類して出す";
 const THEME_PRESETS = [
@@ -254,6 +261,20 @@ function buildCandidateClaim(candidate: ExternalAiCandidate) {
   return parts.join("\n\n") || candidate.title || "外部AI整理からの投稿";
 }
 
+function buildPrivateLogCandidate(candidate: ExternalAiCandidate) {
+  return {
+    title: candidate.title,
+    question: candidate.question,
+    ai_answer: candidate.ai_answer,
+    premises: safeItems(candidate.premises),
+    reasons: safeItems(candidate.reasons),
+    risks: safeItems(candidate.risks),
+    supplements: safeItems(candidate.supplements),
+    category: candidate.category,
+    node: candidate.node,
+  };
+}
+
 function FieldBlock({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -298,6 +319,9 @@ export default function ExternalAiImportModal({
   );
   const [relatedByCandidate, setRelatedByCandidate] = useState<
     Record<number, RelatedSearchState>
+  >({});
+  const [savedReferences, setSavedReferences] = useState<
+    Record<string, SaveReferenceState>
   >({});
 
   const selectedCount = useMemo(
@@ -471,6 +495,71 @@ export default function ExternalAiImportModal({
     }
   };
 
+  const handleSaveReference = async (
+    index: number,
+    candidate: ExternalAiCandidate,
+    thread: RelatedThread
+  ) => {
+    const key = `${index}:${thread.id}`;
+    const relatedThreadUrl = `/${tenant}/forum/thread/${thread.id}`;
+
+    setSavedReferences((current) => ({
+      ...current,
+      [key]: {
+        loading: true,
+        saved: current[key]?.saved,
+      },
+    }));
+
+    try {
+      const response = await fetch("/api/forum/save-private-log", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          tenantSlug: tenant,
+          candidate: buildPrivateLogCandidate(candidate),
+          relatedThread: thread,
+          relatedThreadUrl,
+          memo: "",
+        }),
+      });
+
+      const data: unknown = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message = isRecord(data)
+          ? toText(data.error) || "保存できませんでした。"
+          : "保存できませんでした。";
+        throw new Error(message);
+      }
+
+      const log = isRecord(data) && isRecord(data.log) ? data.log : null;
+
+      setSavedReferences((current) => ({
+        ...current,
+        [key]: {
+          loading: false,
+          saved: true,
+          logId: log ? toText(log.id) : undefined,
+        },
+      }));
+    } catch (saveError) {
+      setSavedReferences((current) => ({
+        ...current,
+        [key]: {
+          loading: false,
+          saved: false,
+          error:
+            saveError instanceof Error
+              ? saveError.message
+              : "保存できませんでした。",
+        },
+      }));
+    }
+  };
+
   const handleCopyPrompt = async () => {
     setCopyMessage("");
 
@@ -494,6 +583,7 @@ export default function ExternalAiImportModal({
         setCandidates([]);
         setSubmitResults({});
         setRelatedByCandidate({});
+        setSavedReferences({});
         setError("JSONは配列形式で貼り付けてください。");
         return;
       }
@@ -509,6 +599,7 @@ export default function ExternalAiImportModal({
         setCandidates([]);
         setSubmitResults({});
         setRelatedByCandidate({});
+        setSavedReferences({});
         setError("投稿候補として読める項目がありません。title / question / ai_answer のいずれかを含めてください。");
         return;
       }
@@ -516,6 +607,7 @@ export default function ExternalAiImportModal({
       setCandidates(normalized);
       setSubmitResults({});
       setRelatedByCandidate({});
+      setSavedReferences({});
       setSubmitError("");
       if (parsed.length > MAX_CANDIDATES) {
         setNotice(`最大${MAX_CANDIDATES}件まで読み取りました。`);
@@ -526,6 +618,7 @@ export default function ExternalAiImportModal({
       setCandidates([]);
       setSubmitResults({});
       setRelatedByCandidate({});
+      setSavedReferences({});
       setError(
         "これはJSON形式ではありません。\nこの欄には、外部AIが出力したJSON配列を貼り付けてください。\n会話ログをそのまま貼る場合は、上のプロンプトをあなたのChatGPTや外部AIに貼り、返ってきたJSONだけをここに貼り付けてください。"
       );
@@ -713,6 +806,7 @@ export default function ExternalAiImportModal({
                   setSubmitError("");
                   setSubmitResults({});
                   setRelatedByCandidate({});
+                  setSavedReferences({});
                 }}
                 style={buttonStyle}
               >
@@ -1040,59 +1134,111 @@ export default function ExternalAiImportModal({
                           </div>
                         ) : relatedByCandidate[index].threads.length > 0 ? (
                           <div style={{ display: "grid", gap: 8 }}>
-                            {relatedByCandidate[index].threads.map((thread) => (
-                              <div
-                                key={thread.id}
-                                style={{
-                                  border: "1px solid #e2e8f0",
-                                  borderRadius: 8,
-                                  padding: 10,
-                                  background: "#ffffff",
-                                  color: "#111827",
-                                }}
-                              >
-                                <div style={{ fontWeight: 900 }}>
-                                  {thread.title}
-                                </div>
-                                {thread.category && (
-                                  <div
-                                    style={{
-                                      color: "#64748b",
-                                      fontSize: 13,
-                                      marginTop: 2,
-                                    }}
-                                  >
-                                    {thread.category}
-                                  </div>
-                                )}
-                                {(thread.ai_summary || thread.reason) && (
-                                  <div
-                                    style={{
-                                      marginTop: 6,
-                                      color: "#334155",
-                                      fontSize: 13,
-                                    }}
-                                  >
-                                    {thread.ai_summary || thread.reason}
-                                  </div>
-                                )}
-                                <a
-                                  href={`/${tenant}/forum/thread/${thread.id}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                            {relatedByCandidate[index].threads.map((thread) => {
+                              const saveKey = `${index}:${thread.id}`;
+                              const saveState = savedReferences[saveKey];
+
+                              return (
+                                <div
+                                  key={thread.id}
                                   style={{
-                                    display: "inline-block",
-                                    marginTop: 8,
-                                    color: "#0369a1",
-                                    fontWeight: 900,
-                                    textDecoration: "underline",
-                                    textUnderlineOffset: 3,
+                                    border: "1px solid #e2e8f0",
+                                    borderRadius: 8,
+                                    padding: 10,
+                                    background: "#ffffff",
+                                    color: "#111827",
                                   }}
                                 >
-                                  開く
-                                </a>
-                              </div>
-                            ))}
+                                  <div style={{ fontWeight: 900 }}>
+                                    {thread.title}
+                                  </div>
+                                  {thread.category && (
+                                    <div
+                                      style={{
+                                        color: "#64748b",
+                                        fontSize: 13,
+                                        marginTop: 2,
+                                      }}
+                                    >
+                                      {thread.category}
+                                    </div>
+                                  )}
+                                  {(thread.ai_summary || thread.reason) && (
+                                    <div
+                                      style={{
+                                        marginTop: 6,
+                                        color: "#334155",
+                                        fontSize: 13,
+                                      }}
+                                    >
+                                      {thread.ai_summary || thread.reason}
+                                    </div>
+                                  )}
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      flexWrap: "wrap",
+                                      gap: 10,
+                                      alignItems: "center",
+                                      marginTop: 8,
+                                    }}
+                                  >
+                                    <a
+                                      href={`/${tenant}/forum/thread/${thread.id}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{
+                                        display: "inline-block",
+                                        color: "#0369a1",
+                                        fontWeight: 900,
+                                        textDecoration: "underline",
+                                        textUnderlineOffset: 3,
+                                      }}
+                                    >
+                                      開く
+                                    </a>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleSaveReference(index, candidate, thread)
+                                      }
+                                      disabled={Boolean(saveState?.loading || saveState?.saved)}
+                                      style={{
+                                        ...buttonStyle,
+                                        padding: "6px 10px",
+                                        background: saveState?.saved
+                                          ? "#dcfce7"
+                                          : "#ffffff",
+                                        color: saveState?.saved
+                                          ? "#166534"
+                                          : "#0f172a",
+                                        borderColor: saveState?.saved
+                                          ? "#86efac"
+                                          : "#cbd5e1",
+                                      }}
+                                    >
+                                      {saveState?.loading
+                                        ? "保存中..."
+                                        : saveState?.saved
+                                          ? "保存済み"
+                                          : "参考投稿として保存"}
+                                    </button>
+                                  </div>
+                                  {saveState?.error && (
+                                    <div
+                                      style={{
+                                        marginTop: 6,
+                                        color: "#991b1b",
+                                        fontSize: 13,
+                                        fontWeight: 800,
+                                      }}
+                                    >
+                                      保存できませんでした：{saveState.error}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         ) : (
                           <div style={{ color: "#475569", fontWeight: 800 }}>
