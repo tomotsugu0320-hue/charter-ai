@@ -110,7 +110,7 @@ function sourceTypeLabel(value: string | null | undefined) {
   if (sourceType === "thread_bookmark") return "あとで読む";
   if (sourceType === "post_bookmark") return "投稿ブックマーク";
 
-  return "投稿前に保存";
+  return "投稿前保存";
 }
 
 function isReadLaterLog(log: PrivateImportLog) {
@@ -366,8 +366,8 @@ export default function PrivateLogsPage() {
       {!fetchState.loading && !fetchState.error && (
         <section style={{ display: "grid", gap: 22 }}>
           {renderLogSection(
-            "投稿前に保存したもの",
-            "まだ投稿前に保存した参考投稿はありません。",
+            "投稿前保存",
+            "まだ投稿前保存はありません。",
             prePostLogs
           )}
           {renderLogSection(
