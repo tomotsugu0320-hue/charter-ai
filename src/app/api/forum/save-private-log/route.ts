@@ -9,6 +9,13 @@ function toText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+const ALLOWED_SOURCE_TYPES = new Set([
+  "external_ai_import",
+  "external_ai_related",
+  "thread_bookmark",
+  "post_bookmark",
+]);
+
 function getOrCreateAuthorKey(req: NextRequest) {
   const cookie = req.headers.get("cookie") || "";
   const match = cookie.match(/author_key=([^;]+)/);
@@ -63,6 +70,8 @@ export async function POST(req: NextRequest) {
       body.relatedThreadUrl ?? body.related_thread_url
     );
     const memo = toText(body.memo);
+    const sourceType =
+      toText(body.sourceType ?? body.source_type) || "external_ai_import";
 
     if (!tenantSlug) {
       return NextResponse.json(
@@ -85,6 +94,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!ALLOWED_SOURCE_TYPES.has(sourceType)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid source_type" },
+        { status: 400 }
+      );
+    }
+
     const relatedThreadId = isRecord(relatedThread)
       ? toText(relatedThread.id) || null
       : null;
@@ -96,7 +112,7 @@ export async function POST(req: NextRequest) {
       .insert({
         tenant_slug: tenantSlug,
         author_key: authorKey,
-        source_type: "external_ai_import",
+        source_type: sourceType,
         candidate,
         related_thread: relatedThread,
         related_thread_id: relatedThreadId,
@@ -104,7 +120,7 @@ export async function POST(req: NextRequest) {
         memo: memo || null,
         status: "saved",
       })
-      .select("id, status, related_thread_id, created_at")
+      .select("id, status, source_type, related_thread_id, created_at")
       .single();
 
     if (error) {
