@@ -1154,6 +1154,21 @@ export default function ForumPage() {
           >
             自分のChatGPTや外部AIで整理した内容から、複数の投稿候補を確認できます。
           </div>
+          <Link
+            href={`/${tenant}/forum/private-logs`}
+            style={{
+              ...ghostButtonStyle,
+              display: "inline-flex",
+              alignItems: "center",
+              background: "#e0f2fe",
+              color: "#075985",
+              borderColor: "#7dd3fc",
+              flexShrink: 0,
+              textDecoration: "none",
+            }}
+          >
+            保存済み参考投稿を見る
+          </Link>
           <button
             type="button"
             onClick={() => setIsExternalAiImportOpen(true)}
