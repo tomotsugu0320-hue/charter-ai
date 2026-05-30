@@ -272,6 +272,7 @@ export default function PrivateLogsPage() {
     const aiAnswer = compactText(candidate.ai_answer);
     const category = toText(candidate.category);
     const node = toText(candidate.node);
+    const sourceAi = toText(candidate.source_ai);
     const relatedTitle =
       toText(relatedThread.title) || "参考スレッド";
     const relatedReason = compactText(relatedThread.reason);
@@ -292,6 +293,9 @@ export default function PrivateLogsPage() {
         >
           <span style={pillStyle}>{sourceTypeLabel(log.source_type)}</span>
           <span style={pillStyle}>保存日時 {formatDate(log.created_at)}</span>
+          {sourceAi && sourceAi !== "未指定" && (
+            <span style={pillStyle}>整理元AI：{sourceAi}</span>
+          )}
           {category && <span style={pillStyle}>カテゴリ {category}</span>}
           {node && <span style={pillStyle}>ノード {node}</span>}
         </div>

@@ -15,6 +15,7 @@ type ExternalAiCandidate = {
   supplements: string[];
   category: string;
   node: string;
+  source_ai: string;
   status: CandidateStatus;
   isEditing: boolean;
 };
@@ -62,6 +63,16 @@ const THEME_PRESETS = [
   { label: "AI・テクノロジー", value: "AI・テクノロジーの話だけ抜き取る" },
   { label: "生活", value: "生活に関する話だけ抜き取る" },
   { label: "全テーマを分類", value: DEFAULT_EXTRACT_THEME },
+];
+
+const SOURCE_AI_OPTIONS = [
+  "未指定",
+  "ChatGPT",
+  "Gemini",
+  "Claude",
+  "Grok",
+  "Perplexity",
+  "その他",
 ];
 
 function buildExternalAiPrompt(extractTheme: string) {
@@ -226,6 +237,7 @@ function normalizeCandidate(value: unknown): ExternalAiCandidate | null {
     supplements: toTextArray(record.supplements),
     category: toText(record.category),
     node: toText(record.node),
+    source_ai: toText(record.source_ai) || "未指定",
     status: "unselected",
     isEditing: false,
   };
@@ -272,6 +284,7 @@ function buildPrivateLogCandidate(candidate: ExternalAiCandidate) {
     supplements: safeItems(candidate.supplements),
     category: candidate.category,
     node: candidate.node,
+    source_ai: candidate.source_ai || "未指定",
   };
 }
 
@@ -312,6 +325,7 @@ export default function ExternalAiImportModal({
   const [notice, setNotice] = useState("");
   const [copyMessage, setCopyMessage] = useState("");
   const [extractTheme, setExtractTheme] = useState("");
+  const [sourceAi, setSourceAi] = useState("未指定");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitResults, setSubmitResults] = useState<Record<number, SubmitResult>>(
@@ -594,7 +608,11 @@ export default function ExternalAiImportModal({
         .map(normalizeCandidate)
         .filter((candidate): candidate is ExternalAiCandidate =>
           Boolean(candidate)
-        );
+        )
+        .map((candidate) => ({
+          ...candidate,
+          source_ai: sourceAi || "未指定",
+        }));
 
       if (normalized.length === 0) {
         setCandidates([]);
@@ -733,6 +751,43 @@ export default function ExternalAiImportModal({
                 placeholder="例：消費税と飲食店の話だけ / 恋愛相談だけ / AI掲示板開発の話だけ"
                 style={inputStyle}
               />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label htmlFor="external-ai-source-ai" style={labelStyle}>
+                整理に使ったAI
+              </label>
+              <div
+                style={{
+                  marginBottom: 8,
+                  color: "#64748b",
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                }}
+              >
+                外部AIで整理した投稿候補を、あとで見返す時の目印にできます。
+              </div>
+              <select
+                id="external-ai-source-ai"
+                value={sourceAi}
+                onChange={(event) => {
+                  const nextSourceAi = event.target.value || "未指定";
+                  setSourceAi(nextSourceAi);
+                  setCandidates((current) =>
+                    current.map((candidate) => ({
+                      ...candidate,
+                      source_ai: nextSourceAi,
+                    }))
+                  );
+                }}
+                style={inputStyle}
+              >
+                {SOURCE_AI_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div
