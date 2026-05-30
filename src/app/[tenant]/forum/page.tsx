@@ -1089,6 +1089,35 @@ export default function ForumPage() {
         </div>
       </header>
 
+      <section
+        style={{
+          border: "1px solid #fde68a",
+          borderRadius: 10,
+          background: "#fffbeb",
+          color: "#78350f",
+          marginBottom: 18,
+          padding: "12px 14px",
+          lineHeight: 1.7,
+        }}
+      >
+        <h2
+          style={{
+            margin: "0 0 6px",
+            color: "#78350f",
+            fontSize: 16,
+            fontWeight: 900,
+          }}
+        >
+          β版として試験公開中です
+        </h2>
+        <p style={{ margin: 0 }}>
+          このForumは現在β版です。投稿内容は公開されます。外部AI取り込みを使う場合も、個人名・住所・連絡先・第三者が特定される情報などは貼り付けないでください。保存済み参考投稿は、同じブラウザの author_key をもとに表示される簡易保存です。今後、仕様変更や表示調整が入る可能性があります。
+        </p>
+        <p style={{ margin: "6px 0 0", color: "#92400e" }}>
+          不具合を見つけた場合は、画面や操作内容を控えて管理者へ共有してください。
+        </p>
+      </section>
+
       <section style={{ ...panelStyle, marginBottom: 18 }}>
         <div
           style={{
