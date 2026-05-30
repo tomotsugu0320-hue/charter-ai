@@ -24,6 +24,11 @@ type FetchState = {
   error: string;
 };
 
+type ArchiveState = {
+  loading: boolean;
+  error: string;
+};
+
 const pageStyle: CSSProperties = {
   maxWidth: 1040,
   margin: "0 auto",
@@ -146,6 +151,9 @@ export default function PrivateLogsPage() {
     loading: true,
     error: "",
   });
+  const [archiveStates, setArchiveStates] = useState<
+    Record<string, ArchiveState>
+  >({});
 
   useEffect(() => {
     let cancelled = false;
@@ -205,6 +213,57 @@ export default function PrivateLogsPage() {
     [sortedLogs]
   );
 
+  async function handleArchiveLog(logId: string) {
+    const shouldArchive = window.confirm("この保存を解除しますか？");
+
+    if (!shouldArchive) return;
+
+    setArchiveStates((current) => ({
+      ...current,
+      [logId]: {
+        loading: true,
+        error: "",
+      },
+    }));
+
+    try {
+      const response = await fetch(
+        `/api/forum/private-import-logs/${encodeURIComponent(logId)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ tenantSlug: tenant }),
+        }
+      );
+      const data: unknown = await response.json().catch(() => null);
+      const record = isRecord(data) ? data : {};
+
+      if (!response.ok || record.success === false) {
+        throw new Error(toText(record.error) || "保存解除できませんでした。");
+      }
+
+      setLogs((current) => current.filter((log) => log.id !== logId));
+      setArchiveStates((current) => {
+        const next = { ...current };
+        delete next[logId];
+        return next;
+      });
+    } catch (error) {
+      setArchiveStates((current) => ({
+        ...current,
+        [logId]: {
+          loading: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "保存解除できませんでした。",
+        },
+      }));
+    }
+  }
+
   function renderLogCard(log: PrivateImportLog) {
     const candidate = isRecord(log.candidate) ? log.candidate : {};
     const relatedThread = isRecord(log.related_thread) ? log.related_thread : {};
@@ -218,6 +277,7 @@ export default function PrivateLogsPage() {
     const relatedReason = compactText(relatedThread.reason);
     const relatedSummary = compactText(relatedThread.ai_summary);
     const relatedUrl = toText(log.related_thread_url);
+    const archiveState = archiveStates[log.id];
 
     return (
       <article key={log.id} style={cardStyle}>
@@ -279,6 +339,31 @@ export default function PrivateLogsPage() {
               >
                 関連スレッドを開く
               </Link>
+            </div>
+          )}
+
+          <div>
+            <button
+              type="button"
+              onClick={() => handleArchiveLog(log.id)}
+              disabled={Boolean(archiveState?.loading)}
+              style={{
+                border: "1px solid #cbd5e1",
+                borderRadius: 8,
+                background: "#ffffff",
+                color: "#334155",
+                padding: "8px 11px",
+                fontWeight: 900,
+                cursor: archiveState?.loading ? "not-allowed" : "pointer",
+              }}
+            >
+              {archiveState?.loading ? "解除中..." : "保存解除"}
+            </button>
+          </div>
+
+          {archiveState?.error && (
+            <div style={{ color: "#991b1b", fontWeight: 800 }}>
+              保存解除できませんでした：{archiveState.error}
             </div>
           )}
 
