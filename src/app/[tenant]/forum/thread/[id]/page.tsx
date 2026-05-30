@@ -645,6 +645,11 @@ const [summaryNotice, setSummaryNotice] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [searchText, setSearchText] = useState("");
   const [copied, setCopied] = useState(false);
+  const [bookmarkSaveState, setBookmarkSaveState] = useState({
+    loading: false,
+    saved: false,
+    error: "",
+  });
 
   const [selectedGuide, setSelectedGuide] = useState<{
     type: "論点" | "前提" | "根拠";
@@ -1281,6 +1286,71 @@ const conflictSectionTitle = displayConflicts.some(
   : "主な対立";
 */
 
+  async function handleSaveThreadBookmark() {
+    if (!thread || !tenant) return;
+
+    setBookmarkSaveState({
+      loading: true,
+      saved: false,
+      error: "",
+    });
+
+    try {
+      const response = await fetch("/api/forum/save-private-log", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          tenantSlug: tenant,
+          sourceType: "thread_bookmark",
+          candidate: {
+            title: thread.title,
+            question: thread.original_post || "",
+            ai_answer:
+              summary?.provisional_answer || summary?.summary_text || "",
+            category: thread.category || "",
+            node: "",
+          },
+          relatedThread: {
+            id: thread.id,
+            title: thread.title,
+            category: thread.category || "",
+            ai_summary:
+              summary?.summary_text || summary?.provisional_answer || "",
+            reason: "スレッド詳細ページからあとで読むに保存",
+          },
+          relatedThreadUrl: `/${tenant}/forum/thread/${thread.id}`,
+          memo: "",
+        }),
+      });
+
+      const result = (await response.json().catch(() => null)) as {
+        success?: boolean;
+        error?: string;
+      } | null;
+
+      if (!response.ok || result?.success === false) {
+        throw new Error(result?.error || "保存できませんでした。");
+      }
+
+      setBookmarkSaveState({
+        loading: false,
+        saved: true,
+        error: "",
+      });
+    } catch (bookmarkError) {
+      setBookmarkSaveState({
+        loading: false,
+        saved: false,
+        error:
+          bookmarkError instanceof Error
+            ? bookmarkError.message
+            : "保存できませんでした。",
+      });
+    }
+  }
+
   async function handleShare() {
     const url = window.location.href;
 
@@ -1656,6 +1726,26 @@ function jumpToMainIssues() {
 >
   X
 </LinkButton>
+
+  <PrimaryButton
+    onClick={(e) => {
+      e.stopPropagation();
+      handleSaveThreadBookmark();
+    }}
+    disabled={bookmarkSaveState.loading || bookmarkSaveState.saved}
+    style={{ padding: "8px 12px" }}
+  >
+    {bookmarkSaveState.loading
+      ? "保存中..."
+      : bookmarkSaveState.saved
+      ? "保存済み"
+      : "あとで読むに保存"}
+  </PrimaryButton>
+  {bookmarkSaveState.error && (
+    <span style={{ color: "#991b1b", fontWeight: 700 }}>
+      保存できませんでした：{bookmarkSaveState.error}
+    </span>
+  )}
 
   {copied && <span style={{ color: "#2e7d32" }}>コピーした</span>}
 </div>
