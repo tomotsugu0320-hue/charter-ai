@@ -107,6 +107,44 @@ export async function POST(req: NextRequest) {
     const { authorKey, shouldSetCookie } = getOrCreateAuthorKey(req);
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
+    if (sourceType === "thread_bookmark" && relatedThreadId) {
+      const { data: existingLog, error: duplicateCheckError } = await supabase
+        .from("private_import_logs")
+        .select(
+          "id, status, source_type, related_thread_id, related_thread_url, created_at"
+        )
+        .eq("tenant_slug", tenantSlug)
+        .eq("author_key", authorKey)
+        .eq("source_type", "thread_bookmark")
+        .eq("related_thread_id", relatedThreadId)
+        .eq("status", "saved")
+        .maybeSingle();
+
+      if (duplicateCheckError) {
+        return NextResponse.json(
+          { success: false, error: duplicateCheckError.message },
+          { status: 500 }
+        );
+      }
+
+      if (existingLog) {
+        const response = NextResponse.json({
+          success: true,
+          duplicated: true,
+          log: existingLog,
+        });
+
+        if (shouldSetCookie) {
+          response.headers.set(
+            "Set-Cookie",
+            `author_key=${authorKey}; Path=/; Max-Age=31536000; SameSite=Lax`
+          );
+        }
+
+        return response;
+      }
+    }
+
     const { data, error } = await supabase
       .from("private_import_logs")
       .insert({
