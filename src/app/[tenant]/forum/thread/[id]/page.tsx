@@ -1664,6 +1664,14 @@ function jumpToMainIssues() {
               {thread.title}
             </h1>
   {mainDeletablePost && (
+    <div
+      style={{
+        display: "grid",
+        justifyItems: "end",
+        gap: 4,
+        flex: "0 1 260px",
+      }}
+    >
     <PrimaryButton
       onClick={(e) => {
         e.stopPropagation();
@@ -1678,6 +1686,17 @@ function jumpToMainIssues() {
     >
       この投稿を非表示にする
     </PrimaryButton>
+      <span
+        style={{
+          color: "#64748b",
+          fontSize: currentFont.base * 0.82,
+          lineHeight: 1.5,
+          textAlign: "right",
+        }}
+      >
+        完全削除は管理者のみ、管理画面から行えます。
+      </span>
+    </div>
   )}
 </div>
 <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
