@@ -43,20 +43,95 @@ type Conflict = {
   rebuttal?: string;
 };
 
+const MAX_THREAD_TITLE_LENGTH = 120;
+const MAX_DRAFT_CLAIM_LENGTH = 12000;
+const MAX_DRAFT_TOTAL_LENGTH = 12000;
+const MAX_DRAFT_ARRAY_ITEMS = 20;
+const MAX_DRAFT_ITEM_LENGTH = 1000;
+const MAX_DRAFT_CONFLICT_ITEM_LENGTH = 1500;
+
+function textLength(value: unknown) {
+  return String(value ?? "").trim().length;
+}
+
+function conflictTextLength(conflict: Conflict) {
+  return textLength(conflict?.opinion) + textLength(conflict?.rebuttal);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
     const title = String(body?.title || "").trim();
     const claim = String(body?.claim || "").trim();
-    const premises = Array.isArray(body?.premises) ? body.premises : [];
-    const reasons = Array.isArray(body?.reasons) ? body.reasons : [];
+    const premises: unknown[] = Array.isArray(body?.premises) ? body.premises : [];
+    const reasons: unknown[] = Array.isArray(body?.reasons) ? body.reasons : [];
     const conflicts: Conflict[] = Array.isArray(body?.conflicts) ? body.conflicts : [];
     const postType = body?.postType === "auto" ? "auto" : "human";
 
     if (!title || !claim) {
       return NextResponse.json(
         { success: false, error: "title and claim are required" },
+        { status: 400 }
+      );
+    }
+
+    if (title.length > MAX_THREAD_TITLE_LENGTH) {
+      return NextResponse.json(
+        { success: false, error: "タイトルは120文字以内にしてください。" },
+        { status: 400 }
+      );
+    }
+
+    if (claim.length > MAX_DRAFT_CLAIM_LENGTH) {
+      return NextResponse.json(
+        { success: false, error: "投稿候補の本文が長すぎます。短くしてから投稿してください。" },
+        { status: 400 }
+      );
+    }
+
+    if (
+      premises.length > MAX_DRAFT_ARRAY_ITEMS ||
+      reasons.length > MAX_DRAFT_ARRAY_ITEMS ||
+      conflicts.length > MAX_DRAFT_ARRAY_ITEMS
+    ) {
+      return NextResponse.json(
+        { success: false, error: "前提・根拠・反論は各20件以内にしてください。" },
+        { status: 400 }
+      );
+    }
+
+    if (
+      premises.some((premise) => textLength(premise) > MAX_DRAFT_ITEM_LENGTH) ||
+      reasons.some((reason) => textLength(reason) > MAX_DRAFT_ITEM_LENGTH)
+    ) {
+      return NextResponse.json(
+        { success: false, error: "前提・根拠の各項目は1000文字以内にしてください。" },
+        { status: 400 }
+      );
+    }
+
+    if (
+      conflicts.some(
+        (conflict) => conflictTextLength(conflict) > MAX_DRAFT_CONFLICT_ITEM_LENGTH
+      )
+    ) {
+      return NextResponse.json(
+        { success: false, error: "反論・リスクの各項目は1500文字以内にしてください。" },
+        { status: 400 }
+      );
+    }
+
+    const totalDraftLength =
+      title.length +
+      claim.length +
+      premises.reduce<number>((sum, premise) => sum + textLength(premise), 0) +
+      reasons.reduce<number>((sum, reason) => sum + textLength(reason), 0) +
+      conflicts.reduce<number>((sum, conflict) => sum + conflictTextLength(conflict), 0);
+
+    if (totalDraftLength > MAX_DRAFT_TOTAL_LENGTH) {
+      return NextResponse.json(
+        { success: false, error: "投稿候補の内容が長すぎます。短くしてから投稿してください。" },
         { status: 400 }
       );
     }

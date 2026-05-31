@@ -117,6 +117,8 @@ const ALLOWED_STANCE_LABELS = [
 
 type AllowedStanceLabel = (typeof ALLOWED_STANCE_LABELS)[number];
 
+const MAX_POST_CONTENT_LENGTH = 3000;
+
 
 function isAllowedPostRole(value: string): value is AllowedPostRole {
   return ALLOWED_POST_ROLES.includes(value as AllowedPostRole);
@@ -433,6 +435,13 @@ const predictionResult = predictionFlag
 
     if (!content) {
       return NextResponse.json({ success: false, error: "content is required" }, { status: 400 });
+    }
+
+    if (content.length > MAX_POST_CONTENT_LENGTH) {
+      return NextResponse.json(
+        { success: false, error: "投稿本文は3000文字以内にしてください。" },
+        { status: 400 }
+      );
     }
 
 if (!isAllowedPostRole(postRole)) {
