@@ -21,6 +21,23 @@ function makeSlug(input: string) {
   return `${base || fallback}-${random}`;
 }
 
+function getOrCreateAuthorKey(req: NextRequest) {
+  const cookie = req.headers.get("cookie") || "";
+  const match = cookie.match(/author_key=([^;]+)/);
+
+  if (match?.[1]) {
+    return {
+      authorKey: match[1],
+      shouldSetCookie: false,
+    };
+  }
+
+  return {
+    authorKey: "u_" + Math.random().toString(36).slice(2, 10),
+    shouldSetCookie: true,
+  };
+}
+
 type Conflict = {
   opinion?: string;
   rebuttal?: string;
@@ -72,6 +89,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const { authorKey, shouldSetCookie } = getOrCreateAuthorKey(req);
+
     const { data: thread, error: threadError } = await supabase
       .from("forum_threads")
       .insert({
@@ -110,7 +129,7 @@ export async function POST(req: NextRequest) {
       post_role: "issue_raise",
       trust_status: "trusted",
       logic_score: 70,
-      author_key: "system",
+      author_key: authorKey,
     },
     ];
 
@@ -125,7 +144,7 @@ export async function POST(req: NextRequest) {
         post_role: "supplement",
         trust_status: "trusted",
         logic_score: 85,
-        author_key: "system",
+        author_key: authorKey,
       });
     }
 
@@ -139,7 +158,7 @@ export async function POST(req: NextRequest) {
         post_role: "explanation",
         trust_status: "trusted",
         logic_score: 90,
-        author_key: "system",
+        author_key: authorKey,
       });
     }
 
@@ -156,7 +175,7 @@ export async function POST(req: NextRequest) {
           post_role: "opinion",
           trust_status: "trusted",
           logic_score: 75,
-          author_key: "system",
+          author_key: authorKey,
         });
       }
 
@@ -168,7 +187,7 @@ export async function POST(req: NextRequest) {
           post_role: "rebuttal",
           trust_status: "trusted",
           logic_score: 95,
-          author_key: "system",
+          author_key: authorKey,
         });
       }
     }
@@ -184,10 +203,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       threadId,
     });
+
+    if (shouldSetCookie) {
+      response.headers.set(
+        "Set-Cookie",
+        `author_key=${authorKey}; Path=/; Max-Age=31536000; SameSite=Lax`
+      );
+    }
+
+    return response;
   } catch (e: any) {
     console.error("[create-thread-from-draft error]", e);
 
