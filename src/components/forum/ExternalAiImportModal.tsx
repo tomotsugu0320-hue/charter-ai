@@ -592,7 +592,11 @@ export default function ExternalAiImportModal({
     setNotice("");
 
     try {
-      const parsed: unknown = JSON.parse(jsonInput);
+      const normalizedJsonText = jsonInput
+        .replace(/[“”„＂]/g, '"')
+        .replace(/[‘’]/g, "'")
+        .trim();
+      const parsed: unknown = JSON.parse(normalizedJsonText);
 
       if (!Array.isArray(parsed)) {
         setCandidates([]);
