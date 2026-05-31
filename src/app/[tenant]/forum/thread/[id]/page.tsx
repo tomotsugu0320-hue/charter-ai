@@ -790,11 +790,7 @@ useEffect(() => {
     return (
       posts.find(
         (post) => post.post_role === "issue_raise" && post.can_delete === true
-      ) ??
-      posts.find(
-        (post) => post.post_role === "opinion" && post.can_delete === true
-      ) ??
-      null
+      ) ?? null
     );
   }, [posts]);
 
@@ -1522,7 +1518,7 @@ if (postRole === "rebuttal" && !replyToOpinionId) {
     }
   }
 
-  async function handleHidePost(postId: string) {
+  async function handleHidePost(postId: string, options?: { hideThread?: boolean }) {
     if (
       !confirm(
         "この投稿を非表示にしますか？\n※ 後から復元機能を追加予定です"
@@ -1531,8 +1527,15 @@ if (postRole === "rebuttal" && !replyToOpinionId) {
       return;
     }
 
+    const hideThread = options?.hideThread === true;
     const res = await fetch(`/api/forum/posts/${postId}/delete`, {
       method: "PATCH",
+      ...(hideThread
+        ? {
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ hideThread: true }),
+          }
+        : {}),
     });
 
     const result = await res.json().catch(() => ({}));
@@ -1675,7 +1678,7 @@ function jumpToMainIssues() {
     <PrimaryButton
       onClick={(e) => {
         e.stopPropagation();
-        void handleHidePost(mainDeletablePost.id);
+        void handleHidePost(mainDeletablePost.id, { hideThread: true });
       }}
       style={{
         padding: "8px 12px",
@@ -1684,7 +1687,7 @@ function jumpToMainIssues() {
         border: "1px solid #fecaca",
       }}
     >
-      この投稿を非表示にする
+      このスレッドを非表示にする
     </PrimaryButton>
       <span
         style={{
@@ -1694,7 +1697,7 @@ function jumpToMainIssues() {
           textAlign: "right",
         }}
       >
-        完全削除は管理者のみ、管理画面から行えます。
+        この操作ではスレッドを非表示にします。完全削除は管理者のみ、管理画面から行えます。
       </span>
     </div>
   )}

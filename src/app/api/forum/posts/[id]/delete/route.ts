@@ -36,12 +36,15 @@ export async function PATCH(req: Request, context: RouteContext) {
       );
     }
 
+    const body = await req.json().catch(() => ({}));
+    const hideThread = body?.hideThread === true;
+
     const adminKey = req.headers.get("x-admin-key") || "";
     const isAdmin = Boolean(process.env.ADMIN_KEY) && adminKey === process.env.ADMIN_KEY;
 
     const { data: post, error: postError } = await supabase
       .from("forum_posts")
-      .select("id, author_key")
+      .select("id, author_key, thread_id, post_role")
       .eq("id", id)
       .maybeSingle();
 
@@ -70,6 +73,13 @@ export async function PATCH(req: Request, context: RouteContext) {
       }
     }
 
+    if (hideThread && post.post_role !== "issue_raise") {
+      return NextResponse.json(
+        { success: false, error: "hideThread is allowed only for main posts" },
+        { status: 400 }
+      );
+    }
+
     const { error } = await supabase
       .from("forum_posts")
       .update({
@@ -86,7 +96,24 @@ export async function PATCH(req: Request, context: RouteContext) {
       );
     }
 
-    return NextResponse.json({ success: true });
+    if (hideThread) {
+      const { error: threadError } = await supabase
+        .from("forum_threads")
+        .update({
+          is_deleted: true,
+          deleted_at: new Date().toISOString(),
+        })
+        .eq("id", post.thread_id);
+
+      if (threadError) {
+        return NextResponse.json(
+          { success: false, error: threadError.message },
+          { status: 500 }
+        );
+      }
+    }
+
+    return NextResponse.json({ success: true, threadHidden: hideThread });
   } catch (error) {
     return NextResponse.json(
       {
