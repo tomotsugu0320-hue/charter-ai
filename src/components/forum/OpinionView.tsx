@@ -64,7 +64,6 @@ export default function OpinionView({
   feedbackLoadingPostId,
   handleFeedback,
   onHidePost,
-  currentAuthorKey,
 }: any) {
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
   const [visibleOpinionCount, setVisibleOpinionCount] = useState(
@@ -349,7 +348,6 @@ export default function OpinionView({
             feedbackLoadingPostId={feedbackLoadingPostId}
             handleFeedback={handleFeedback}
             onHidePost={onHidePost}
-            currentAuthorKey={currentAuthorKey}
           />
         </div>
       ) : (

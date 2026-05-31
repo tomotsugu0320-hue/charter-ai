@@ -65,6 +65,19 @@ function asStringArray(value: unknown) {
   return [];
 }
 
+function getAuthorKey(req: NextRequest) {
+  const cookie = req.headers.get("cookie") || "";
+  const match = cookie.match(/author_key=([^;]+)/);
+
+  if (!match?.[1]) return "";
+
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
+
 function buildCounts(posts: ForumPostForSummary[]) {
   const counts = {
     total: posts.length,
@@ -237,6 +250,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const cookieAuthorKey = getAuthorKey(req);
+
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const supabaseKey =
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -374,16 +389,21 @@ if (!thread) {
       }
     });
 
-    const postsWithFeedback = (posts ?? []).map((post: any) => ({
-      ...post,
-      feedback_counts: feedbackMap[post.id] ?? {
-        term_unknown: 0,
-        premise_unknown: 0,
-        conclusion_unknown: 0,
-        evidence_unknown: 0,
-        counterargument_unknown: 0,
-      },
-    }));
+    const postsWithFeedback = (posts ?? []).map((post: any) => {
+      const { author_key: postAuthorKey, ...publicPost } = post;
+
+      return {
+        ...publicPost,
+        can_delete: Boolean(cookieAuthorKey && postAuthorKey === cookieAuthorKey),
+        feedback_counts: feedbackMap[post.id] ?? {
+          term_unknown: 0,
+          premise_unknown: 0,
+          conclusion_unknown: 0,
+          evidence_unknown: 0,
+          counterargument_unknown: 0,
+        },
+      };
+    });
 
     const feedbackSummary = {
       term_unknown: 0,

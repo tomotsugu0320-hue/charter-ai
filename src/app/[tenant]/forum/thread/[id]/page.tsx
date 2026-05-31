@@ -38,7 +38,7 @@ type PostRow = {
   post_role: string;
   stance_label?: StanceLabel | null;
   content: string;
-  author_key?: string;
+  can_delete?: boolean;
   trust_status: string;
   created_at?: string;
   logic_score?: number;
@@ -521,16 +521,6 @@ function formatDate(value?: string) {
   return d.toLocaleString("ja-JP");
 }
 
-function getCookieValue(name: string) {
-  if (typeof document === "undefined") return "";
-
-  const match = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith(`${name}=`));
-
-  return match ? decodeURIComponent(match.split("=").slice(1).join("=")) : "";
-}
-
 function roleColor(role: string) {
   switch (role) {
     case "issue_raise":
@@ -611,7 +601,6 @@ export default function ForumThreadPage({ params }: PageProps) {
 
   const [tenant, setTenant] = useState("");
   const [threadId, setThreadId] = useState("");
-  const [currentAuthorKey, setCurrentAuthorKey] = useState("");
 
 
   const [sortType, setSortType] = useState<"score" | "new">("score");
@@ -630,8 +619,6 @@ useEffect(() => {
   if (saved === "easy" || saved === "normal") {
     setMode(saved);
   }
-
-  setCurrentAuthorKey(getCookieValue("author_key"));
 }, []);
 
 
@@ -999,55 +986,6 @@ const groupedByOpinion = useMemo(() => {
   });
 }, [groupedByIssue, sortType]);
 
-
-  const authorTrustMap = useMemo(() => {
-    const map: Record<
-      string,
-      {
-        total: number;
-        count: number;
-        breaks: number;
-      }
-    > = {};
-
-    posts.forEach((p) => {
-      if (!p.author_key) return;
-
-      if (!map[p.author_key]) {
-        map[p.author_key] = {
-          total: 0,
-          count: 0,
-          breaks: 0,
-        };
-      }
-
-      if ((p.logic_score ?? 0) > 0) {
-        map[p.author_key].total += p.logic_score ?? 0;
-        map[p.author_key].count += 1;
-      }
-
-      if (p.logic_break_type && p.logic_break_type !== "none") {
-        map[p.author_key].breaks += 1;
-      }
-    });
-
-    const result: Record<string, { score: number; label: string }> = {};
-
-    Object.entries(map).forEach(([key, v]) => {
-      if (v.count === 0) return;
-
-      const avg = v.total / v.count;
-      const score = Math.round(avg - v.breaks * 5);
-
-      result[key] = {
-        score,
-        label: score >= 80 ? "A" : score >= 60 ? "B" : "C",
-      };
-    });
-
-    return result;
-  }, [posts]);
-
   const bestOpinionsByIssue = useMemo(() => {
     return groupedByOpinion.map((group) => {
       const scored = group.opinions.map((op) => {
@@ -1057,15 +995,13 @@ const groupedByOpinion = useMemo(() => {
           (c) => c.post_role === "rebuttal"
         ).length;
 
-        const trustLabel = authorTrustMap[op.opinion.author_key ?? ""]?.label;
-        const bonus = trustBonus(trustLabel);
-        const effectiveScore = base - rebuttalCount * 5 + bonus;
+        const effectiveScore = base - rebuttalCount * 5;
 
         return {
           ...op,
           effectiveScore,
           rebuttalCount,
-          trustLabel: trustLabel ?? "-",
+          trustLabel: "-",
         };
       });
 
@@ -1078,7 +1014,7 @@ const groupedByOpinion = useMemo(() => {
         best: sorted[0] ?? null,
       };
     });
-  }, [groupedByOpinion, authorTrustMap]);
+  }, [groupedByOpinion]);
 
   const averageLogicScore = useMemo(() => {
     const scoredPosts = visiblePosts.filter((post) => (post.logic_score ?? 0) > 0);
@@ -1523,7 +1459,6 @@ if (postRole === "rebuttal" && !replyToOpinionId) {
       setPredictionTarget("");
       setPredictionDeadline("");
       setSelectedGuide(null);
-      setCurrentAuthorKey(getCookieValue("author_key"));
       await loadThread();
     } catch (e: any) {
       console.error(e);
@@ -2068,7 +2003,6 @@ function jumpToMainIssues() {
   feedbackLoadingPostId={feedbackLoadingPostId}
   handleFeedback={handleFeedback}
   onHidePost={handleHidePost}
-  currentAuthorKey={currentAuthorKey}
 />
 
 </div>

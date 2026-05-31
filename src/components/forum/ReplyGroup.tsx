@@ -58,7 +58,6 @@ export default function ReplyGroup({
   op,
   hideLowScore,
   onHidePost,
-  currentAuthorKey,
 }: any) {
   if (!op.children?.length) return null;
 
@@ -88,8 +87,7 @@ export default function ReplyGroup({
           const split = splitContent(child.content);
           const canHideChild =
             !!onHidePost &&
-            !!currentAuthorKey &&
-            child.author_key === currentAuthorKey;
+            child.can_delete === true;
 
           const childOpacity =
             hideLowScore && childScore > 0 && childScore < 60

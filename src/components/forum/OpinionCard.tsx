@@ -229,7 +229,6 @@ export default function OpinionCard({
   feedbackLoadingPostId,
   handleFeedback,
   onHidePost,
-  currentAuthorKey,
 }: any) {
 const score = op.opinion.logic_score;
 const numericScore =
@@ -245,9 +244,8 @@ const isLowScore =
   numericScore < 60;
   const canHideOpinion =
     !!onHidePost &&
-    !!currentAuthorKey &&
     !String(op.opinion.id).startsWith("virtual-") &&
-    op.opinion.author_key === currentAuthorKey;
+    op.opinion.can_delete === true;
 
 const displayText = op.opinion.is_sensitive
   ? "（非公開）プライバシー保護のため一部内容を表示していません"
@@ -614,7 +612,6 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
         op={op}
         hideLowScore={hideLowScore}
         onHidePost={onHidePost}
-        currentAuthorKey={currentAuthorKey}
       />
     </PostCard>
   );
