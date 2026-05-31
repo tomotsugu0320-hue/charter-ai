@@ -786,6 +786,18 @@ useEffect(() => {
     });
   }, [posts, searchText]);
 
+  const mainDeletablePost = useMemo(() => {
+    return (
+      posts.find(
+        (post) => post.post_role === "issue_raise" && post.can_delete === true
+      ) ??
+      posts.find(
+        (post) => post.post_role === "opinion" && post.can_delete === true
+      ) ??
+      null
+    );
+  }, [posts]);
+
 const handleGenerateSummary = async () => {
   try {
     setSummaryLoading(true);
@@ -1630,6 +1642,15 @@ function jumpToMainIssues() {
 
 
 <SectionCard variant="info">
+<div
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    flexWrap: "wrap",
+  }}
+>
             <h1
               style={{
                 margin: 0,
@@ -1637,10 +1658,28 @@ function jumpToMainIssues() {
                 fontWeight: 800,
                 lineHeight: 1.4,
                 color: "#111",
+                flex: "1 1 280px",
               }}
             >
               {thread.title}
             </h1>
+  {mainDeletablePost && (
+    <PrimaryButton
+      onClick={(e) => {
+        e.stopPropagation();
+        void handleHidePost(mainDeletablePost.id);
+      }}
+      style={{
+        padding: "8px 12px",
+        background: "#fef2f2",
+        color: "#991b1b",
+        border: "1px solid #fecaca",
+      }}
+    >
+      この投稿を非表示にする
+    </PrimaryButton>
+  )}
+</div>
 <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
   <PrimaryButton
     onClick={(e) => {
@@ -1676,6 +1715,7 @@ function jumpToMainIssues() {
       ? "保存済み"
       : "あとで読むに保存"}
   </PrimaryButton>
+
   {bookmarkSaveState.error && (
     <span style={{ color: "#991b1b", fontWeight: 700 }}>
       保存できませんでした：{bookmarkSaveState.error}
