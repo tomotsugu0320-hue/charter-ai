@@ -28,7 +28,7 @@ type ForumPostRow = {
   post_role: string | null;
   created_at: string | null;
   thread_id: string;
-  forum_threads: { title?: string | null; category?: string | null } | { title?: string | null; category?: string | null }[] | null;
+  forum_threads: { title?: string | null; category?: string | null; is_deleted?: boolean | null } | { title?: string | null; category?: string | null; is_deleted?: boolean | null }[] | null;
 };
 
 export async function POST(req: Request) {
@@ -59,12 +59,14 @@ export async function POST(req: Request) {
         post_role,
         created_at,
         thread_id,
-        forum_threads (
+        forum_threads!inner (
           title,
-          category
+          category,
+          is_deleted
         )
       `)
       .eq("is_deleted", false)
+      .eq("forum_threads.is_deleted", false)
       .order("created_at", { ascending: false })
       .limit(20);
 
@@ -127,6 +129,7 @@ export async function POST(req: Request) {
       let fallbackQuery = supabase
         .from("forum_threads")
         .select("id, title, category, ai_summary")
+        .eq("is_deleted", false)
         .order("created_at", { ascending: false })
         .limit(3);
 

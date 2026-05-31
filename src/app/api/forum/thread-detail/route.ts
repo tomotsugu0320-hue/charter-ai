@@ -272,6 +272,7 @@ const { data: thread, error: threadError } = await supabase
   ai_conflicts
 `)
   .eq("id", threadId)
+  .eq("is_deleted", false)
   .maybeSingle();
 
 console.log("[thread-detail] thread =", thread);
