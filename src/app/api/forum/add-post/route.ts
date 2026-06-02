@@ -589,7 +589,6 @@ const res = NextResponse.json({
     logicBreakType,
     logicBreakNote,
     insertedRows,
-    authorKey,
   },
 });
 
