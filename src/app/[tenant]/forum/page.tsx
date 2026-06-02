@@ -993,7 +993,17 @@ export default function ForumPage() {
       const result: unknown = await res.json();
 
       if (!res.ok || !isRecord(result)) {
-        throw new Error("スレッド作成に失敗しました");
+        const message = isRecord(result)
+          ? toText(
+              result.error || result.details || result.message,
+              "スレッド作成に失敗しました"
+            )
+          : "スレッド作成に失敗しました";
+        throw new Error(
+          message === "スレッド作成に失敗しました"
+            ? message
+            : `スレッド作成に失敗しました：${message}`
+        );
       }
 
       const threadId = toText(result.threadId).trim();
