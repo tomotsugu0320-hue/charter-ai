@@ -275,9 +275,6 @@ const { data: thread, error: threadError } = await supabase
   .eq("is_deleted", false)
   .maybeSingle();
 
-console.log("[thread-detail] thread =", thread);
-console.log("[thread-detail] threadError =", threadError);
-
 if (threadError) {
   return NextResponse.json(
     { success: false, error: threadError.message },
