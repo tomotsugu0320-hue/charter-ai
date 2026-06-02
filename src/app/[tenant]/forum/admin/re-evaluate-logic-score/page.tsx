@@ -331,7 +331,7 @@ export default function ReEvaluateLogicScorePage() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-admin-key": adminKey,
+        "x-admin-key": adminKey.trim(),
       },
       body: JSON.stringify({
         postId: targetPostId,
@@ -405,7 +405,7 @@ export default function ReEvaluateLogicScorePage() {
     try {
       const res = await fetch("/api/forum/admin-posts", {
         headers: {
-          "x-admin-key": adminKey,
+          "x-admin-key": adminKey.trim(),
         },
       });
 
