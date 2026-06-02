@@ -123,7 +123,7 @@ ${text}
     try {
       parsed = JSON.parse(rawText);
     } catch (e) {
-      console.error("[organize-post parse error]", rawText);
+      console.error("[organize-post parse error]");
       parsed = {
         summary: "要点整理に失敗しました。",
         postText: text,
@@ -143,7 +143,7 @@ ${text}
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("[organize-post]", error);
+    console.error("[organize-post failed]");
     return NextResponse.json(
       { error: "failed to organize post" },
       { status: 500 }
