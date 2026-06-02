@@ -203,6 +203,10 @@ export default function OpinionView({
     numericScore < 60;
   const cardOpacity = hideLowScore && isLowScore ? 0.5 : 1;
   const isHighlighted = highlightedPostId === String(op.opinion.id);
+  const canHideOpinion =
+    !!onHidePost &&
+    !String(op.opinion.id).startsWith("virtual-") &&
+    op.opinion.can_delete === true;
 
   return (
     <div
@@ -331,6 +335,28 @@ export default function OpinionView({
           >
             共有
           </button>
+          {canHideOpinion && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onHidePost(op.opinion.id);
+              }}
+              style={{
+                border: "1px solid #d1d5db",
+                borderRadius: 999,
+                background: "#ffffff",
+                color: "#6b7280",
+                cursor: "pointer",
+                fontSize: currentFont.base * 0.85,
+                fontWeight: 700,
+                padding: "4px 8px",
+                whiteSpace: "nowrap",
+              }}
+            >
+              非表示
+            </button>
+          )}
 
         </div>
       </div>
