@@ -255,6 +255,12 @@ function normalizeGeneratedIssue(value: unknown, fallbackClaim: string): Generat
   };
 }
 
+function makeDraftTitle(value: string) {
+  const trimmed = value.trim().replace(/\s+/g, " ");
+  if (trimmed.length <= 120) return trimmed;
+  return `${trimmed.slice(0, 119)}…`;
+}
+
 function normalizeThreadRow(value: unknown): ThreadRow | null {
   if (!isRecord(value)) return null;
 
@@ -969,6 +975,7 @@ export default function ForumPage() {
 
     const finalClaim =
       generatedIssue.claim.trim() || text.trim() || "新しい議論";
+    const draftTitle = makeDraftTitle(finalClaim);
 
     setCreatingThread(true);
     setActionError("");
@@ -981,7 +988,7 @@ export default function ForumPage() {
         },
         body: JSON.stringify({
           tenantSlug: tenant,
-          title: finalClaim,
+          title: draftTitle,
           claim: finalClaim,
           premises: generatedIssue.premises,
           reasons: generatedIssue.reasons,
