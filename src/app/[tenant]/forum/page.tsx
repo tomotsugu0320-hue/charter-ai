@@ -50,6 +50,14 @@ type OrganizedResult = {
   postText: string;
 };
 
+type RankingMode = "recent" | "score" | "posts";
+
+const RANKING_TABS: { value: RankingMode; label: string }[] = [
+  { value: "recent", label: "新着順" },
+  { value: "score", label: "AI論理スコア順" },
+  { value: "posts", label: "投稿数順" },
+];
+
 type DiscussionMapNode = {
   id: string;
   label: string;
@@ -669,6 +677,7 @@ export default function ForumPage() {
   const [popularThreads, setPopularThreads] = useState<ThreadRow[]>([]);
   const [activeThreads, setActiveThreads] = useState<ThreadRow[]>([]);
   const [recentThreads, setRecentThreads] = useState<ThreadRow[]>([]);
+  const [rankingMode, setRankingMode] = useState<RankingMode>("recent");
   const [defaultMode, setDefaultMode] = useState<"normal" | "easy">("normal");
   const [fontSizeMode, setFontSizeMode] =
     useState<"small" | "medium" | "large">("medium");
@@ -733,6 +742,17 @@ export default function ForumPage() {
   const visiblePopularThreads = filteredPopularThreads.slice(0, 10);
   const visibleActiveThreads = filteredActiveThreads.slice(0, 10);
   const visibleRecentThreads = filteredRecentThreads.slice(0, 10);
+  const rankingThreads = useMemo(() => {
+    if (rankingMode === "score") return filteredPopularThreads;
+    if (rankingMode === "posts") return filteredActiveThreads;
+    return filteredRecentThreads;
+  }, [
+    filteredActiveThreads,
+    filteredPopularThreads,
+    filteredRecentThreads,
+    rankingMode,
+  ]);
+  const visibleRankingThreads = rankingThreads.slice(0, 10);
   const aiSummaryThreads = useMemo(
     () =>
       filteredPopularThreads
@@ -1384,6 +1404,110 @@ export default function ForumPage() {
         {renderDiscussionMap(discussionMapRoot, discussionMapBranches, tenant, node)}
       </div>
     </section>
+
+      <section
+        style={{
+          ...panelStyle,
+          marginBottom: 22,
+          background: "#f8fafc",
+          color: "#0f172a",
+          border: "1px solid #cbd5e1",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+            alignItems: "flex-start",
+            marginBottom: 12,
+          }}
+        >
+          <div>
+            <h2 style={{ margin: 0, fontSize: 20 }}>ランキングで見る</h2>
+            <p
+              style={{
+                margin: "6px 0 0",
+                color: "#475569",
+                fontSize: currentFontSize - 2,
+                lineHeight: 1.6,
+              }}
+            >
+              新着順、AI論理スコア順、投稿数順を切り替えて議論を探せます。
+            </p>
+          </div>
+          <span
+            style={{
+              border: "1px solid #cbd5e1",
+              borderRadius: 999,
+              padding: "4px 10px",
+              background: "#ffffff",
+              color: "#334155",
+              fontSize: 12,
+              fontWeight: 800,
+              whiteSpace: "nowrap",
+            }}
+          >
+            最大10件
+          </span>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 8,
+            marginBottom: 12,
+          }}
+        >
+          {RANKING_TABS.map((tab) => {
+            const selected = rankingMode === tab.value;
+
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => setRankingMode(tab.value)}
+                aria-pressed={selected}
+                style={{
+                  ...ghostButtonStyle,
+                  background: selected ? "#111827" : "#ffffff",
+                  color: selected ? "#ffffff" : "#111827",
+                  borderColor: selected ? "#111827" : "#cbd5e1",
+                }}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+            gap: 12,
+          }}
+        >
+          {visibleRankingThreads.length > 0 ? (
+            visibleRankingThreads.map((thread, index) => (
+              <ThreadCard
+                key={`ranking-${rankingMode}-${thread.id}`}
+                thread={thread}
+                tenant={tenant}
+                currentFontSize={currentFontSize}
+                isFeatured={index === 0 && !hasFilter}
+              />
+            ))
+          ) : (
+            <div style={{ ...panelStyle, color: "#475569" }}>
+              条件に合うランキング対象はありません。
+            </div>
+          )}
+        </div>
+      </section>
 
       <section
         style={{
