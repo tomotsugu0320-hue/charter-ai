@@ -1397,7 +1397,7 @@ export default function ExternalAiImportModal({
                 {isSubmitting ? "投稿中..." : "選択した候補を投稿"}
               </button>
               <div style={{ marginTop: 8, color: "#64748b", lineHeight: 1.6 }}>
-                category / node は第1実装では保存しません。投稿後のリンクから内容を確認できます。
+                カテゴリと論点タグは参考表示です。投稿後のリンクから内容を確認できます。
               </div>
             </section>
           )}
