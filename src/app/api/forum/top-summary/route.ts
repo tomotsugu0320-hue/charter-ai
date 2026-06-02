@@ -147,10 +147,19 @@ export async function GET() {
       })
       .slice(0, 8);
 
+    const recentThreads = [...threadStats]
+      .sort(
+        (a, b) =>
+          new Date(b.created_at ?? 0).getTime() -
+          new Date(a.created_at ?? 0).getTime()
+      )
+      .slice(0, 10);
+
     return NextResponse.json({
       success: true,
       popularThreads,
       activeThreads,
+      recentThreads,
     });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "error";

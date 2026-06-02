@@ -668,6 +668,7 @@ export default function ForumPage() {
 
   const [popularThreads, setPopularThreads] = useState<ThreadRow[]>([]);
   const [activeThreads, setActiveThreads] = useState<ThreadRow[]>([]);
+  const [recentThreads, setRecentThreads] = useState<ThreadRow[]>([]);
   const [defaultMode, setDefaultMode] = useState<"normal" | "easy">("normal");
   const [fontSizeMode, setFontSizeMode] =
     useState<"small" | "medium" | "large">("medium");
@@ -690,12 +691,12 @@ export default function ForumPage() {
   const allThreads = useMemo(() => {
     const map = new Map<string, ThreadRow>();
 
-    for (const thread of [...popularThreads, ...activeThreads]) {
+    for (const thread of [...popularThreads, ...activeThreads, ...recentThreads]) {
       map.set(thread.id, thread);
     }
 
     return Array.from(map.values());
-  }, [activeThreads, popularThreads]);
+  }, [activeThreads, popularThreads, recentThreads]);
 
   const categoryOptions = useMemo(() => {
     const categories = allThreads
@@ -721,8 +722,17 @@ export default function ForumPage() {
     [activeThreads, categoryFilter, searchQuery]
   );
 
+  const filteredRecentThreads = useMemo(
+    () =>
+      recentThreads.filter((thread) =>
+        matchesThread(thread, searchQuery, categoryFilter)
+      ),
+    [categoryFilter, recentThreads, searchQuery]
+  );
+
   const visiblePopularThreads = filteredPopularThreads.slice(0, 10);
   const visibleActiveThreads = filteredActiveThreads.slice(0, 10);
+  const visibleRecentThreads = filteredRecentThreads.slice(0, 10);
   const aiSummaryThreads = useMemo(
     () =>
       filteredPopularThreads
@@ -792,6 +802,7 @@ export default function ForumPage() {
 
         setPopularThreads(normalizeThreadRows(result.popularThreads));
         setActiveThreads(normalizeThreadRows(result.activeThreads));
+        setRecentThreads(normalizeThreadRows(result.recentThreads));
       } catch (error) {
         if (cancelled) return;
         console.error(error);
@@ -1369,8 +1380,83 @@ export default function ForumPage() {
             fontFamily:
               'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
           }}
+      >
+        {renderDiscussionMap(discussionMapRoot, discussionMapBranches, tenant, node)}
+      </div>
+    </section>
+
+      <section
+        style={{
+          ...panelStyle,
+          marginBottom: 22,
+          background: "#f0f9ff",
+          color: "#0f172a",
+          border: "1px solid #bae6fd",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+            alignItems: "flex-start",
+            marginBottom: 12,
+          }}
         >
-          {renderDiscussionMap(discussionMapRoot, discussionMapBranches, tenant, node)}
+          <div>
+            <h2 style={{ margin: 0, fontSize: 20 }}>新着スレッド</h2>
+            <p
+              style={{
+                margin: "6px 0 0",
+                color: "#075985",
+                fontSize: currentFontSize - 2,
+                lineHeight: 1.6,
+                fontWeight: 700,
+              }}
+            >
+              新しく作成された議論を、作成日の新しい順で表示します。
+            </p>
+          </div>
+          <span
+            style={{
+              border: "1px solid #7dd3fc",
+              borderRadius: 999,
+              padding: "4px 10px",
+              background: "#e0f2fe",
+              color: "#075985",
+              fontSize: 12,
+              fontWeight: 800,
+              whiteSpace: "nowrap",
+            }}
+          >
+            最大10件
+          </span>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+            gap: 12,
+          }}
+        >
+          {visibleRecentThreads.length > 0 ? (
+            visibleRecentThreads.map((thread, index) => (
+              <ThreadCard
+                key={`recent-${thread.id}`}
+                thread={thread}
+                tenant={tenant}
+                currentFontSize={currentFontSize}
+                isFeatured={index === 0 && !hasFilter}
+              />
+            ))
+          ) : (
+            <div style={{ ...panelStyle, color: "#475569" }}>
+              条件に合う新着スレッドはありません。
+            </div>
+          )}
         </div>
       </section>
 
