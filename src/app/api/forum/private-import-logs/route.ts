@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from("private_import_logs")
       .select(
-        "id, tenant_slug, author_key, source_type, candidate, related_thread, related_thread_id, related_thread_url, memo, status, created_at"
+        "id, tenant_slug, source_type, candidate, related_thread, related_thread_id, related_thread_url, memo, status, created_at"
       )
       .eq("tenant_slug", tenantSlug)
       .eq("author_key", authorKey)
