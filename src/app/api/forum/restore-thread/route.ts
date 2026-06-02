@@ -52,6 +52,24 @@ export async function POST(req: Request) {
       );
     }
 
+    const { error: postRestoreError } = await supabase
+      .from("forum_posts")
+      .update({
+        is_deleted: false,
+        deleted_at: null,
+        delete_reason: null,
+      })
+      .eq("thread_id", threadId)
+      .eq("post_role", "issue_raise")
+      .eq("is_deleted", true);
+
+    if (postRestoreError) {
+      return NextResponse.json(
+        { success: false, error: postRestoreError.message },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({ success: true, thread: data });
   } catch (error) {
     return NextResponse.json(
