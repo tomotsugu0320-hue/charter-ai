@@ -526,7 +526,7 @@ const supabase = createClient(
 );
 
 // ① 投稿保存
-const { data: insertedRows, error } = await supabase
+const { error } = await supabase
   .from("forum_posts")
 .insert({
   thread_id: threadId,
@@ -552,7 +552,7 @@ const { data: insertedRows, error } = await supabase
   prediction_result: predictionResult,
   updated_at: new Date().toISOString(),
 })
-  .select("id, content, logic_score, logic_score_reason, logic_break_type, logic_break_note");
+  .select("id");
 
 if (error) {
   return NextResponse.json(
@@ -591,12 +591,6 @@ await supabase
 
 const res = NextResponse.json({
   success: true,
-  debug: {
-    logicResult,
-    logicBreakType,
-    logicBreakNote,
-    insertedRows,
-  },
 });
 
 res.headers.set(
