@@ -33,6 +33,13 @@ function getOrCreateAuthorKey(req: NextRequest) {
   };
 }
 
+function buildAuthorKeyCookie(authorKey: string) {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `author_key=${encodeURIComponent(
+    authorKey
+  )}; Path=/; Max-Age=31536000; SameSite=Lax; HttpOnly${secure}`;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -137,7 +144,7 @@ export async function POST(req: NextRequest) {
         if (shouldSetCookie) {
           response.headers.set(
             "Set-Cookie",
-            `author_key=${authorKey}; Path=/; Max-Age=31536000; SameSite=Lax`
+            buildAuthorKeyCookie(authorKey)
           );
         }
 
@@ -176,7 +183,7 @@ export async function POST(req: NextRequest) {
     if (shouldSetCookie) {
       response.headers.set(
         "Set-Cookie",
-        `author_key=${authorKey}; Path=/; Max-Age=31536000; SameSite=Lax`
+        buildAuthorKeyCookie(authorKey)
       );
     }
 

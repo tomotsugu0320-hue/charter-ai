@@ -31,6 +31,13 @@ function getOrCreateAuthorKey(req: NextRequest) {
   return "u_" + Math.random().toString(36).slice(2, 10);
 }
 
+function buildAuthorKeyCookie(authorKey: string) {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `author_key=${encodeURIComponent(
+    authorKey
+  )}; Path=/; Max-Age=31536000; SameSite=Lax; HttpOnly${secure}`;
+}
+
 
 function buildSimpleSummary(posts: ForumPost[]) {
   const issueRaises = posts
@@ -594,7 +601,7 @@ const res = NextResponse.json({
 
 res.headers.set(
   "Set-Cookie",
-  `author_key=${authorKey}; Path=/; Max-Age=31536000; SameSite=Lax`
+  buildAuthorKeyCookie(authorKey)
 );
 
 return res;
