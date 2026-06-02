@@ -718,6 +718,42 @@ const [treeVariant, setTreeVariant] = useState<"A" | "C">("A");
   const [predictionDeadline, setPredictionDeadline] = useState("");
 
 
+  async function fetchThreadBookmarkSaved(targetThreadId: string) {
+    if (!tenant || !targetThreadId) return false;
+
+    const response = await fetch(
+      `/api/forum/private-import-logs?tenantSlug=${encodeURIComponent(
+        tenant
+      )}&sourceType=thread_bookmark&relatedThreadId=${encodeURIComponent(
+        targetThreadId
+      )}`,
+      { cache: "no-store" }
+    );
+    const result = (await response.json().catch(() => null)) as {
+      success?: boolean;
+      error?: string;
+      logs?: unknown[];
+    } | null;
+
+    if (!response.ok || result?.success === false) {
+      throw new Error(result?.error || "保存状態を確認できませんでした。");
+    }
+
+    return Array.isArray(result?.logs) && result.logs.length > 0;
+  }
+
+  async function loadThreadBookmarkState(targetThreadId: string) {
+    const saved = await fetchThreadBookmarkSaved(targetThreadId);
+
+    setBookmarkSaveState({
+      loading: false,
+      saved,
+      error: "",
+    });
+
+    return saved;
+  }
+
 
   useEffect(() => {
     (async () => {
@@ -731,6 +767,44 @@ const [treeVariant, setTreeVariant] = useState<"A" | "C">("A");
     if (!threadId) return;
     loadThread();
   }, [threadId]);
+
+  useEffect(() => {
+    if (!tenant || !thread?.id) {
+      setBookmarkSaveState((current) => ({
+        ...current,
+        saved: false,
+        error: "",
+      }));
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const saved = await fetchThreadBookmarkSaved(thread.id);
+
+        if (!cancelled) {
+          setBookmarkSaveState((current) => ({
+            ...current,
+            saved,
+            error: "",
+          }));
+        }
+      } catch {
+        if (!cancelled) {
+          setBookmarkSaveState((current) => ({
+            ...current,
+            saved: false,
+          }));
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tenant, thread?.id]);
 
 
 
@@ -1278,11 +1352,11 @@ const conflictSectionTitle = displayConflicts.some(
         throw new Error(result?.error || "保存できませんでした。");
       }
 
-      setBookmarkSaveState({
-        loading: false,
-        saved: true,
-        error: "",
-      });
+      const saved = await loadThreadBookmarkState(thread.id);
+
+      if (!saved) {
+        throw new Error("保存状態を確認できませんでした。");
+      }
     } catch (bookmarkError) {
       setBookmarkSaveState({
         loading: false,
