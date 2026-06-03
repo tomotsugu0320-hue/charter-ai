@@ -85,6 +85,15 @@ export default async function ForumAdminPage({ params }: PageProps) {
             投稿のAI論理スコアを管理者操作で1件ずつ再評価します。
           </p>
         </Link>
+
+        <Link href={`/${tenant}/forum/admin/users`} style={menuCardStyle}>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
+            利用者別投稿管理
+          </h2>
+          <p style={menuDescriptionStyle}>
+            author_key ごとの投稿数、非表示投稿数、投稿内容を確認します。
+          </p>
+        </Link>
       </div>
     </main>
   );
