@@ -1175,10 +1175,9 @@ export default function ForumPage() {
               >
                 {[
                   { href: `/${tenant}/forum/private-logs`, label: "あとで読む管理" },
-                  { href: `/${tenant}/forum/admin`, label: "管理画面" },
                   {
                     href: `/${tenant}/forum/admin/delete-threads`,
-                    label: "管理：スレッド削除/復元",
+                    label: "管理画面（会員）：非表示/復元",
                   },
                   {
                     href: `/${tenant}/forum/admin/re-evaluate-logic-score`,
@@ -1188,6 +1187,7 @@ export default function ForumPage() {
                     href: `/${tenant}/forum/admin/rebuild-discussion-map`,
                     label: "議論マップ再編案",
                   },
+                  { href: `/${tenant}/forum/admin`, label: "管理者用画面" },
                   { href: `/${tenant}/forum`, label: "トップへ戻る" },
                 ].map((item) => (
                   <Link
