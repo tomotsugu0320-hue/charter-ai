@@ -72,6 +72,25 @@ function extractOutputText(json: any) {
   return json?.output_text ?? json?.output?.[0]?.content?.[0]?.text ?? "";
 }
 
+function normalizeSourceThreadIds(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+
+    const threadId = item.trim();
+    if (!threadId || seen.has(threadId)) continue;
+
+    seen.add(threadId);
+    normalized.push(threadId);
+  }
+
+  return normalized;
+}
+
 function normalizePreviewJson(value: PreviewJson) {
   return {
     root:
@@ -82,7 +101,18 @@ function normalizePreviewJson(value: PreviewJson) {
             label: "日本経済",
             summary: "",
           },
-    nodes: Array.isArray(value.nodes) ? value.nodes : [],
+    nodes: Array.isArray(value.nodes)
+      ? value.nodes.map((node) =>
+          node && typeof node === "object" && !Array.isArray(node)
+            ? {
+                ...node,
+                source_thread_ids: normalizeSourceThreadIds(
+                  (node as { source_thread_ids?: unknown }).source_thread_ids
+                ),
+              }
+            : node
+        )
+      : [],
     existing_node_matches: Array.isArray(value.existing_node_matches)
       ? value.existing_node_matches
       : [],
