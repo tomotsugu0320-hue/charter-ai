@@ -699,6 +699,130 @@ export default function ExternalAiImportModal({
             個人情報や投稿したくない内容が含まれていないか、投稿前に必ず確認してください。
           </div>
 
+          <section
+            style={{
+              ...sectionStyle,
+              background: "#eff6ff",
+              color: "#0f172a",
+              borderColor: "#bfdbfe",
+            }}
+          >
+            <h3 style={{ margin: "0 0 8px", fontSize: 18 }}>
+              外部AIで整理した内容を取り込む使い方
+            </h3>
+            <p
+              style={{
+                margin: "0 0 12px",
+                color: "#1e3a8a",
+                lineHeight: 1.7,
+                fontWeight: 700,
+              }}
+            >
+              自分のChatGPTや外部AIで整理した会話ログ・考えを、投稿候補としてまとめて取り込めます。
+            </p>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
+                gap: 12,
+              }}
+            >
+              <div>
+                <div style={{ ...labelStyle, color: "#1d4ed8" }}>手順</div>
+                <ol
+                  style={{
+                    margin: 0,
+                    paddingLeft: 20,
+                    color: "#1f2937",
+                    lineHeight: 1.7,
+                  }}
+                >
+                  <li>下のプロンプトをコピーする</li>
+                  <li>自分のChatGPTや外部AIに貼る</li>
+                  <li>整理したい過去の会話ログや文章も貼る</li>
+                  <li>外部AIが返したJSONをコピーする</li>
+                  <li>この画面の入力欄に貼り付ける</li>
+                  <li>「投稿候補を読み取る」を押す</li>
+                  <li>投稿する / 投稿しない / 類似スレッド確認を選ぶ</li>
+                </ol>
+              </div>
+
+              <div>
+                <div style={{ ...labelStyle, color: "#1d4ed8" }}>
+                  貼れるもの
+                </div>
+                <ul
+                  style={{
+                    margin: 0,
+                    paddingLeft: 20,
+                    color: "#1f2937",
+                    lineHeight: 1.7,
+                  }}
+                >
+                  <li>過去にChatGPTと話した経済・政策の会話</li>
+                  <li>自分のメモや長くなった考え</li>
+                  <li>SNSに投稿する前の下書き</li>
+                  <li>複数の論点が混ざった文章</li>
+                </ul>
+              </div>
+
+              <div>
+                <div style={{ ...labelStyle, color: "#b91c1c" }}>
+                  貼らないもの
+                </div>
+                <ul
+                  style={{
+                    margin: 0,
+                    paddingLeft: 20,
+                    color: "#7f1d1d",
+                    lineHeight: 1.7,
+                  }}
+                >
+                  <li>個人名、住所、電話番号、メールアドレス</li>
+                  <li>LINEなどの個人的なやりとり</li>
+                  <li>第三者が特定される情報</li>
+                  <li>店名や勤務先など個人特定につながる情報</li>
+                </ul>
+              </div>
+
+              <div>
+                <div style={{ ...labelStyle, color: "#047857" }}>
+                  この機能でできること
+                </div>
+                <ul
+                  style={{
+                    margin: 0,
+                    paddingLeft: 20,
+                    color: "#064e3b",
+                    lineHeight: 1.7,
+                  }}
+                >
+                  <li>複数の投稿候補をまとめて作れる</li>
+                  <li>投稿前に内容を確認・編集できる</li>
+                  <li>類似スレッドを確認できる</li>
+                  <li>参考投稿として保存できる</li>
+                </ul>
+              </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: 12,
+                border: "1px solid #93c5fd",
+                borderRadius: 8,
+                background: "#dbeafe",
+                color: "#1e3a8a",
+                padding: 10,
+                lineHeight: 1.7,
+                fontWeight: 800,
+              }}
+            >
+              読み取っただけでは投稿されません。投稿する候補を自分で選んでから投稿します。
+            </div>
+          </section>
+
           <section style={sectionStyle}>
             <div style={{ marginBottom: 16 }}>
               <label htmlFor="external-ai-extract-theme" style={labelStyle}>
