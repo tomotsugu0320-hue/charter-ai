@@ -35,6 +35,9 @@ export default function DeleteThreadsPage() {
   const [operatingThreadId, setOperatingThreadId] = useState<string | null>(
     null
   );
+  const [openDangerThreadIds, setOpenDangerThreadIds] = useState<
+    Record<string, boolean>
+  >({});
   const requestAdminKey = adminKey.trim();
 
   function titleOf(thread: ThreadRow) {
@@ -322,6 +325,7 @@ export default function DeleteThreadsPage() {
           {threads.map((thread) => {
             const hidden = thread.is_deleted === true;
             const operating = operatingThreadId === thread.id;
+            const dangerOpen = openDangerThreadIds[thread.id] === true;
 
             return (
               <section
@@ -420,38 +424,65 @@ export default function DeleteThreadsPage() {
                   </button>
                 )}
 
-                <div
-                  style={{
-                    border: "1px solid #fecaca",
-                    borderRadius: 8,
-                    background: "#fef2f2",
-                    color: "#7f1d1d",
-                    marginTop: 12,
-                    padding: "10px 12px",
-                  }}
-                >
-                  <div style={{ fontWeight: 800, marginBottom: 8 }}>
-                    危険操作
-                  </div>
-
+                <div style={{ marginTop: 12 }}>
                   <button
                     type="button"
-                    onClick={() => void hardDelete(thread)}
-                    disabled={operating}
+                    onClick={() =>
+                      setOpenDangerThreadIds((current) => ({
+                        ...current,
+                        [thread.id]: !dangerOpen,
+                      }))
+                    }
                     style={{
-                      color: "#991b1b",
-                      border: "1px solid #ef4444",
+                      color: dangerOpen ? "#7f1d1d" : "#374151",
+                      border: dangerOpen
+                        ? "1px solid #fca5a5"
+                        : "1px solid #d1d5db",
                       borderRadius: 6,
-                      background: "#fff",
+                      background: dangerOpen ? "#fef2f2" : "#fff",
                       padding: "6px 10px",
-                      cursor: operating ? "wait" : "pointer",
+                      cursor: "pointer",
                       fontWeight: 700,
-                      opacity: operating ? 0.65 : 1,
                     }}
                   >
-                    {operating ? "処理中..." : "完全削除（復元不可）"}
+                    {dangerOpen ? "危険操作を閉じる" : "危険操作を表示"}
                   </button>
                 </div>
+
+                {dangerOpen && (
+                  <div
+                    style={{
+                      border: "1px solid #fecaca",
+                      borderRadius: 8,
+                      background: "#fef2f2",
+                      color: "#7f1d1d",
+                      marginTop: 10,
+                      padding: "10px 12px",
+                    }}
+                  >
+                    <div style={{ fontWeight: 800, marginBottom: 8 }}>
+                      危険操作
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => void hardDelete(thread)}
+                      disabled={operating}
+                      style={{
+                        color: "#991b1b",
+                        border: "1px solid #ef4444",
+                        borderRadius: 6,
+                        background: "#fff",
+                        padding: "6px 10px",
+                        cursor: operating ? "wait" : "pointer",
+                        fontWeight: 700,
+                        opacity: operating ? 0.65 : 1,
+                      }}
+                    >
+                      {operating ? "処理中..." : "完全削除（復元不可）"}
+                    </button>
+                  </div>
+                )}
               </section>
             );
           })}
