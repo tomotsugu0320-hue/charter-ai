@@ -1329,21 +1329,6 @@ export default function ForumPage() {
             </p>
           </div>
 
-          <Link
-            href={`/${tenant}/macro`}
-            style={{
-              display: "inline-block",
-              padding: "10px 14px",
-              borderRadius: 8,
-              border: "1px solid #64748b",
-              color: "#f9fafb",
-              textDecoration: "none",
-              fontWeight: 800,
-              background: "#1f2937",
-            }}
-          >
-            マクロで整理
-          </Link>
         </div>
 
         <div
