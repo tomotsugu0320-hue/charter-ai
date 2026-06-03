@@ -1461,9 +1461,14 @@ export default function ForumPage() {
               color: "#cbd5e1",
               fontSize: currentFontSize - 2,
               lineHeight: 1.6,
+              flex: "1 1 280px",
             }}
           >
-            自分のChatGPTや外部AIで整理した内容から、複数の投稿候補を確認できます。
+            <strong style={{ color: "#f9fafb" }}>
+              過去のChatGPT会話や自分のメモを投稿候補にできます。
+            </strong>
+            <br />
+            長くなった考えや複数の論点を、掲示板に投稿しやすい形へまとめて取り込めます。読み取っただけでは投稿されません。
           </div>
           <Link
             href={`/${tenant}/forum/private-logs`}
@@ -1491,7 +1496,7 @@ export default function ForumPage() {
               flexShrink: 0,
             }}
           >
-            外部AIで整理した内容を取り込む
+            過去の会話・メモから投稿候補を作る
           </button>
         </div>
 
