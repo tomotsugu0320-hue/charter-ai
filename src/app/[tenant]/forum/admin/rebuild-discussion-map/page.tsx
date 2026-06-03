@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 type RebuildMapResponse = {
   success?: boolean;
@@ -35,6 +35,31 @@ type PreviewTreeNode = PreviewRoot & {
   related_keywords?: string[];
   source_thread_ids?: string[];
   children: PreviewTreeNode[];
+};
+
+type ExistingNodeMatch = {
+  existing_node_id: string;
+  suggested_node_id: string;
+  confidence: string;
+  reason: string;
+};
+
+type NewNodeCandidate = {
+  id: string;
+  label: string;
+  reason: string;
+};
+
+type MergeCandidate = {
+  from_node_ids: string[];
+  to_label: string;
+  reason: string;
+};
+
+type PreviewSuggestions = {
+  existingNodeMatches: ExistingNodeMatch[];
+  newNodeCandidates: NewNodeCandidate[];
+  mergeCandidates: MergeCandidate[];
 };
 
 const pageStyle = {
@@ -140,6 +165,68 @@ function buildPreviewTree(preview: unknown): PreviewTreeNode | null {
   return root;
 }
 
+function buildPreviewSuggestions(preview: unknown): PreviewSuggestions {
+  if (!isRecord(preview)) {
+    return {
+      existingNodeMatches: [],
+      newNodeCandidates: [],
+      mergeCandidates: [],
+    };
+  }
+
+  const existingNodeMatches = Array.isArray(preview.existing_node_matches)
+    ? preview.existing_node_matches
+        .filter(isRecord)
+        .map((item): ExistingNodeMatch => ({
+          existing_node_id: textValue(item.existing_node_id),
+          suggested_node_id: textValue(item.suggested_node_id),
+          confidence:
+            typeof item.confidence === "number"
+              ? String(item.confidence)
+              : textValue(item.confidence),
+          reason: textValue(item.reason),
+        }))
+        .filter(
+          (item) =>
+            item.existing_node_id ||
+            item.suggested_node_id ||
+            item.confidence ||
+            item.reason
+        )
+    : [];
+
+  const newNodeCandidates = Array.isArray(preview.new_node_candidates)
+    ? preview.new_node_candidates
+        .filter(isRecord)
+        .map((item): NewNodeCandidate => ({
+          id: textValue(item.id),
+          label: textValue(item.label),
+          reason: textValue(item.reason),
+        }))
+        .filter((item) => item.id || item.label || item.reason)
+    : [];
+
+  const mergeCandidates = Array.isArray(preview.merge_candidates)
+    ? preview.merge_candidates
+        .filter(isRecord)
+        .map((item): MergeCandidate => ({
+          from_node_ids: stringArray(item.from_node_ids),
+          to_label: textValue(item.to_label),
+          reason: textValue(item.reason),
+        }))
+        .filter(
+          (item) =>
+            item.from_node_ids.length > 0 || item.to_label || item.reason
+        )
+    : [];
+
+  return {
+    existingNodeMatches,
+    newNodeCandidates,
+    mergeCandidates,
+  };
+}
+
 export default function RebuildDiscussionMapPage() {
   const params = useParams();
   const tenantParam = params?.tenant;
@@ -161,6 +248,45 @@ export default function RebuildDiscussionMapPage() {
     () => buildPreviewTree(result?.preview),
     [result]
   );
+  const previewSuggestions = useMemo(
+    () => buildPreviewSuggestions(result?.preview),
+    [result]
+  );
+  const hasPreviewSuggestions =
+    previewSuggestions.existingNodeMatches.length > 0 ||
+    previewSuggestions.newNodeCandidates.length > 0 ||
+    previewSuggestions.mergeCandidates.length > 0;
+
+  function renderSuggestionValue(label: string, value: string) {
+    return (
+      <div
+        style={{
+          display: "grid",
+          gap: 3,
+          minWidth: 0,
+        }}
+      >
+        <span style={{ color: "#64748b", fontSize: 12, fontWeight: 800 }}>
+          {label}
+        </span>
+        <span style={{ overflowWrap: "anywhere", lineHeight: 1.6 }}>
+          {value || "-"}
+        </span>
+      </div>
+    );
+  }
+
+  function renderSuggestionSection(
+    title: string,
+    children: ReactNode
+  ) {
+    return (
+      <section style={{ display: "grid", gap: 8 }}>
+        <h4 style={{ margin: 0, fontSize: 16, fontWeight: 900 }}>{title}</h4>
+        <div style={{ display: "grid", gap: 8 }}>{children}</div>
+      </section>
+    );
+  }
 
   function renderTreeNode(node: PreviewTreeNode, depth = 0) {
     const sourceThreadIds = node.source_thread_ids ?? [];
@@ -525,6 +651,114 @@ export default function RebuildDiscussionMapPage() {
               <p style={{ margin: 0, color: "#64748b", lineHeight: 1.6 }}>
                 ツリー表示できる preview.root / preview.nodes がありません。
               </p>
+            )}
+          </section>
+
+          <section
+            style={{
+              border: "1px solid #dbe3ef",
+              borderRadius: 8,
+              background: "#ffffff",
+              color: "#111827",
+              marginBottom: 16,
+              padding: 14,
+            }}
+          >
+            <h3
+              style={{
+                margin: "0 0 10px",
+                fontSize: 18,
+                fontWeight: 900,
+              }}
+            >
+              AI提案
+            </h3>
+
+            {!hasPreviewSuggestions ? (
+              <p style={{ margin: 0, color: "#64748b", lineHeight: 1.6 }}>
+                候補なし
+              </p>
+            ) : (
+              <div style={{ display: "grid", gap: 16 }}>
+                {previewSuggestions.existingNodeMatches.length > 0 &&
+                  renderSuggestionSection(
+                    "既存ノードとの対応",
+                    previewSuggestions.existingNodeMatches.map((item, index) => (
+                      <article
+                        key={`${item.existing_node_id}:${item.suggested_node_id}:${index}`}
+                        style={{
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 8,
+                          background: "#f8fafc",
+                          color: "#111827",
+                          display: "grid",
+                          gap: 8,
+                          padding: 12,
+                        }}
+                      >
+                        {renderSuggestionValue(
+                          "existing_node_id",
+                          item.existing_node_id
+                        )}
+                        {renderSuggestionValue(
+                          "suggested_node_id",
+                          item.suggested_node_id
+                        )}
+                        {renderSuggestionValue("confidence", item.confidence)}
+                        {renderSuggestionValue("reason", item.reason)}
+                      </article>
+                    ))
+                  )}
+
+                {previewSuggestions.newNodeCandidates.length > 0 &&
+                  renderSuggestionSection(
+                    "新規ノード候補",
+                    previewSuggestions.newNodeCandidates.map((item, index) => (
+                      <article
+                        key={`${item.id}:${index}`}
+                        style={{
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 8,
+                          background: "#f8fafc",
+                          color: "#111827",
+                          display: "grid",
+                          gap: 8,
+                          padding: 12,
+                        }}
+                      >
+                        {renderSuggestionValue("id", item.id)}
+                        {renderSuggestionValue("label", item.label)}
+                        {renderSuggestionValue("reason", item.reason)}
+                      </article>
+                    ))
+                  )}
+
+                {previewSuggestions.mergeCandidates.length > 0 &&
+                  renderSuggestionSection(
+                    "統合候補",
+                    previewSuggestions.mergeCandidates.map((item, index) => (
+                      <article
+                        key={`${item.to_label}:${index}`}
+                        style={{
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 8,
+                          background: "#f8fafc",
+                          color: "#111827",
+                          display: "grid",
+                          gap: 8,
+                          padding: 12,
+                        }}
+                      >
+                        {renderSuggestionValue(
+                          "from_node_ids",
+                          item.from_node_ids.join(", ")
+                        )}
+                        {renderSuggestionValue("to_label", item.to_label)}
+                        {renderSuggestionValue("reason", item.reason)}
+                      </article>
+                    ))
+                  )}
+              </div>
             )}
           </section>
 
