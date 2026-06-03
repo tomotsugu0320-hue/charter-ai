@@ -15,6 +15,28 @@ type RebuildMapResponse = {
   };
 };
 
+type PreviewRoot = {
+  id: string;
+  label: string;
+  summary: string;
+};
+
+type PreviewNode = {
+  id: string;
+  label: string;
+  summary: string;
+  parent_id: string | null;
+  related_keywords: string[];
+  source_thread_ids: string[];
+};
+
+type PreviewTreeNode = PreviewRoot & {
+  parent_id?: string | null;
+  related_keywords?: string[];
+  source_thread_ids?: string[];
+  children: PreviewTreeNode[];
+};
+
 const pageStyle = {
   maxWidth: 960,
   margin: "0 auto",
@@ -60,6 +82,64 @@ function formatJson(value: unknown) {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function textValue(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function stringArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => textValue(item))
+    .filter((item) => item.length > 0);
+}
+
+function buildPreviewTree(preview: unknown): PreviewTreeNode | null {
+  if (!isRecord(preview)) return null;
+
+  const rootValue = isRecord(preview.root) ? preview.root : {};
+  const root: PreviewTreeNode = {
+    id: textValue(rootValue.id) || "root",
+    label: textValue(rootValue.label) || "議論全体",
+    summary: textValue(rootValue.summary),
+    children: [],
+  };
+
+  const rawNodes = Array.isArray(preview.nodes) ? preview.nodes : [];
+  const nodes: PreviewTreeNode[] = rawNodes
+    .filter(isRecord)
+    .map((node): PreviewTreeNode => ({
+      id: textValue(node.id),
+      label: textValue(node.label) || "無題の論点",
+      summary: textValue(node.summary),
+      parent_id: textValue(node.parent_id) || null,
+      related_keywords: stringArray(node.related_keywords),
+      source_thread_ids: stringArray(node.source_thread_ids),
+      children: [],
+    }))
+    .filter((node) => node.id.length > 0);
+
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+
+  for (const node of nodes) {
+    const parentId = node.parent_id;
+    const parent =
+      parentId && parentId !== root.id ? nodeMap.get(parentId) : undefined;
+
+    if (parent && parent.id !== node.id) {
+      parent.children.push(node);
+    } else {
+      root.children.push(node);
+    }
+  }
+
+  return root;
+}
+
 export default function RebuildDiscussionMapPage() {
   const params = useParams();
   const tenantParam = params?.tenant;
@@ -74,6 +154,120 @@ export default function RebuildDiscussionMapPage() {
 
   const requestAdminKey = adminKey.trim();
   const previewJson = useMemo(() => formatJson(result?.preview), [result]);
+  const previewTree = useMemo(
+    () => buildPreviewTree(result?.preview),
+    [result]
+  );
+
+  function renderTreeNode(node: PreviewTreeNode, depth = 0) {
+    return (
+      <div
+        key={node.id}
+        style={{
+          borderLeft: depth > 0 ? "2px solid #cbd5e1" : "none",
+          marginLeft: depth > 0 ? 14 : 0,
+          paddingLeft: depth > 0 ? 12 : 0,
+        }}
+      >
+        <div
+          style={{
+            border: "1px solid #e2e8f0",
+            borderRadius: 8,
+            background: depth === 0 ? "#f8fafc" : "#ffffff",
+            color: "#111827",
+            marginBottom: 8,
+            padding: "10px 12px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: node.summary ? 6 : 0,
+            }}
+          >
+            <strong style={{ fontSize: depth === 0 ? 18 : 15 }}>
+              {node.label}
+            </strong>
+            <code
+              style={{
+                border: "1px solid #cbd5e1",
+                borderRadius: 999,
+                background: "#ffffff",
+                color: "#475569",
+                fontSize: 12,
+                padding: "2px 7px",
+              }}
+            >
+              {node.id}
+            </code>
+          </div>
+
+          {node.summary && (
+            <p
+              style={{
+                margin: "0 0 8px",
+                color: "#475569",
+                lineHeight: 1.6,
+              }}
+            >
+              {node.summary}
+            </p>
+          )}
+
+          {node.related_keywords && node.related_keywords.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 6,
+                marginTop: 8,
+              }}
+            >
+              {node.related_keywords.map((keyword) => (
+                <span
+                  key={keyword}
+                  style={{
+                    border: "1px solid #bfdbfe",
+                    borderRadius: 999,
+                    background: "#eff6ff",
+                    color: "#1d4ed8",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    padding: "2px 7px",
+                  }}
+                >
+                  {keyword}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {node.source_thread_ids && node.source_thread_ids.length > 0 && (
+            <div
+              style={{
+                marginTop: 8,
+                color: "#64748b",
+                fontSize: 12,
+                lineHeight: 1.5,
+                overflowWrap: "anywhere",
+              }}
+            >
+              source_thread_ids: {node.source_thread_ids.join(", ")}
+            </div>
+          )}
+        </div>
+
+        {node.children.length > 0 && (
+          <div style={{ display: "grid", gap: 6 }}>
+            {node.children.map((child) => renderTreeNode(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   async function handleGenerate() {
     if (!requestAdminKey) {
@@ -235,6 +429,47 @@ export default function RebuildDiscussionMapPage() {
               preview only
             </span>
           </div>
+
+          <section
+            style={{
+              border: "1px solid #dbe3ef",
+              borderRadius: 8,
+              background: "#ffffff",
+              color: "#111827",
+              marginBottom: 16,
+              padding: 14,
+            }}
+          >
+            <h3
+              style={{
+                margin: "0 0 10px",
+                fontSize: 18,
+                fontWeight: 900,
+              }}
+            >
+              ツリー表示
+            </h3>
+
+            {previewTree ? (
+              <div style={{ display: "grid", gap: 8 }}>
+                {renderTreeNode(previewTree)}
+              </div>
+            ) : (
+              <p style={{ margin: 0, color: "#64748b", lineHeight: 1.6 }}>
+                ツリー表示できる preview.root / preview.nodes がありません。
+              </p>
+            )}
+          </section>
+
+          <h3
+            style={{
+              margin: "0 0 10px",
+              fontSize: 18,
+              fontWeight: 900,
+            }}
+          >
+            生JSON
+          </h3>
 
           <pre
             style={{
