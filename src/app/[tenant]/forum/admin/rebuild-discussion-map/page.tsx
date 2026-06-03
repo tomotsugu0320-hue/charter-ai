@@ -151,6 +151,9 @@ export default function RebuildDiscussionMapPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<RebuildMapResponse | null>(null);
+  const [expandedSourceNodeIds, setExpandedSourceNodeIds] = useState<
+    Record<string, boolean>
+  >({});
 
   const requestAdminKey = adminKey.trim();
   const previewJson = useMemo(() => formatJson(result?.preview), [result]);
@@ -160,6 +163,9 @@ export default function RebuildDiscussionMapPage() {
   );
 
   function renderTreeNode(node: PreviewTreeNode, depth = 0) {
+    const sourceThreadIds = node.source_thread_ids ?? [];
+    const sourceIdsOpen = expandedSourceNodeIds[node.id] === true;
+
     return (
       <div
         key={node.id}
@@ -245,17 +251,77 @@ export default function RebuildDiscussionMapPage() {
             </div>
           )}
 
-          {node.source_thread_ids && node.source_thread_ids.length > 0 && (
+          {sourceThreadIds.length > 0 && (
             <div
               style={{
                 marginTop: 8,
                 color: "#64748b",
                 fontSize: 12,
                 lineHeight: 1.5,
-                overflowWrap: "anywhere",
               }}
             >
-              source_thread_ids: {node.source_thread_ids.join(", ")}
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <span>参照スレッド数：{sourceThreadIds.length}件</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpandedSourceNodeIds((current) => ({
+                      ...current,
+                      [node.id]: !sourceIdsOpen,
+                    }))
+                  }
+                  style={{
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 999,
+                    background: "#ffffff",
+                    color: "#334155",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    padding: "3px 8px",
+                  }}
+                >
+                  {sourceIdsOpen ? "参照IDを隠す" : "参照IDを表示"}
+                </button>
+              </div>
+
+              {sourceIdsOpen && (
+                <div
+                  style={{
+                    display: "grid",
+                    gap: 4,
+                    marginTop: 8,
+                    maxWidth: "100%",
+                    overflowX: "auto",
+                  }}
+                >
+                  {sourceThreadIds.map((threadId) => (
+                    <code
+                      key={threadId}
+                      style={{
+                        display: "block",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 6,
+                        background: "#f8fafc",
+                        color: "#475569",
+                        fontSize: 12,
+                        padding: "3px 6px",
+                        whiteSpace: "normal",
+                        wordBreak: "break-all",
+                      }}
+                    >
+                      {threadId}
+                    </code>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -279,6 +345,7 @@ export default function RebuildDiscussionMapPage() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setExpandedSourceNodeIds({});
 
     try {
       const res = await fetch("/api/forum/admin-rebuild-discussion-map", {
