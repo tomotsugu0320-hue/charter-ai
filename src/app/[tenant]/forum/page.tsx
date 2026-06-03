@@ -679,6 +679,7 @@ export default function ForumPage() {
   const [actionError, setActionError] = useState("");
   const [topError, setTopError] = useState("");
   const [isExternalAiImportOpen, setIsExternalAiImportOpen] = useState(false);
+  const [isTopMenuOpen, setIsTopMenuOpen] = useState(false);
 
   const [popularThreads, setPopularThreads] = useState<ThreadRow[]>([]);
   const [activeThreads, setActiveThreads] = useState<ThreadRow[]>([]);
@@ -1063,8 +1064,88 @@ export default function ForumPage() {
           border: "1px solid #cbd5e1",
         }}
       >
-        <div style={{ fontWeight: 900, fontSize: currentFontSize }}>
-          表示設定
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          <div style={{ fontWeight: 900, fontSize: currentFontSize }}>
+            表示設定
+          </div>
+          <div style={{ position: "relative" }}>
+            <button
+              type="button"
+              aria-label="メニューを開く"
+              aria-expanded={isTopMenuOpen}
+              onClick={() => setIsTopMenuOpen((open) => !open)}
+              style={{
+                ...ghostButtonStyle,
+                minWidth: 44,
+                background: isTopMenuOpen ? "#111827" : "#ffffff",
+                color: isTopMenuOpen ? "#ffffff" : "#111827",
+                borderColor: isTopMenuOpen ? "#111827" : "#cbd5e1",
+                fontSize: 18,
+                lineHeight: 1,
+              }}
+            >
+              ☰
+            </button>
+            {isTopMenuOpen && (
+              <nav
+                aria-label="Forumメニュー"
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 8px)",
+                  right: 0,
+                  zIndex: 20,
+                  minWidth: 240,
+                  maxWidth: "calc(100vw - 32px)",
+                  display: "grid",
+                  gap: 6,
+                  padding: 10,
+                  borderRadius: 10,
+                  border: "1px solid #cbd5e1",
+                  background: "#ffffff",
+                  color: "#111827",
+                  boxShadow: "0 12px 30px rgba(15, 23, 42, 0.18)",
+                }}
+              >
+                {[
+                  { href: `/${tenant}/forum/private-logs`, label: "あとで読む管理" },
+                  { href: `/${tenant}/forum/admin`, label: "管理画面" },
+                  {
+                    href: `/${tenant}/forum/admin/delete-threads`,
+                    label: "管理：スレッド削除/復元",
+                  },
+                  {
+                    href: `/${tenant}/forum/admin/re-evaluate-logic-score`,
+                    label: "AI論理スコア再評価",
+                  },
+                  { href: `/${tenant}/forum`, label: "トップへ戻る" },
+                ].map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setIsTopMenuOpen(false)}
+                    style={{
+                      display: "block",
+                      padding: "9px 10px",
+                      borderRadius: 8,
+                      color: "#111827",
+                      textDecoration: "none",
+                      fontWeight: 800,
+                    }}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </nav>
+            )}
+          </div>
         </div>
         <div
           style={{
