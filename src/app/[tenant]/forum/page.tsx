@@ -1315,7 +1315,7 @@ export default function ForumPage() {
                 letterSpacing: 0,
               }}
             >
-              前提と根拠をそろえて議論する
+              AIで整理して書き込める掲示板
             </h1>
             <p
               style={{
@@ -1325,7 +1325,7 @@ export default function ForumPage() {
                 fontSize: currentFontSize,
               }}
             >
-              投稿前に主張、前提、根拠、反論を分けて、近い既存スレッドも確認できます。
+              長くなった考えやChatGPTとの会話を、投稿しやすい形にまとめて共有できます。
             </p>
           </div>
 
