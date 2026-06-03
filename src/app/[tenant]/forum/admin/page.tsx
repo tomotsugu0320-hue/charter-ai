@@ -94,6 +94,17 @@ export default async function ForumAdminPage({ params }: PageProps) {
             author_key ごとの投稿数、非表示投稿数、投稿内容を確認します。
           </p>
         </Link>
+        <Link
+          href={`/${tenant}/forum/admin/rebuild-discussion-map`}
+          style={menuCardStyle}
+        >
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
+            議論マップ再編案
+          </h2>
+          <p style={menuDescriptionStyle}>
+            公開中のスレッドと投稿をもとに、AIが議論ツリーの再編案を生成します。今回はプレビューのみです。
+          </p>
+        </Link>
       </div>
     </main>
   );
