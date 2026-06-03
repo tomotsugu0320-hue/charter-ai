@@ -1052,6 +1052,96 @@ export default function ForumPage() {
         tenant={tenant}
       />
 
+      <section
+        style={{
+          ...panelStyle,
+          marginBottom: 18,
+          gap: 12,
+          display: "grid",
+          background: "#f8fafc",
+          color: "#0f172a",
+          border: "1px solid #cbd5e1",
+        }}
+      >
+        <div style={{ fontWeight: 900, fontSize: currentFontSize }}>
+          表示設定
+        </div>
+        <div
+          style={{
+            display: "flex",
+            gap: 18,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              flexWrap: "wrap",
+              flex: "1 1 280px",
+            }}
+          >
+            <div style={{ fontWeight: 800, minWidth: 92 }}>表示モード：</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => selectMode("normal")}
+                style={{
+                  ...ghostButtonStyle,
+                  background: defaultMode === "normal" ? "#111827" : "#ffffff",
+                  color: defaultMode === "normal" ? "#ffffff" : "#111827",
+                  borderColor: defaultMode === "normal" ? "#111827" : "#cbd5e1",
+                }}
+              >
+                標準
+              </button>
+              <button
+                type="button"
+                onClick={() => selectMode("easy")}
+                style={{
+                  ...ghostButtonStyle,
+                  background: defaultMode === "easy" ? "#111827" : "#ffffff",
+                  color: defaultMode === "easy" ? "#ffffff" : "#111827",
+                  borderColor: defaultMode === "easy" ? "#111827" : "#cbd5e1",
+                }}
+              >
+                やさしい表示
+              </button>
+            </div>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              flexWrap: "wrap",
+              flex: "1 1 240px",
+            }}
+          >
+            <div style={{ fontWeight: 800, minWidth: 92 }}>文字サイズ：</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {(["small", "medium", "large"] as const).map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={() => selectFontSize(size)}
+                  style={{
+                    ...ghostButtonStyle,
+                    background: fontSizeMode === size ? "#111827" : "#ffffff",
+                    color: fontSizeMode === size ? "#ffffff" : "#111827",
+                    borderColor: fontSizeMode === size ? "#111827" : "#cbd5e1",
+                  }}
+                >
+                  {size === "small" ? "小" : size === "medium" ? "中" : "大"}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       <header style={{ ...darkPanelStyle, marginBottom: 18 }}>
         <div
           style={{
@@ -1288,51 +1378,6 @@ export default function ForumPage() {
               条件をリセット
             </button>
           )}
-        </div>
-      </section>
-
-      <section
-        style={{
-          ...panelStyle,
-          marginBottom: 18,
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-          alignItems: "center",
-          background: "#f8fafc",
-          color: "#0f172a",
-          border: "1px solid #cbd5e1",
-        }}
-      >
-        <div style={{ fontWeight: 800, fontSize: currentFontSize }}>
-          表示モード：
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            onClick={() => selectMode("normal")}
-            style={{
-              ...ghostButtonStyle,
-              background: defaultMode === "normal" ? "#111827" : "#ffffff",
-              color: defaultMode === "normal" ? "#ffffff" : "#111827",
-              borderColor: defaultMode === "normal" ? "#111827" : "#cbd5e1",
-            }}
-          >
-            標準
-          </button>
-          <button
-            type="button"
-            onClick={() => selectMode("easy")}
-            style={{
-              ...ghostButtonStyle,
-              background: defaultMode === "easy" ? "#111827" : "#ffffff",
-              color: defaultMode === "easy" ? "#ffffff" : "#111827",
-              borderColor: defaultMode === "easy" ? "#111827" : "#cbd5e1",
-            }}
-          >
-            やさしい表示
-          </button>
         </div>
       </section>
 
@@ -1933,32 +1978,6 @@ export default function ForumPage() {
               まず考えを書きます。必要ならAIで読みやすく整えてから、論点整理へ進めます。
             </p>
           </div>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            flexWrap: "wrap",
-            marginTop: 14,
-          }}
-        >
-          {(["small", "medium", "large"] as const).map((size) => (
-            <button
-              key={size}
-              type="button"
-              onClick={() => selectFontSize(size)}
-              style={{
-                ...ghostButtonStyle,
-                padding: "7px 10px",
-                background: fontSizeMode === size ? "#ffffff" : "#1f2937",
-                color: fontSizeMode === size ? "#111827" : "#e5e7eb",
-                borderColor: fontSizeMode === size ? "#ffffff" : "#475569",
-              }}
-            >
-              {size === "small" ? "小" : size === "medium" ? "中" : "大"}
-            </button>
-          ))}
         </div>
 
         <div style={{ marginTop: 16 }}>
