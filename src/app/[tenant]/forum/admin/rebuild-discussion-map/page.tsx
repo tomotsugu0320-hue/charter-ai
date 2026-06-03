@@ -7,6 +7,9 @@ import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 type RebuildMapResponse = {
   success?: boolean;
   error?: string;
+  error_code?: string;
+  details?: string;
+  message?: string;
   preview?: unknown;
   source?: {
     threads?: number;
@@ -121,6 +124,32 @@ function stringArray(value: unknown) {
   return value
     .map((item) => textValue(item))
     .filter((item) => item.length > 0);
+}
+
+function compactErrorText(value: string) {
+  const text = value.replace(/\s+/g, " ").trim();
+
+  if (!text) return "";
+  if (text.startsWith("<")) return "API returned a non-JSON response";
+
+  return text.length > 240 ? `${text.slice(0, 240)}...` : text;
+}
+
+function buildApiErrorMessage(
+  response: Response,
+  result: RebuildMapResponse
+) {
+  const parts = [`HTTP ${response.status}`];
+  const apiMessage =
+    result.error || result.details || result.message || "API request failed";
+
+  if (result.error_code) {
+    parts.push(`error_code: ${result.error_code}`);
+  }
+
+  parts.push(apiMessage);
+
+  return `議論マップ再編案の生成に失敗しました。${parts.join(" / ")}`;
 }
 
 function buildPreviewTree(preview: unknown): PreviewTreeNode | null {
@@ -481,10 +510,19 @@ export default function RebuildDiscussionMapPage() {
           "x-admin-key": requestAdminKey,
         },
       });
-      const json = (await res.json().catch(() => ({}))) as RebuildMapResponse;
+      const responseText = await res.text();
+      let json: RebuildMapResponse = {};
+
+      if (responseText.trim()) {
+        try {
+          json = JSON.parse(responseText) as RebuildMapResponse;
+        } catch {
+          json = { error: compactErrorText(responseText) };
+        }
+      }
 
       if (!res.ok || json.success !== true) {
-        setError(json.error || "議論マップ再編案の生成に失敗しました。");
+        setError(buildApiErrorMessage(res, json));
         return;
       }
 

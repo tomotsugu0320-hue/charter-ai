@@ -126,26 +126,40 @@ function normalizePreviewJson(value: PreviewJson) {
   };
 }
 
+function errorResponse(
+  error_code: string,
+  error: string,
+  status = 500,
+  details?: string
+) {
+  return NextResponse.json(
+    {
+      success: false,
+      error,
+      error_code,
+      ...(details ? { details } : {}),
+    },
+    { status }
+  );
+}
+
 export async function POST(req: Request) {
   if (req.headers.get("x-admin-key") !== process.env.ADMIN_KEY) {
-    return new Response("Unauthorized", { status: 401 });
+    return errorResponse("admin_key_invalid", "Unauthorized", 401);
   }
 
   const supabase = getSupabase();
 
   if (!supabase) {
-    return NextResponse.json(
-      { success: false, error: "Supabase env is missing" },
-      { status: 500 }
-    );
+    return errorResponse("supabase_env_missing", "Supabase env is missing");
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
-    return NextResponse.json(
-      { success: false, error: "OPENAI_API_KEY is not set" },
-      { status: 500 }
+    return errorResponse(
+      "openai_api_key_missing",
+      "OPENAI_API_KEY is not set"
     );
   }
 
@@ -158,9 +172,11 @@ export async function POST(req: Request) {
       .limit(MAX_THREADS);
 
     if (threadsError) {
-      return NextResponse.json(
-        { success: false, error: threadsError.message },
-        { status: 500 }
+      return errorResponse(
+        "supabase_threads_failed",
+        "Supabase threads query failed",
+        500,
+        threadsError.message
       );
     }
 
@@ -178,9 +194,11 @@ export async function POST(req: Request) {
         .limit(MAX_POSTS);
 
       if (postsError) {
-        return NextResponse.json(
-          { success: false, error: postsError.message },
-          { status: 500 }
+        return errorResponse(
+          "supabase_posts_failed",
+          "Supabase posts query failed",
+          500,
+          postsError.message
         );
       }
 
@@ -433,9 +451,9 @@ export async function POST(req: Request) {
     const outputText = extractOutputText(response);
 
     if (!outputText) {
-      return NextResponse.json(
-        { success: false, error: "OpenAI did not return preview JSON" },
-        { status: 500 }
+      return errorResponse(
+        "openai_preview_json_missing",
+        "OpenAI did not return preview JSON"
       );
     }
 
@@ -444,9 +462,9 @@ export async function POST(req: Request) {
     try {
       parsed = JSON.parse(outputText);
     } catch {
-      return NextResponse.json(
-        { success: false, error: "Failed to parse discussion map preview JSON" },
-        { status: 500 }
+      return errorResponse(
+        "openai_preview_json_parse_failed",
+        "Failed to parse discussion map preview JSON"
       );
     }
 
@@ -465,9 +483,6 @@ export async function POST(req: Request) {
         ? error.message
         : "failed to rebuild discussion map preview";
 
-    return NextResponse.json(
-      { success: false, error: message },
-      { status: 500 }
-    );
+    return errorResponse("discussion_map_rebuild_failed", message);
   }
 }
