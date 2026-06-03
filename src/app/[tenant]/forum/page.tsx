@@ -66,6 +66,7 @@ type DiscussionMapNode = {
 };
 
 const ALL_CATEGORIES = "すべて";
+const SEARCH_RESULTS_PER_PAGE = 5;
 const draftStorageKey = "forum_thread_draft_input";
 const NODE_INFO: Record<string, { label: string; path?: string[] }> = {
   "consumption-tax": {
@@ -714,11 +715,13 @@ export default function ForumPage() {
   >(null);
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
+  const [searchResultPage, setSearchResultPage] = useState(1);
   const [analyzeScrollKey, setAnalyzeScrollKey] = useState(0);
   const [relatedThreads, setRelatedThreads] = useState<RelatedThread[]>([]);
   const [generatedIssue, setGeneratedIssue] = useState<GeneratedIssue | null>(null);
 
   const hasFilter = searchQuery.trim() !== "" || categoryFilter !== ALL_CATEGORIES;
+  const hasSearchResultContext = searchQuery.trim() !== "" || Boolean(selectedNodeLabel);
 
   const allThreads = useMemo(() => {
     const map = new Map<string, ThreadRow>();
@@ -729,6 +732,42 @@ export default function ForumPage() {
 
     return Array.from(map.values());
   }, [activeThreads, popularThreads, recentThreads]);
+
+  const searchResultThreads = useMemo(
+    () =>
+      allThreads.filter((thread) =>
+        matchesThread(thread, searchQuery, categoryFilter)
+      ),
+    [allThreads, categoryFilter, searchQuery]
+  );
+
+  const searchResultTotalPages = Math.max(
+    1,
+    Math.ceil(searchResultThreads.length / SEARCH_RESULTS_PER_PAGE)
+  );
+  const currentSearchResultPage = Math.min(
+    searchResultPage,
+    searchResultTotalPages
+  );
+  const searchResultStartIndex =
+    searchResultThreads.length === 0
+      ? 0
+      : (currentSearchResultPage - 1) * SEARCH_RESULTS_PER_PAGE;
+  const visibleSearchResultThreads = searchResultThreads.slice(
+    searchResultStartIndex,
+    searchResultStartIndex + SEARCH_RESULTS_PER_PAGE
+  );
+  const searchResultEndIndex =
+    searchResultThreads.length === 0
+      ? 0
+      : searchResultStartIndex + visibleSearchResultThreads.length;
+  const searchResultDisplayStart =
+    searchResultThreads.length === 0 ? 0 : searchResultStartIndex + 1;
+  const searchResultTerm = searchQuery.trim() || selectedNodeLabel || "";
+  const searchResultTitle =
+    selectedNodeLabel && searchQuery.trim() === selectedNodeLabel
+      ? `論点「${selectedNodeLabel}」の関連スレッド`
+      : `「${searchResultTerm}」の検索結果`;
 
   const categoryOptions = useMemo(() => {
     const categories = allThreads
@@ -794,6 +833,10 @@ export default function ForumPage() {
       setSearchQuery(initialSearchQuery);
     }
   }, [initialSearchQuery]);
+
+  useEffect(() => {
+    setSearchResultPage(1);
+  }, [categoryFilter, node, searchQuery]);
 
   useEffect(() => {
     const saved = localStorage.getItem("forum_default_mode");
@@ -1473,6 +1516,8 @@ export default function ForumPage() {
               onClick={() => {
                 setSearchQuery("");
                 setCategoryFilter(ALL_CATEGORIES);
+                setSearchResultPage(1);
+                router.push(`/${tenant}/forum`);
               }}
               style={ghostButtonStyle}
             >
@@ -1523,6 +1568,148 @@ export default function ForumPage() {
                   位置：{selectedNodePathText}
                 </div>
               )}
+            </div>
+          )}
+        </section>
+      )}
+
+      {hasSearchResultContext && (
+        <section
+          style={{
+            ...panelStyle,
+            marginBottom: 22,
+            background: "#ffffff",
+            color: "#111827",
+            border: "1px solid #cbd5e1",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap",
+              alignItems: "flex-start",
+              marginBottom: 12,
+            }}
+          >
+            <div>
+              <h2 style={{ margin: 0, fontSize: 20 }}>{searchResultTitle}</h2>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  marginTop: 8,
+                  color: "#475569",
+                  fontSize: currentFontSize - 2,
+                  lineHeight: 1.6,
+                }}
+              >
+                <span>関連スレッド：{searchResultThreads.length}件</span>
+                <span>
+                  表示中：{searchResultDisplayStart}〜{searchResultEndIndex}件
+                </span>
+                <span>条件：カテゴリ {categoryFilter}</span>
+              </div>
+              {selectedNodeLabel && (
+                <div style={{ ...smallMetaStyle, marginTop: 6 }}>
+                  選択中の論点：{selectedNodeLabel}
+                  {selectedNodePathText ? ` / 位置：${selectedNodePathText}` : ""}
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setCategoryFilter(ALL_CATEGORIES);
+                setSearchResultPage(1);
+                router.push(`/${tenant}/forum`);
+              }}
+              style={ghostButtonStyle}
+            >
+              条件をリセット
+            </button>
+          </div>
+
+          {visibleSearchResultThreads.length > 0 ? (
+            <>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+                  gap: 12,
+                }}
+              >
+                {visibleSearchResultThreads.map((thread, index) => (
+                  <ThreadCard
+                    key={`search-result-${thread.id}`}
+                    thread={thread}
+                    tenant={tenant}
+                    currentFontSize={currentFontSize}
+                    isFeatured={index === 0 && currentSearchResultPage === 1}
+                  />
+                ))}
+              </div>
+
+              {searchResultTotalPages > 1 && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 10,
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    marginTop: 14,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSearchResultPage((page) => Math.max(1, page - 1))
+                    }
+                    disabled={currentSearchResultPage <= 1}
+                    style={{
+                      ...ghostButtonStyle,
+                      opacity: currentSearchResultPage <= 1 ? 0.55 : 1,
+                      cursor:
+                        currentSearchResultPage <= 1 ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    前へ
+                  </button>
+                  <div style={smallMetaStyle}>
+                    {currentSearchResultPage} / {searchResultTotalPages}ページ
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSearchResultPage((page) =>
+                        Math.min(searchResultTotalPages, page + 1)
+                      )
+                    }
+                    disabled={currentSearchResultPage >= searchResultTotalPages}
+                    style={{
+                      ...ghostButtonStyle,
+                      opacity:
+                        currentSearchResultPage >= searchResultTotalPages ? 0.55 : 1,
+                      cursor:
+                        currentSearchResultPage >= searchResultTotalPages
+                          ? "not-allowed"
+                          : "pointer",
+                    }}
+                  >
+                    次へ
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ ...panelStyle, color: "#475569" }}>
+              条件に合うスレッドはありません。
             </div>
           )}
         </section>
