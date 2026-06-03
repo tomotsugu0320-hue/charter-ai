@@ -1141,6 +1141,10 @@ export default function ForumPage() {
                     href: `/${tenant}/forum/admin/re-evaluate-logic-score`,
                     label: "AI論理スコア再評価",
                   },
+                  {
+                    href: `/${tenant}/forum/admin/rebuild-discussion-map`,
+                    label: "議論マップ再編案",
+                  },
                   { href: `/${tenant}/forum`, label: "トップへ戻る" },
                 ].map((item) => (
                   <Link
