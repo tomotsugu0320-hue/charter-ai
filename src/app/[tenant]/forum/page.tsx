@@ -96,6 +96,14 @@ const NODE_INFO: Record<string, { label: string; path?: string[] }> = {
     label: "財源",
     path: ["反論・リスクを確認する", "財源"],
   },
+  "funding-inflation": {
+    label: "財源・インフレ",
+    path: ["反論・リスクを確認する", "財源・インフレ"],
+  },
+  "employment-wages-impact": {
+    label: "雇用・賃金への影響",
+    path: ["消費税", "雇用・賃金への影響"],
+  },
   abenomics: {
     label: "アベノミクス",
     path: ["政策を検証する", "アベノミクス"],
@@ -124,8 +132,16 @@ const discussionMapBranches: DiscussionMapNode[] = [
             children: [
               { id: "demand-shortage", label: "需要不足", nodeId: "demand-shortage" },
               { id: "tax-cuts", label: "減税", nodeId: "tax-cuts" },
-              { id: "funding-inflation", label: "財源・インフレ" },
-              { id: "employment-wages-impact", label: "雇用・賃金への影響" },
+              {
+                id: "funding-inflation",
+                label: "財源・インフレ",
+                nodeId: "funding-inflation",
+              },
+              {
+                id: "employment-wages-impact",
+                label: "雇用・賃金への影響",
+                nodeId: "employment-wages-impact",
+              },
             ],
           },
         ],
