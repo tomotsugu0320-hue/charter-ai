@@ -47,20 +47,16 @@ export default function DeleteThreadsPage() {
   function requireAdminKey() {
     if (requestAdminKey) return true;
 
-    setError("管理者キーを入力してください。");
+    setError("完全削除には管理者キーを入力してください。");
     return false;
   }
 
   async function load() {
-    if (!requireAdminKey()) return;
-
     setListLoading(true);
     setError(null);
 
     try {
-      const res = await fetch(`/api/forum/admin-threads?mode=${mode}`, {
-        headers: { "x-admin-key": requestAdminKey },
-      });
+      const res = await fetch(`/api/forum/admin-threads?mode=${mode}`);
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
@@ -75,7 +71,6 @@ export default function DeleteThreadsPage() {
   }
 
   async function del(thread: ThreadRow) {
-    if (!requireAdminKey()) return;
     if (!confirm(`このスレッドを非表示にします。対象: ${titleOf(thread)}`)) {
       return;
     }
@@ -88,7 +83,6 @@ export default function DeleteThreadsPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": requestAdminKey,
         },
         body: JSON.stringify({ threadId: thread.id }),
       });
@@ -119,7 +113,6 @@ export default function DeleteThreadsPage() {
   }
 
   async function restore(thread: ThreadRow) {
-    if (!requireAdminKey()) return;
     if (
       !confirm(
         `このスレッドを公開状態に戻します。対象: ${titleOf(thread)}`
@@ -136,7 +129,6 @@ export default function DeleteThreadsPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": requestAdminKey,
         },
         body: JSON.stringify({ threadId: thread.id }),
       });
@@ -209,7 +201,7 @@ export default function DeleteThreadsPage() {
   return (
     <main style={{ padding: 20 }}>
       <Link
-        href={`/${tenant}/forum/admin`}
+        href={`/${tenant}/forum`}
         style={{
           display: "inline-block",
           color: "#1d4ed8",
@@ -219,42 +211,30 @@ export default function DeleteThreadsPage() {
           textDecoration: "underline",
         }}
       >
-        ← forum管理トップへ戻る
+        ← Forumトップへ戻る
       </Link>
 
       <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
-        スレッド非表示管理
+        管理画面（会員）：非表示/復元
       </h1>
 
       <p style={{ opacity: 0.7, marginBottom: 16 }}>
-        トップ一覧に表示する/しないを切り替えます。
+        この画面では、スレッドの非表示・復元を行えます。完全削除は管理者のみです。
       </p>
 
-      <div style={{ marginBottom: 16 }}>
-        <label
-          style={{
-            display: "block",
-            fontSize: 12,
-            fontWeight: 700,
-            color: "#374151",
-            marginBottom: 6,
-          }}
-        >
-          管理者キー（完全削除用）
-        </label>
-        <input
-          type="password"
-          value={adminKey}
-          onChange={(event) => setAdminKey(event.target.value)}
-          placeholder="ADMIN_KEY"
-          style={{
-            width: "100%",
-            maxWidth: 360,
-            border: "1px solid #d1d5db",
-            borderRadius: 6,
-            padding: "8px 10px",
-          }}
-        />
+      <div
+        style={{
+          border: "1px solid #bfdbfe",
+          borderRadius: 8,
+          background: "#eff6ff",
+          color: "#1e3a8a",
+          lineHeight: 1.7,
+          marginBottom: 16,
+          padding: "10px 12px",
+          fontWeight: 700,
+        }}
+      >
+        一覧の読み込み、非表示、復元は管理者キーなしで使えます。完全削除だけ管理者キーが必要です。
       </div>
 
       <button
@@ -463,6 +443,41 @@ export default function DeleteThreadsPage() {
                     <div style={{ fontWeight: 800, marginBottom: 8 }}>
                       危険操作
                     </div>
+                    <div
+                      style={{
+                        color: "#7f1d1d",
+                        fontSize: 13,
+                        lineHeight: 1.6,
+                        marginBottom: 8,
+                      }}
+                    >
+                      完全削除には管理者キーが必要です。
+                    </div>
+
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: 12,
+                        fontWeight: 800,
+                        marginBottom: 6,
+                      }}
+                    >
+                      管理者キー（完全削除のみ）
+                    </label>
+                    <input
+                      type="password"
+                      value={adminKey}
+                      onChange={(event) => setAdminKey(event.target.value)}
+                      placeholder="ADMIN_KEY"
+                      style={{
+                        width: "100%",
+                        maxWidth: 360,
+                        border: "1px solid #fecaca",
+                        borderRadius: 6,
+                        marginBottom: 10,
+                        padding: "8px 10px",
+                      }}
+                    />
 
                     <button
                       type="button"

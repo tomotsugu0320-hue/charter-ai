@@ -67,10 +67,10 @@ export default async function ForumAdminPage({ params }: PageProps) {
           style={menuCardStyle}
         >
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
-            スレッド削除管理
+            会員向け：非表示/復元
           </h2>
           <p style={menuDescriptionStyle}>
-            スレッドの非表示、復元、完全削除を管理します。
+            管理者キーなしでスレッドの非表示・復元を行えます。完全削除のみ管理者キーが必要です。
           </p>
         </Link>
 
