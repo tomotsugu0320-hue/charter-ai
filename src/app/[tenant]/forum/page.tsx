@@ -1464,11 +1464,11 @@ export default function ForumPage() {
               flex: "1 1 280px",
             }}
           >
-            <strong style={{ color: "#f9fafb" }}>
-              過去のChatGPT会話や自分のメモを投稿候補にできます。
-            </strong>
+            ご自分のスマホでChatGPTと話した過去の会話や、自分のメモを投稿候補にできます。
             <br />
-            長くなった考えや複数の論点を、掲示板に投稿しやすい形へまとめて取り込めます。読み取っただけでは投稿されません。
+            長くなった考えや複数の論点を、掲示板に投稿しやすい形へまとめてAI掲示板に取り込めます。
+            <br />
+            ※ 読み取っただけでは投稿されません。
           </div>
           <Link
             href={`/${tenant}/forum/private-logs`}
