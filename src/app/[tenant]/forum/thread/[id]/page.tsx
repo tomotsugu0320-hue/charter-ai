@@ -3368,15 +3368,19 @@ function jumpToPostForm() {
     </div>
 
     <textarea
+      className="forum-textarea"
       value={rebuttalClaim}
       onChange={(e) => setRebuttalClaim(e.target.value)}
       placeholder="主張を書く"
       style={{
         width: "100%",
-        border: "1px solid #ccc",
+        border: "1px solid #cbd5e1",
         borderRadius: 10,
         padding: 10,
         fontSize: currentFont.base,
+        background: "#fff",
+        color: "#111827",
+        caretColor: "#111827",
       }}
     ></textarea>
 
@@ -3394,34 +3398,41 @@ function jumpToPostForm() {
     />
 
     <textarea
+      className="forum-textarea"
       value={rebuttalReason}
       onChange={(e) => setRebuttalReason(e.target.value)}
       placeholder="根拠を書く"
       style={{
         width: "100%",
-        border: "1px solid #ccc",
+        border: "1px solid #cbd5e1",
         borderRadius: 10,
         padding: 10,
         fontSize: currentFont.base,
+        background: "#fff",
+        color: "#111827",
+        caretColor: "#111827",
       }}
     ></textarea>
   </div>
 ) : (
   <>
     <textarea
+      className="forum-textarea"
       value={text}
       onChange={(e) => setText(e.target.value)}
       placeholder="あなたの考えを書く（主張・前提・根拠でもOK）"
       rows={5}
       style={{
         width: "100%",
-        border: "1px solid #ccc",
+        border: "1px solid #cbd5e1",
         borderRadius: 10,
         padding: 12,
         fontSize: currentFont.base,
         resize: "vertical",
         outline: "none",
-        color: "#111",
+        background: "#fff",
+        color: "#111827",
+        caretColor: "#111827",
       }}
 ></textarea>
 

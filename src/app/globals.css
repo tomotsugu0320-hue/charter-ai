@@ -35,6 +35,16 @@ a {
   text-decoration: none;
 }
 
+.forum-textarea::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
+.forum-textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
+}
+
 @media (prefers-color-scheme: dark) {
   html {
     color-scheme: dark;
