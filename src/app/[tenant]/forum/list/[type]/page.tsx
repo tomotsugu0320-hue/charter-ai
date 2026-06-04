@@ -252,6 +252,13 @@ export default function ForumListPage() {
   const displayStart = listThreads.length === 0 ? 0 : startIndex + 1;
   const displayEnd = startIndex + visibleThreads.length;
 
+  function handlePageChange(nextPage: number) {
+    setPage(nextPage);
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
+
   if (!config) {
     return (
       <main style={pageStyle}>
@@ -448,7 +455,7 @@ export default function ForumListPage() {
           >
             <button
               type="button"
-              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
               disabled={currentPage <= 1}
               style={{
                 ...ghostButtonStyle,
@@ -463,9 +470,7 @@ export default function ForumListPage() {
             </div>
             <button
               type="button"
-              onClick={() =>
-                setPage((current) => Math.min(totalPages, current + 1))
-              }
+              onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage >= totalPages}
               style={{
                 ...ghostButtonStyle,
