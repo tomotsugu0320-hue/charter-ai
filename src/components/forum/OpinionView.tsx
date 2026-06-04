@@ -171,8 +171,8 @@ export default function OpinionView({
   }}
 >
 {group.issue
-  ? `問い: ${group.issue.content}`
-  : `問い: ${thread?.title ?? "このスレのテーマ"}`}
+  ? `起（問い）: ${group.issue.content}`
+  : `起（問い）: ${thread?.title ?? "このスレのテーマ"}`}
 </summary>
             <div style={{ marginTop: 12 }}>
 {group.opinions.length === 0 ? (
