@@ -2275,7 +2275,7 @@ function jumpToPostForm() {
       minHeight: 44,
     }}
   >
-    <span>AIの初期整理を見る</span>
+    <span>参考：AIが最初に整理した内容を見る</span>
     <span
       style={{
         fontSize: currentFont.base * 0.85,
@@ -2307,7 +2307,7 @@ function jumpToPostForm() {
       color: "#111",
     }}
   >
-    AIの初期整理
+    AIが最初に整理した内容
   </h2>
 
   <p
@@ -2318,7 +2318,7 @@ function jumpToPostForm() {
       lineHeight: 1.7,
     }}
   >
-    議論が少ない段階では、AIの整理を叩き台として表示しています。
+    投稿が少ない段階でAIが作った仮の整理です。現在の結論ではありません。
   </p>
 
   {showInitialDiscussionNote && (
