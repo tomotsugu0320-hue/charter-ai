@@ -367,15 +367,25 @@ const feedbackActions = [
   </div>
 )}
 
+      <div>
+        <div style={{ marginBottom: 6 }}>
+          <b>主張</b>
+          <div>{claim}</div>
+        </div>
+
+      </div>
+
       <div
         style={{
           display: "flex",
           gap: 8,
+          marginTop: 10,
           marginBottom: 8,
           flexWrap: "wrap",
         }}
       >
-        <PrimaryButton
+        <button
+          type="button"
 onClick={() => {
 setSelectedGuide({ type: "根拠", text: displayText });
   setPostRole("rebuttal");
@@ -383,15 +393,21 @@ setSelectedGuide({ type: "根拠", text: displayText });
 window.dispatchEvent(new Event("scroll-to-post-form"));
 }}
           style={{
-            padding: "6px 10px",
-            borderRadius: 6,
-            fontSize: currentFont?.base,
+            fontSize: 12,
+            color: "#b71c1c",
+            border: "1px solid #fecaca",
+            borderRadius: 999,
+            background: "#fff",
+            cursor: "pointer",
+            fontWeight: 700,
+            padding: "5px 10px",
           }}
         >
           反論する
-        </PrimaryButton>
+        </button>
 
-        <PrimaryButton
+        <button
+          type="button"
 onClick={() => {
 setSelectedGuide({ type: "前提", text: displayText });
   setPostRole("supplement");
@@ -400,21 +416,18 @@ setSelectedGuide({ type: "前提", text: displayText });
 window.dispatchEvent(new Event("scroll-to-post-form"));
 }}
           style={{
-            padding: "6px 10px",
-            borderRadius: 6,
-            fontSize: currentFont?.base,
+            fontSize: 12,
+            color: "#1d4ed8",
+            border: "1px solid #bfdbfe",
+            borderRadius: 999,
+            background: "#fff",
+            cursor: "pointer",
+            fontWeight: 700,
+            padding: "5px 10px",
           }}
         >
           補足する
-        </PrimaryButton>
-      </div>
-
-      <div>
-        <div style={{ marginBottom: 6 }}>
-          <b>主張</b>
-          <div>{claim}</div>
-        </div>
-
+        </button>
       </div>
 
       {displayLogicScoreReason && (
@@ -474,6 +487,60 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
         </div>
       )}
 
+      <details style={{ marginTop: 10, marginBottom: 10 }}>
+        <summary
+          style={{
+            cursor: "pointer",
+            color: "#475569",
+            fontSize: currentFont?.base ? currentFont.base * 0.9 : 14,
+            fontWeight: 800,
+            lineHeight: 1.5,
+          }}
+        >
+          調べる・AIで補助する
+        </summary>
+        <div
+          style={{
+            marginTop: 8,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 8,
+          }}
+        >
+          {feedbackActions.map(([type, label]) => (
+            <PrimaryButton
+              key={type}
+              variant="secondary"
+              onClick={() => handleFeedback(op.opinion.id, type)}
+              disabled={feedbackLoadingPostId === op.opinion.id}
+              style={{
+                borderRadius: 999,
+                padding: "6px 10px",
+                fontSize: currentFont?.base ? currentFont.base * 0.9 : undefined,
+              }}
+            >
+              {label}
+            </PrimaryButton>
+          ))}
+          <PrimaryButton
+            variant="secondary"
+            onClick={() =>
+              window.open(
+                `https://www.google.com/search?q=${encodeURIComponent(claim || displayText)}`,
+                "_blank"
+              )
+            }
+            style={{
+              borderRadius: 999,
+              padding: "6px 10px",
+              fontSize: currentFont?.base ? currentFont.base * 0.9 : undefined,
+            }}
+          >
+            Googleで調べる
+          </PrimaryButton>
+        </div>
+      </details>
+
       {(savedConclusionExplanation || savedCounterargumentExplanation) && (
         <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
           {savedConclusionExplanation && (
@@ -523,52 +590,6 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
           )}
         </div>
       )}
-
-      {feedbackActions.length > 0 && (
-      <div
-        style={{
-          marginTop: 10,
-          marginBottom: 10,
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 8,
-        }}
-      >
-        {feedbackActions.map(([type, label]) => (
-          <PrimaryButton
-            key={type}
-            variant="secondary"
-            onClick={() => handleFeedback(op.opinion.id, type)}
-            disabled={feedbackLoadingPostId === op.opinion.id}
-            style={{
-              borderRadius: 999,
-              padding: "6px 10px",
-              fontSize: currentFont?.base,
-            }}
-          >
-            {label}
-          </PrimaryButton>
-        ))}
-      </div>
-      )}
-
-<PrimaryButton
-  variant="secondary"
-  onClick={() =>
-    window.open(
-      `https://www.google.com/search?q=${encodeURIComponent(claim || displayText)}`,
-      "_blank"
-    )
-  }
-  style={{
-    borderRadius: 999,
-    padding: "5px 9px",
-    fontSize: currentFont?.base ? currentFont.base * 0.9 : undefined,
-    marginTop: 2,
-  }}
->
-  Googleで調べる
-</PrimaryButton>
 
       {feedbackLoadingPostId === op.opinion.id &&
         !explanations?.[op.opinion.id] && (

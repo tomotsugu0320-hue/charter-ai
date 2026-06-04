@@ -1623,7 +1623,14 @@ if (postRole === "rebuttal" && !replyToOpinionId) {
   }
 
 function jumpToMainIssues() {
+  const details = document.getElementById("main-issues-section") as HTMLDetailsElement | null;
+  if (details) details.open = true;
   const el = document.getElementById("main-issues");
+  el?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function jumpToPostForm() {
+  const el = document.getElementById("post-form");
   el?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -1821,6 +1828,38 @@ function jumpToMainIssues() {
   {copied && <span style={{ color: "#2e7d32" }}>コピーした</span>}
 </div>
 
+<div
+  style={{
+    marginTop: 14,
+    padding: "12px 14px",
+    border: "1px solid #dbeafe",
+    borderRadius: 10,
+    background: "#eff6ff",
+    color: "#1e3a8a",
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap",
+    alignItems: "center",
+    lineHeight: 1.7,
+  }}
+>
+  <div style={{ flex: "1 1 280px", fontSize: currentFont.base }}>
+    まずは「問い → 現時点の答え → 主な理由 → 反論・リスク」の順に読むと、この議論の全体像が分かります。
+  </div>
+  <PrimaryButton
+    onClick={jumpToPostForm}
+    style={{
+      padding: "8px 12px",
+      background: "#1d4ed8",
+      color: "#ffffff",
+      border: "1px solid #1d4ed8",
+    }}
+  >
+    この議論に投稿する
+  </PrimaryButton>
+</div>
+
 <div style={{ marginTop: 8, fontSize: currentFont.base * 0.9, color: "#666" }}>
   作成日時: {formatDate(thread.created_at)}
 </div>
@@ -1839,7 +1878,7 @@ function jumpToMainIssues() {
 >
   {averageLogicScore > 0 ? (
     <>
-      AI論理スコア平均: {averageLogicScore}
+      議論全体の論理性: {averageLogicScore}
       <span
         style={{
           marginLeft: 8,
@@ -1856,7 +1895,7 @@ function jumpToMainIssues() {
       </span>
     </>
   ) : (
-    <>AI論理スコア平均: 未評価</>
+    <>議論全体の論理性: 未評価</>
   )}
 </div>
 
@@ -1868,7 +1907,7 @@ function jumpToMainIssues() {
     fontWeight: maxLogicScore && maxLogicScore >= 80 ? 700 : 500,
   }}
 >
-  最高AI論理スコア: {maxLogicScore ?? "未評価"}
+  最高評価の投稿: {maxLogicScore ?? "未評価"}
 </div>
 
   <div>
@@ -2044,80 +2083,94 @@ function jumpToMainIssues() {
 
 <SectionCard variant="white" style={{ marginTop: 24 }}>
             <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
-              まず意見を読む
+              この議論への投稿
             </SectionTitle>
 
-            <div style={{ marginBottom: 12 }}>
-              <input
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                placeholder="投稿を検索"
-                style={{
-                  width: "100%",
-                  border: "1px solid #ccc",
-                  borderRadius: 10,
-                  padding: "12px 14px",
-                  fontSize: currentFont.base,
-                  background: "#fff",
-                  color: "#000",
-                }}
-              />
-            </div>
-
-            <label
+            <p
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 12,
-                fontSize: currentFont.base,
-                color: "#444",
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={hideLowScore}
-                onChange={(e) => setHideLowScore(e.target.checked)}
-              />
-              AI論理スコアが低い投稿を薄く表示する
-            </label>
-
-            <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <PrimaryButton
-                onClick={() => setSortType("score")}
-                style={{
-                  background: sortType === "score" ? "#111" : "#eee",
-                  color: sortType === "score" ? "#fff" : "#333",
-                }}
-              >
-                AI論理スコア順
-              </PrimaryButton>
-
-              <PrimaryButton
-                onClick={() => setSortType("new")}
-                style={{
-                  background: sortType === "new" ? "#111" : "#eee",
-                  color: sortType === "new" ? "#fff" : "#333",
-                }}
-              >
-                新着順
-              </PrimaryButton>
-            </div>
-
-            <div
-              style={{
-                marginTop: 4,
+                marginTop: 0,
                 marginBottom: 12,
                 color: "#475569",
-                fontSize: currentFont.base - 2,
+                fontSize: currentFont.base,
                 lineHeight: 1.6,
               }}
             >
-              AI論理スコアは正解判定ではなく、前提・根拠・因果関係・反論耐性を見るための目安です。
+              意見・反論・補足をここで読めます。
+            </p>
+
+            <div
+              style={{
+                marginBottom: 16,
+                padding: "12px 14px",
+                border: "1px solid #d7dde8",
+                borderRadius: 10,
+                background: "#f8fafc",
+                color: "#111",
+              }}
+            >
+              <div
+                style={{
+                  marginBottom: 10,
+                  fontSize: currentFont.base,
+                  fontWeight: 800,
+                  color: "#111",
+                }}
+              >
+                投稿の表示設定
+              </div>
+
+              <label
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 12,
+                  fontSize: currentFont.base,
+                  color: "#444",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={hideLowScore}
+                  onChange={(e) => setHideLowScore(e.target.checked)}
+                />
+                AI論理スコアが低い投稿を薄く表示する
+              </label>
+
+              <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <PrimaryButton
+                  onClick={() => setSortType("score")}
+                  style={{
+                    background: sortType === "score" ? "#111" : "#eee",
+                    color: sortType === "score" ? "#fff" : "#333",
+                  }}
+                >
+                  AI論理スコア順
+                </PrimaryButton>
+
+                <PrimaryButton
+                  onClick={() => setSortType("new")}
+                  style={{
+                    background: sortType === "new" ? "#111" : "#eee",
+                    color: sortType === "new" ? "#fff" : "#333",
+                  }}
+                >
+                  新着順
+                </PrimaryButton>
+              </div>
+
+              <div
+                style={{
+                  marginTop: 4,
+                  color: "#475569",
+                  fontSize: currentFont.base - 2,
+                  lineHeight: 1.6,
+                }}
+              >
+                AI論理スコアは正解判定ではなく、前提・根拠・因果関係・反論耐性を見るための目安です。
+              </div>
             </div>
-
-
 
             {visiblePosts.length === 0 ? (
               <div style={{ color: "#666" }}>まだ投稿がない。</div>
@@ -2143,6 +2196,59 @@ function jumpToMainIssues() {
 
 </div>
             )}
+
+            <details style={{ marginTop: 14 }}>
+              <summary
+                style={{
+                  cursor: "pointer",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "10px 12px",
+                  border: "1px solid #d7dde8",
+                  borderRadius: 8,
+                  background: "#f8fafc",
+                  color: "#111",
+                  fontSize: currentFont.base,
+                  fontWeight: 800,
+                  lineHeight: 1.4,
+                }}
+              >
+                <span>投稿を検索する</span>
+                <span
+                  style={{
+                    fontSize: currentFont.base * 0.85,
+                    color: "#64748b",
+                    fontWeight: 700,
+                    whiteSpace: "normal",
+                  }}
+                >
+                  タップして開く
+                </span>
+              </summary>
+
+            <div style={{ marginTop: 12 }}>
+
+            <div>
+              <input
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                placeholder="投稿を検索"
+                style={{
+                  width: "100%",
+                  border: "1px solid #ccc",
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                  fontSize: currentFont.base,
+                  background: "#fff",
+                  color: "#000",
+                }}
+              />
+            </div>
+            </div>
+            </details>
           </SectionCard>
 
 
@@ -2291,6 +2397,43 @@ function jumpToMainIssues() {
   </div>
 </div>
 </details>
+
+  </div>
+
+<details style={{ marginTop: 16 }}>
+  <summary
+    style={{
+      cursor: "pointer",
+      display: "flex",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 12,
+      padding: "12px 14px",
+      border: "1px solid #d7dde8",
+      borderRadius: 8,
+      background: "#f8fafc",
+      color: "#111",
+      fontSize: currentFont.title,
+      fontWeight: 800,
+      lineHeight: 1.4,
+      minHeight: 44,
+    }}
+  >
+    <span>{mode === "normal" ? "この議論の要約を見る" : "全体理解（やさしい要約）を見る"}</span>
+    <span
+      style={{
+        fontSize: currentFont.base * 0.85,
+        color: "#64748b",
+        fontWeight: 700,
+        whiteSpace: "normal",
+      }}
+    >
+      タップして開く
+    </span>
+  </summary>
+
+<div style={{ marginTop: 12 }}>
 
 <div
   style={{
@@ -2442,11 +2585,45 @@ function jumpToMainIssues() {
     )}
   </div>
 </div>
+</details>
 
 </SectionCard>
 {/* ←ここで完全に閉じる */}
 
-<SectionCard variant="white" style={{ marginTop: 24 }}>
+<details id="main-issues-section" style={{ marginTop: 24 }}>
+  <summary
+    style={{
+      cursor: "pointer",
+      display: "flex",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 12,
+      padding: "12px 14px",
+      border: "1px solid #d7dde8",
+      borderRadius: 8,
+      background: "#f8fafc",
+      color: "#111",
+      fontSize: currentFont.title,
+      fontWeight: 800,
+      lineHeight: 1.4,
+      minHeight: 44,
+    }}
+  >
+    <span>論点整理を見る</span>
+    <span
+      style={{
+        fontSize: currentFont.base * 0.85,
+        color: "#64748b",
+        fontWeight: 700,
+        whiteSpace: "normal",
+      }}
+    >
+      タップして開く
+    </span>
+  </summary>
+
+<SectionCard variant="white" style={{ marginTop: 12 }}>
   <div id="main-issues" style={{ scrollMarginTop: 80 }} />
 
   <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
@@ -2675,6 +2852,7 @@ function jumpToMainIssues() {
     )}
   </div>
 </SectionCard>
+</details>
 
 
 <details style={{ marginTop: 24 }}>
@@ -3308,7 +3486,40 @@ function jumpToMainIssues() {
             </div>
           </SectionCard>
 
-          <SectionCard variant="white" style={{ marginTop: 24 }}>
+          <details style={{ marginTop: 24 }}>
+            <summary
+              style={{
+                cursor: "pointer",
+                display: "flex",
+                flexWrap: "wrap",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+                padding: "12px 14px",
+                border: "1px solid #d7dde8",
+                borderRadius: 8,
+                background: "#f8fafc",
+                color: "#111",
+                fontSize: currentFont.title,
+                fontWeight: 800,
+                lineHeight: 1.4,
+                minHeight: 44,
+              }}
+            >
+              <span>議論の全体マップを見る</span>
+              <span
+                style={{
+                  fontSize: currentFont.base * 0.85,
+                  color: "#64748b",
+                  fontWeight: 700,
+                  whiteSpace: "normal",
+                }}
+              >
+                タップして開く
+              </span>
+            </summary>
+
+          <SectionCard variant="white" style={{ marginTop: 12 }}>
             <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
               議論の全体マップ
             </SectionTitle>
@@ -3364,6 +3575,7 @@ function jumpToMainIssues() {
               </div>
             </div>
           </SectionCard>
+          </details>
         </>
       )}
     </main>

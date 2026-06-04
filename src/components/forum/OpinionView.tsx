@@ -252,7 +252,7 @@ export default function OpinionView({
               }}
             >
               <div style={{ display: "grid", gap: 2 }}>
-                <span>🏆 まず読む意見 {op.opinion.logic_score ?? "-"}</span>
+                <span>🏆 AIが選んだ注目反応 {op.opinion.logic_score ?? "-"}</span>
                 <span
                   style={{
                     color: "#666",
@@ -260,7 +260,7 @@ export default function OpinionView({
                     fontSize: currentFont.base * 0.85,
                   }}
                 >
-                  AI論理スコアの目安
+                  意見・反論・補足の中から、読む価値が高い投稿をAIが厳選しました。
                 </span>
               </div>
               <span
@@ -422,23 +422,54 @@ export default function OpinionView({
         </div>
       )}
 
-      <button
-        onClick={() => {
-          setReplyToOpinionId(op.opinion.id);
-          setPostRole("rebuttal");
-        }}
-        style={{
-          marginTop: 8,
-          fontSize: 12,
-          color: "#b71c1c",
-          border: "none",
-          background: "transparent",
-          cursor: "pointer",
-          fontWeight: 700,
-        }}
-      >
-        この意見に反論する
-      </button>
+      {!isExpanded && (
+        <div
+          style={{
+            marginTop: 10,
+            display: "flex",
+            gap: 8,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          <button
+            onClick={() => {
+              setReplyToOpinionId(op.opinion.id);
+              setPostRole("rebuttal");
+            }}
+            style={{
+              fontSize: 12,
+              color: "#b71c1c",
+              border: "1px solid #fecaca",
+              borderRadius: 999,
+              background: "#fff7f7",
+              cursor: "pointer",
+              fontWeight: 700,
+              padding: "5px 10px",
+            }}
+          >
+            反論する
+          </button>
+          <button
+            onClick={() => {
+              setReplyToOpinionId(op.opinion.id);
+              setPostRole("supplement");
+            }}
+            style={{
+              fontSize: 12,
+              color: "#1d4ed8",
+              border: "1px solid #bfdbfe",
+              borderRadius: 999,
+              background: "#eff6ff",
+              cursor: "pointer",
+              fontWeight: 700,
+              padding: "5px 10px",
+            }}
+          >
+            補足する
+          </button>
+        </div>
+      )}
       </PostCard>
     </div>
       );
