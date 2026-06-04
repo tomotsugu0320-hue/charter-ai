@@ -711,7 +711,7 @@ for (const word of matches) {
     useState<PostRoleOption["value"]>("opinion");
   const [stanceLabel, setStanceLabel] = useState<StanceLabel>("unknown");
 
-const [treeVariant, setTreeVariant] = useState<"A" | "C">("A");
+const [treeVariant] = useState<"A" | "C">("A");
 
   const [predictionFlag, setPredictionFlag] = useState(false);
   const [predictionTarget, setPredictionTarget] = useState("");
@@ -2874,7 +2874,7 @@ function jumpToPostForm() {
       minHeight: 44,
     }}
   >
-    <span>構造で見る</span>
+    <span>議論ツリーを見る</span>
     <span
       style={{
         fontSize: currentFont.base * 0.85,
@@ -2888,24 +2888,6 @@ function jumpToPostForm() {
   </summary>
 
 <div style={{ marginTop: 12 }}>
-
-<div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-  <PrimaryButton
-    variant={treeVariant === "A" ? "primary" : "secondary"}
-    onClick={() => setTreeVariant("A")}
-    style={{ padding: "6px 12px" }}
-  >
-    A表示（読みやすい）
-  </PrimaryButton>
-
-  <PrimaryButton
-    variant={treeVariant === "C" ? "primary" : "secondary"}
-    onClick={() => setTreeVariant("C")}
-    style={{ padding: "6px 12px" }}
-  >
-    C表示（構造重視）
-  </PrimaryButton>
-</div>
 
   <div
     style={{
