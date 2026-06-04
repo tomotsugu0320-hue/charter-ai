@@ -53,8 +53,8 @@ type OrganizedResult = {
 type RankingMode = "recent" | "score" | "posts";
 
 const RANKING_TABS: { value: RankingMode; label: string }[] = [
-  { value: "recent", label: "新着順" },
   { value: "score", label: "AI論理スコア順" },
+  { value: "recent", label: "新着順" },
   { value: "posts", label: "投稿数順" },
 ];
 
@@ -66,7 +66,8 @@ type DiscussionMapNode = {
 };
 
 const ALL_CATEGORIES = "すべて";
-const SEARCH_RESULTS_PER_PAGE = 5;
+const TOP_CARD_LIMIT = 9;
+const SEARCH_RESULTS_PER_PAGE = 9;
 const draftStorageKey = "forum_thread_draft_input";
 const NODE_INFO: Record<string, { label: string; path?: string[] }> = {
   "consumption-tax": {
@@ -218,6 +219,20 @@ const smallMetaStyle: CSSProperties = {
   lineHeight: 1.6,
 };
 
+const sectionLinkStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  border: "1px solid #cbd5e1",
+  borderRadius: 999,
+  padding: "5px 11px",
+  background: "#ffffff",
+  color: "#0f172a",
+  fontSize: 13,
+  fontWeight: 900,
+  textDecoration: "none",
+  whiteSpace: "nowrap",
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -365,7 +380,7 @@ function normalizeRelatedThreads(value: unknown): RelatedThread[] {
       };
     })
     .filter((thread): thread is RelatedThread => thread !== null)
-    .slice(0, 5);
+    .slice(0, TOP_CARD_LIMIT);
 }
 
 function formatScore(value?: number) {
@@ -492,13 +507,13 @@ function matchesThread(thread: ThreadRow, query: string, category: string) {
   return matchesSearch && matchesCategory;
 }
 
-function threadCardStyle(isFeatured: boolean): CSSProperties {
+function threadCardStyle(isFeatured: boolean, compact = false): CSSProperties {
   return {
     border: isFeatured ? "1px solid #2563eb" : "1px solid #d7dde8",
     borderRadius: 8,
-    padding: 14,
+    padding: compact ? 12 : 14,
     background: isFeatured ? "#eff6ff" : "#ffffff",
-    minHeight: 148,
+    minHeight: compact ? 118 : 148,
   };
 }
 
@@ -507,11 +522,13 @@ function ThreadCard({
   tenant,
   currentFontSize,
   isFeatured = false,
+  compact = false,
 }: {
   thread: ThreadRow;
   tenant: string;
   currentFontSize: number;
   isFeatured?: boolean;
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [isActive, setIsActive] = useState(false);
@@ -537,10 +554,10 @@ function ThreadCard({
       onFocus={() => setIsActive(true)}
       onBlur={() => setIsActive(false)}
       style={{
-        ...threadCardStyle(isFeatured),
+        ...threadCardStyle(isFeatured, compact),
         border: isActive
           ? "1px solid #2563eb"
-          : threadCardStyle(isFeatured).border,
+          : threadCardStyle(isFeatured, compact).border,
         cursor: "pointer",
         boxShadow: isActive ? "0 8px 18px rgba(37, 99, 235, 0.14)" : "none",
         outline: isActive ? "2px solid rgba(37, 99, 235, 0.18)" : "none",
@@ -596,12 +613,12 @@ function ThreadCard({
         <h3
           style={{
             margin: 0,
-            fontSize: currentFontSize + 2,
+            fontSize: compact ? currentFontSize : currentFontSize + 2,
             lineHeight: 1.45,
             fontWeight: 800,
           }}
         >
-          {thread.title}
+            {truncate(thread.title, compact ? 30 : 36)}
         </h3>
 
         {preview && (
@@ -610,10 +627,10 @@ function ThreadCard({
               margin: "8px 0 0",
               color: "#4b5563",
               fontSize: currentFontSize - 2,
-              lineHeight: 1.7,
+              lineHeight: compact ? 1.55 : 1.7,
             }}
           >
-            {truncate(preview, 80)}
+            {truncate(preview, 50)}
           </p>
         )}
 
@@ -701,7 +718,7 @@ export default function ForumPage() {
   const [popularThreads, setPopularThreads] = useState<ThreadRow[]>([]);
   const [activeThreads, setActiveThreads] = useState<ThreadRow[]>([]);
   const [recentThreads, setRecentThreads] = useState<ThreadRow[]>([]);
-  const [rankingMode, setRankingMode] = useState<RankingMode>("recent");
+  const [rankingMode, setRankingMode] = useState<RankingMode>("score");
   const [defaultMode, setDefaultMode] = useState<"normal" | "easy">("normal");
   const [fontSizeMode, setFontSizeMode] =
     useState<"small" | "medium" | "large">("medium");
@@ -801,11 +818,25 @@ export default function ForumPage() {
     [categoryFilter, recentThreads, searchQuery]
   );
 
-  const visiblePopularThreads = filteredPopularThreads.slice(0, 10);
-  const visibleActiveThreads = filteredActiveThreads.slice(0, 10);
-  const visibleRecentThreads = filteredRecentThreads.slice(0, 10);
+  const visiblePopularThreads = filteredPopularThreads.slice(0, TOP_CARD_LIMIT);
+  const visibleActiveThreads = filteredActiveThreads.slice(0, TOP_CARD_LIMIT);
+  const visibleRecentThreads = filteredRecentThreads.slice(0, TOP_CARD_LIMIT);
   const rankingThreads = useMemo(() => {
-    if (rankingMode === "score") return filteredPopularThreads;
+    if (rankingMode === "score") {
+      return [...filteredPopularThreads].sort((a, b) => {
+        const scoreA =
+          typeof a.avg_logic_score === "number"
+            ? a.avg_logic_score
+            : Number.NEGATIVE_INFINITY;
+        const scoreB =
+          typeof b.avg_logic_score === "number"
+            ? b.avg_logic_score
+            : Number.NEGATIVE_INFINITY;
+
+        if (scoreA !== scoreB) return scoreB - scoreA;
+        return (b.post_count ?? 0) - (a.post_count ?? 0);
+      });
+    }
     if (rankingMode === "posts") return filteredActiveThreads;
     return filteredRecentThreads;
   }, [
@@ -814,12 +845,14 @@ export default function ForumPage() {
     filteredRecentThreads,
     rankingMode,
   ]);
-  const visibleRankingThreads = rankingThreads.slice(0, 10);
+  const rankingListType =
+    rankingMode === "posts" ? "posts" : rankingMode === "recent" ? "latest" : "logic";
+  const visibleRankingThreads = rankingThreads.slice(0, TOP_CARD_LIMIT);
   const aiSummaryThreads = useMemo(
     () =>
       filteredPopularThreads
         .filter((thread) => thread.summary?.trim())
-        .slice(0, 10),
+        .slice(0, TOP_CARD_LIMIT),
     [filteredPopularThreads]
   );
 
@@ -1386,6 +1419,165 @@ export default function ForumPage() {
       </section>
 
       <section style={{ ...panelStyle, marginBottom: 18 }}>
+        <div style={{ marginBottom: 14 }}>
+          <h2 style={{ margin: 0, fontSize: 22 }}>投稿する・投稿候補を作る</h2>
+          <p
+            style={{
+              margin: "8px 0 0",
+              color: "#475569",
+              fontSize: currentFontSize - 1,
+              lineHeight: 1.7,
+            }}
+          >
+            過去の会話やメモから投稿候補を作るか、自分の考えを直接書いて投稿できます。
+          </p>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+            gap: 12,
+          }}
+        >
+          <div
+            style={{
+              border: "1px solid #3d4657",
+              borderRadius: 8,
+              padding: 14,
+              background: "#10141d",
+              color: "#f9fafb",
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: currentFontSize + 2 }}>
+              過去の会話やメモを投稿に変換できます
+            </h3>
+            <div
+              style={{
+                marginTop: 12,
+                display: "grid",
+                gap: 8,
+                color: "#e5e7eb",
+                fontSize: currentFontSize - 1,
+                lineHeight: 1.6,
+              }}
+            >
+              <div>① ChatGPTとの会話・メモを用意</div>
+              <div style={{ color: "#93c5fd", fontWeight: 900 }}>↓</div>
+              <div>② AIで投稿用に整理</div>
+              <div style={{ color: "#93c5fd", fontWeight: 900 }}>↓</div>
+              <div>③ 投稿候補を選んで投稿</div>
+            </div>
+            <p
+              style={{
+                margin: "12px 0 0",
+                color: "#cbd5e1",
+                fontSize: currentFontSize - 2,
+                lineHeight: 1.6,
+              }}
+            >
+              読み取っただけでは投稿されません。投稿する内容は自分で選べます。
+            </p>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 10,
+                marginTop: 14,
+                alignItems: "center",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setIsExternalAiImportOpen(true)}
+                style={{
+                  ...ghostButtonStyle,
+                  background: "#2563eb",
+                  color: "#ffffff",
+                  borderColor: "#2563eb",
+                  flexShrink: 0,
+                }}
+              >
+                過去の会話・メモから投稿候補を作る
+              </button>
+              <Link
+                href={`/${tenant}/forum/private-logs`}
+                style={{
+                  ...ghostButtonStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  background: "#e0f2fe",
+                  color: "#075985",
+                  borderColor: "#7dd3fc",
+                  flexShrink: 0,
+                  textDecoration: "none",
+                }}
+              >
+                保存済み参考投稿を見る
+              </Link>
+            </div>
+          </div>
+
+          <div
+            style={{
+              border: "1px solid #d7dde8",
+              borderRadius: 8,
+              padding: 14,
+              background: "#f8fafc",
+              color: "#0f172a",
+            }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 900, color: "#475569" }}>
+              直接書く場合はこちら
+            </div>
+            <h3 style={{ margin: "8px 0 0", fontSize: currentFontSize + 2 }}>
+              投稿したい考えを書く
+            </h3>
+            <p
+              style={{
+                margin: "10px 0 0",
+                color: "#475569",
+                fontSize: currentFontSize - 2,
+                lineHeight: 1.7,
+              }}
+            >
+              短い意見でも大丈夫です。必要ならAIで読みやすく整えてから投稿できます。
+            </p>
+            <button
+              type="button"
+              onClick={() =>
+                document
+                  .getElementById("thread-draft-input")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
+              style={{
+                ...ghostButtonStyle,
+                marginTop: 14,
+                background: "#111827",
+                color: "#ffffff",
+                borderColor: "#111827",
+              }}
+            >
+              投稿欄へ移動する
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section style={{ ...panelStyle, marginBottom: 18 }}>
+        <div style={{ marginBottom: 14 }}>
+          <h2 style={{ margin: 0, fontSize: 22 }}>投稿を検索して読む</h2>
+          <p
+            style={{
+              margin: "8px 0 0",
+              color: "#475569",
+              fontSize: currentFontSize - 1,
+              lineHeight: 1.7,
+            }}
+          >
+            気になる言葉やカテゴリから、関連する投稿を探せます。
+          </p>
+        </div>
         <div
           style={{
             display: "grid",
@@ -1424,65 +1616,6 @@ export default function ForumPage() {
               ))}
             </select>
           </div>
-        </div>
-
-        <div
-          style={{
-            marginTop: 16,
-            border: "1px solid #3d4657",
-            borderRadius: 8,
-            padding: 12,
-            background: "#10141d",
-            color: "#f9fafb",
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 12,
-            flexWrap: "wrap",
-            alignItems: "center",
-          }}
-        >
-          <div
-            style={{
-              color: "#cbd5e1",
-              fontSize: currentFontSize - 2,
-              lineHeight: 1.6,
-              flex: "1 1 280px",
-            }}
-          >
-            ご自分のスマホでChatGPTと話した過去の会話や、自分のメモを投稿候補にできます。
-            <br />
-            長くなった考えや複数の論点を、掲示板に投稿しやすい形へまとめてAI掲示板に取り込めます。
-            <br />
-            ※ 読み取っただけでは投稿されません。
-          </div>
-          <Link
-            href={`/${tenant}/forum/private-logs`}
-            style={{
-              ...ghostButtonStyle,
-              display: "inline-flex",
-              alignItems: "center",
-              background: "#e0f2fe",
-              color: "#075985",
-              borderColor: "#7dd3fc",
-              flexShrink: 0,
-              textDecoration: "none",
-            }}
-          >
-            保存済み参考投稿を見る
-          </Link>
-          <button
-            type="button"
-            onClick={() => setIsExternalAiImportOpen(true)}
-            style={{
-              ...ghostButtonStyle,
-              background: "#f8fafc",
-              color: "#111827",
-              borderColor: "#e5e7eb",
-              flexShrink: 0,
-            }}
-          >
-            過去の会話・メモから投稿候補を作る
-          </button>
         </div>
 
         <div
@@ -1641,6 +1774,7 @@ export default function ForumPage() {
                     tenant={tenant}
                     currentFontSize={currentFontSize}
                     isFeatured={index === 0 && currentSearchResultPage === 1}
+                    compact
                   />
                 ))}
               </div>
@@ -1777,20 +1911,12 @@ export default function ForumPage() {
               新着順、AI論理スコア順、投稿数順を切り替えて議論を探せます。
             </p>
           </div>
-          <span
-            style={{
-              border: "1px solid #cbd5e1",
-              borderRadius: 999,
-              padding: "4px 10px",
-              background: "#ffffff",
-              color: "#334155",
-              fontSize: 12,
-              fontWeight: 800,
-              whiteSpace: "nowrap",
-            }}
+          <Link
+            href={`/${tenant}/forum/list/${rankingListType}`}
+            style={sectionLinkStyle}
           >
-            最大10件
-          </span>
+            全ての投稿を見る →
+          </Link>
         </div>
 
         <div
@@ -1882,20 +2008,9 @@ export default function ForumPage() {
               新しく作成された議論を、作成日の新しい順で表示します。
             </p>
           </div>
-          <span
-            style={{
-              border: "1px solid #7dd3fc",
-              borderRadius: 999,
-              padding: "4px 10px",
-              background: "#e0f2fe",
-              color: "#075985",
-              fontSize: 12,
-              fontWeight: 800,
-              whiteSpace: "nowrap",
-            }}
-          >
-            最大10件
-          </span>
+          <Link href={`/${tenant}/forum/list/latest`} style={sectionLinkStyle}>
+            全ての投稿を見る →
+          </Link>
         </div>
 
         <div
@@ -1956,20 +2071,9 @@ export default function ForumPage() {
               投稿が集まっている議論から、AIの要約を先に読めます。
             </p>
           </div>
-          <span
-            style={{
-              border: "1px solid #dbeafe",
-              borderRadius: 999,
-              padding: "4px 10px",
-              background: "#eff6ff",
-              color: "#1d4ed8",
-              fontSize: 12,
-              fontWeight: 800,
-              whiteSpace: "nowrap",
-            }}
-          >
-            最大10件
-          </span>
+          <Link href={`/${tenant}/forum/list/ai-summary`} style={sectionLinkStyle}>
+            全ての投稿を見る →
+          </Link>
         </div>
 
         {aiSummaryThreads.length > 0 ? (
@@ -2075,7 +2179,7 @@ export default function ForumPage() {
                       fontWeight: 900,
                     }}
                   >
-                    {truncate(thread.title, 64)}
+                    {truncate(thread.title, 36)}
                   </h3>
                 </div>
 
@@ -2098,7 +2202,7 @@ export default function ForumPage() {
                       lineHeight: 1.7,
                     }}
                   >
-                    {truncate(thread.summary, 120)}
+                    {truncate(thread.summary, 50)}
                   </p>
                 </div>
 
@@ -2159,7 +2263,21 @@ export default function ForumPage() {
             border: "1px solid #bbf7d0",
           }}
         >
-          <h2 style={{ margin: "0 0 10px", fontSize: 20 }}>評価が高いスレッド</h2>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap",
+              alignItems: "flex-start",
+              marginBottom: 10,
+            }}
+          >
+            <h2 style={{ margin: 0, fontSize: 20 }}>評価が高いスレッド</h2>
+            <Link href={`/${tenant}/forum/list/high-score`} style={sectionLinkStyle}>
+              全ての投稿を見る →
+            </Link>
+          </div>
           <p
             style={{
               margin: "0 0 12px",
@@ -2203,7 +2321,21 @@ export default function ForumPage() {
             border: "1px solid #fde68a",
           }}
         >
-          <h2 style={{ margin: "0 0 10px", fontSize: 20 }}>投稿が多いスレッド</h2>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap",
+              alignItems: "flex-start",
+              marginBottom: 10,
+            }}
+          >
+            <h2 style={{ margin: 0, fontSize: 20 }}>投稿が多いスレッド</h2>
+            <Link href={`/${tenant}/forum/list/many-posts`} style={sectionLinkStyle}>
+              全ての投稿を見る →
+            </Link>
+          </div>
           <p
             style={{
               margin: "0 0 12px",
@@ -2560,11 +2692,11 @@ export default function ForumPage() {
                         fontSize: currentFontSize,
                       }}
                     >
-                      {thread.title}
+                      {truncate(thread.title, 36)}
                     </div>
                     {thread.summary && (
                       <div style={{ ...smallMetaStyle, marginTop: 6 }}>
-                        {truncate(thread.summary, 90)}
+                        {truncate(thread.summary, 50)}
                       </div>
                     )}
                     {selectedNodeLabel && (
@@ -2574,7 +2706,7 @@ export default function ForumPage() {
                     )}
                     {thread.reason && (
                       <div style={{ ...smallMetaStyle, marginTop: 6 }}>
-                        {thread.reason}
+                        {truncate(thread.reason, 50)}
                       </div>
                     )}
                     {selectedThreadId === thread.id && (

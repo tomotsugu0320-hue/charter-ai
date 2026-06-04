@@ -145,7 +145,7 @@ export async function GET() {
           new Date(a.created_at ?? 0).getTime()
         );
       })
-      .slice(0, 8);
+      .slice(0, 100);
 
     const recentThreads = [...threadStats]
       .sort(
@@ -153,7 +153,7 @@ export async function GET() {
           new Date(b.created_at ?? 0).getTime() -
           new Date(a.created_at ?? 0).getTime()
       )
-      .slice(0, 10);
+      .slice(0, 100);
 
     return NextResponse.json({
       success: true,
