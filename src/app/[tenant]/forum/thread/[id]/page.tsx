@@ -1278,6 +1278,19 @@ const overviewReasons = visibleReasons.slice(0, 3);
 const overviewConflicts = visibleConflicts.slice(0, 3);
 const compactText = (value: string, max = 120) =>
   value.length > max ? `${value.slice(0, max)}...` : value;
+const groupedByOpinionForDisplay = useMemo(
+  () =>
+    groupedByOpinion.map((group) => ({
+      ...group,
+      issue: group.issue
+        ? {
+            ...group.issue,
+            content: compactText(group.issue.content, 50),
+          }
+        : group.issue,
+    })),
+  [groupedByOpinion]
+);
 const normalizeQuestionText = (value?: string | null) =>
   (value ?? "").replace(/[。、．.！？!?「」『』【】（）()[\]\s]/g, "");
 const shouldShowQuestionCard =
@@ -1940,7 +1953,17 @@ function jumpToPostForm() {
         lineHeight: 1.7,
       }}
     >
-      {compactText(thread.original_post, 150)}
+      {compactText(thread.original_post, 280)}
+    </div>
+    <div
+      style={{
+        marginTop: 8,
+        color: "#64748b",
+        fontSize: currentFont.base * 0.85,
+        lineHeight: 1.6,
+      }}
+    >
+      ※この問いはAIが読みやすく整理したものです。質問者の原文は下部で確認できます。
     </div>
   </div>
 )}
@@ -2022,7 +2045,7 @@ function jumpToPostForm() {
           </div>
           <ul style={{ margin: 0, paddingLeft: 20, color: "#333", lineHeight: 1.7 }}>
             {overviewPremises.map((premise, index) => (
-              <li key={`overview-premise-${index}`}>{compactText(premise, 110)}</li>
+              <li key={`overview-premise-${index}`}>{compactText(premise, 160)}</li>
             ))}
           </ul>
         </div>
@@ -2034,7 +2057,7 @@ function jumpToPostForm() {
           </div>
           <ul style={{ margin: 0, paddingLeft: 20, color: "#333", lineHeight: 1.7 }}>
             {overviewReasons.map((reason, index) => (
-              <li key={`overview-reason-${index}`}>{compactText(reason, 110)}</li>
+              <li key={`overview-reason-${index}`}>{compactText(reason, 160)}</li>
             ))}
           </ul>
         </div>
@@ -2068,7 +2091,7 @@ function jumpToPostForm() {
     <ul style={{ margin: "10px 0 0", paddingLeft: 20, color: "#333", lineHeight: 1.7 }}>
       {overviewConflicts.map((conflict, index) => (
         <li key={`overview-conflict-${index}`}>
-          {compactText(conflict.rebuttal || conflict.opinion, 110)}
+          {compactText(conflict.rebuttal || conflict.opinion, 160)}
         </li>
       ))}
     </ul>
@@ -2180,7 +2203,7 @@ function jumpToPostForm() {
 
 
 <OpinionView
-  groupedByOpinion={groupedByOpinion}
+  groupedByOpinion={groupedByOpinionForDisplay}
   bestOpinionsByIssue={bestOpinionsByIssue}
   hideLowScore={hideLowScore}
   currentFont={currentFont}
@@ -2254,6 +2277,72 @@ function jumpToPostForm() {
 
 <SectionCard variant="white" style={{ marginTop: 24 }}>
   <div>
+
+<details style={{ marginTop: 16 }}>
+  <summary
+    style={{
+      cursor: "pointer",
+      display: "flex",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 12,
+      padding: "12px 14px",
+      border: "1px solid #d7dde8",
+      borderRadius: 8,
+      background: "#f8fafc",
+      color: "#111",
+      fontSize: currentFont.title,
+      fontWeight: 800,
+      lineHeight: 1.4,
+      minHeight: 44,
+    }}
+  >
+    <span>質問者の原文を見る</span>
+    <span
+      style={{
+        fontSize: currentFont.base * 0.85,
+        color: "#64748b",
+        fontWeight: 700,
+        whiteSpace: "normal",
+      }}
+    >
+      AI整理前の投稿内容です
+    </span>
+  </summary>
+
+  <div
+    style={{
+      marginTop: 10,
+      padding: 14,
+      border: "1px solid #dbe3ef",
+      borderRadius: 10,
+      background: "#fff",
+      color: "#111",
+    }}
+  >
+    <p
+      style={{
+        margin: "0 0 10px",
+        color: "#475569",
+        fontSize: currentFont.base,
+        lineHeight: 1.7,
+      }}
+    >
+      質問者が最初に投稿した内容です。AI整理前の原文です。
+    </p>
+    <div
+      style={{
+        whiteSpace: "pre-wrap",
+        color: "#333",
+        fontSize: currentFont.base,
+        lineHeight: 1.7,
+      }}
+    >
+      {thread.original_post}
+    </div>
+  </div>
+</details>
 
 <details style={{ marginTop: 16 }}>
   <summary
