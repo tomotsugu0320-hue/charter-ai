@@ -437,6 +437,50 @@ export default function DiscussionTree({
 
       <div
         style={{
+          marginBottom: 12,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          flexWrap: "wrap",
+          fontSize: currentFont.base * 0.9,
+          color: "#475569",
+          lineHeight: 1.5,
+        }}
+      >
+        <span style={{ fontWeight: 700 }}>色の意味：</span>
+        {[
+          ["opinion", "意見"],
+          ["rebuttal", "反論"],
+          ["supplement", "補足"],
+          ["explanation", "解説"],
+        ].map(([role, label]) => (
+          <span
+            key={role}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              color: "#334155",
+            }}
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: 999,
+                background: nodeBackgroundColor(role),
+                border: `1px solid ${nodeBorderColor(role)}`,
+                display: "inline-block",
+              }}
+            />
+            {label}
+          </span>
+        ))}
+      </div>
+
+      <div
+        style={{
           overflowX: "auto",
           border: "1px solid #ddd",
           borderRadius: 12,

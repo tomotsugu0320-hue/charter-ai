@@ -3,7 +3,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import SectionCard from "@/components/forum/SectionCard";
 import SectionTitle from "@/components/forum/SectionTitle";
@@ -162,6 +162,8 @@ const STANCE_LABEL_OPTIONS: StanceLabelOption[] = [
   { value: "neutral", label: "中立" },
   { value: "other", label: "その他" },
 ];
+
+const DISCUSSION_CARD_TEXT_LIMIT = 120;
 
 type LocationMapNode = {
   id: string;
@@ -642,6 +644,9 @@ const [summaryNotice, setSummaryNotice] = useState<string | null>(null);
     type: "論点" | "前提" | "根拠";
     text: string;
   } | null>(null);
+  const [expandedDiscussionTextMap, setExpandedDiscussionTextMap] = useState<
+    Record<string, boolean>
+  >({});
 
   const [relatedPosts, setRelatedPosts] = useState<
     {
@@ -1647,6 +1652,75 @@ function jumpToMainIssues() {
 function jumpToPostForm() {
   const el = document.getElementById("post-form");
   el?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function discussionCardHint(text: string) {
+  const isSelected = selectedGuide?.text.trim() === text.trim();
+  const hasReadableTarget =
+    isSelected && (relatedPosts.length > 0 || Boolean(relatedSummary?.trim()));
+
+  return hasReadableTarget ? "読む / 投稿する" : "投稿する";
+}
+
+function renderDiscussionCard({
+  keyId,
+  text,
+  guideType,
+  titlePrefix = "",
+  style,
+  variant,
+}: {
+  keyId: string;
+  text: string;
+  guideType: "論点" | "前提" | "根拠";
+  titlePrefix?: string;
+  style?: CSSProperties;
+  variant?: "default" | "danger" | "info";
+}) {
+  const trimmedText = text.trim();
+  const isLong = trimmedText.length > DISCUSSION_CARD_TEXT_LIMIT;
+  const isExpanded = expandedDiscussionTextMap[keyId] === true;
+  const displayText =
+    isLong && !isExpanded
+      ? compactText(trimmedText, DISCUSSION_CARD_TEXT_LIMIT)
+      : trimmedText;
+
+  return (
+    <div key={keyId} style={{ display: "grid", gap: 6 }}>
+      <SelectableCardButton
+        title={`${titlePrefix}${displayText}`}
+        hint={discussionCardHint(text)}
+        variant={variant}
+        onClick={() => handleNodeClick(guideType, text)}
+        style={style}
+      />
+
+      {isLong && (
+        <button
+          type="button"
+          onClick={() =>
+            setExpandedDiscussionTextMap((current) => ({
+              ...current,
+              [keyId]: !current[keyId],
+            }))
+          }
+          style={{
+            justifySelf: "start",
+            border: "1px solid #cbd5e1",
+            borderRadius: 999,
+            background: "#fff",
+            color: "#0f4aa1",
+            cursor: "pointer",
+            fontSize: currentFont.base * 0.9,
+            fontWeight: 800,
+            padding: "5px 10px",
+          }}
+        >
+          {isExpanded ? "短く表示" : "全文を見る"}
+        </button>
+      )}
+    </div>
+  );
 }
 
 
@@ -2751,20 +2825,19 @@ function jumpToPostForm() {
 
     <div style={{ display: "grid", gap: 10 }}>
       {summary?.key_points?.issues?.length ? (
-        summary.key_points.issues.map((item, index) => (
-          <SelectableCardButton
-            key={`issue-${item}-${index}`}
-            title={compactText(item, 100)}
-            hint="関連する議論を見る →"
-            onClick={() => handleNodeClick("論点", item)}
-            style={{
+        summary.key_points.issues.map((item, index) =>
+          renderDiscussionCard({
+            keyId: `issue-${item}-${index}`,
+            text: item,
+            guideType: "論点",
+            style: {
               fontSize: currentFont.base,
               background: "#f5f0ff",
               border: "1px solid #ddd6fe",
               color: "#111827",
-            }}
-          />
-        ))
+            },
+          })
+        )
       ) : (
         <div style={{ color: "#666" }}>まだ論点は整理されていない。</div>
       )}
@@ -2796,20 +2869,19 @@ function jumpToPostForm() {
         </div>
       )}
 {visiblePremises.length ? (
-  visiblePremises.map((item, index) => (
-          <SelectableCardButton
-            key={`premise-${item}-${index}`}
-            title={compactText(item, 100)}
-            hint="関連する議論を見る →"
-            onClick={() => handleNodeClick("前提", item)}
-            style={{
+  visiblePremises.map((item, index) =>
+          renderDiscussionCard({
+            keyId: `premise-${item}-${index}`,
+            text: item,
+            guideType: "前提",
+            style: {
               fontSize: currentFont.base,
               background: "#eff6ff",
               border: "1px solid #bfdbfe",
               color: "#111827",
-            }}
-          />
-        ))
+            },
+          })
+        )
       ) : premiseQualityDisplay.mode === "empty" ? (
         <div style={{ display: "grid", gap: 8 }}>
           {premiseQualityDisplay.messages.map((msg, i) => (
@@ -2855,20 +2927,19 @@ function jumpToPostForm() {
         </div>
       )}
 {visibleReasons.length ? (
-  visibleReasons.map((item, index) => (
-          <SelectableCardButton
-            key={`reason-${item}-${index}`}
-            title={compactText(item, 100)}
-            hint="関連する議論を見る →"
-            onClick={() => handleNodeClick("根拠", item)}
-            style={{
+  visibleReasons.map((item, index) =>
+          renderDiscussionCard({
+            keyId: `reason-${item}-${index}`,
+            text: item,
+            guideType: "根拠",
+            style: {
               fontSize: currentFont.base,
               background: "#f0fdf4",
               border: "1px solid #bbf7d0",
               color: "#111827",
-            }}
-          />
-        ))
+            },
+          })
+        )
       ) : reasonQualityDisplay.mode === "empty" ? (
         <div style={{ display: "grid", gap: 8 }}>
           {reasonQualityDisplay.messages.map((msg, i) => (
@@ -2942,25 +3013,27 @@ function jumpToPostForm() {
               marginBottom: 0,
             }}
           >
-            <SelectableCardButton
-              title={`元の意見：${compactText(c.opinion, 90)}`}
-              hint="関連する議論を見る →"
-              onClick={() => handleNodeClick("論点", c.opinion)}
-              style={{
+            {renderDiscussionCard({
+              keyId: `conflict-opinion-${c.opinion}-${i}`,
+              text: c.opinion,
+              guideType: "論点",
+              titlePrefix: "元の意見：",
+              style: {
                 fontSize: currentFont.base,
                 background: "#fff",
                 border: "1px solid #fecdd3",
                 color: "#111827",
-              }}
-            />
+              },
+            })}
 
-            <SelectableCardButton
-              title={`反論・リスク：${compactText(c.rebuttal, 90)}`}
-              hint="関連する議論を見る →"
-              variant="danger"
-              onClick={() => handleNodeClick("論点", c.rebuttal)}
-              style={{ fontSize: currentFont.base }}
-            />
+            {renderDiscussionCard({
+              keyId: `conflict-rebuttal-${c.rebuttal}-${i}`,
+              text: c.rebuttal,
+              guideType: "論点",
+              titlePrefix: "反論・リスク：",
+              variant: "danger",
+              style: { fontSize: currentFont.base },
+            })}
           </SectionCard>
         ))}
       </div>
@@ -3175,10 +3248,15 @@ function jumpToPostForm() {
     <div style={{ fontWeight: 800, marginBottom: 6 }}>
       返信先
     </div>
-                <div style={{ fontWeight: 700 }}>
-      「{selectedGuide.text.length > 60
-        ? selectedGuide.text.slice(0, 60) + "..."
-        : selectedGuide.text}」
+                <div
+                  style={{
+                    fontWeight: 700,
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                    overflowWrap: "anywhere",
+                  }}
+                >
+      「{selectedGuide.text}」
                 </div>
               </SectionCard>
             )}
@@ -3189,6 +3267,33 @@ function jumpToPostForm() {
                 style={{ marginBottom: 12 }}
               >
 <div id="related-section" style={{ scrollMarginTop: 80 }}>
+                <details>
+                  <summary
+                    style={{
+                      cursor: "pointer",
+                      display: "flex",
+                      flexWrap: "wrap",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 10,
+                      color: "#111827",
+                      fontSize: currentFont.base,
+                      fontWeight: 800,
+                    }}
+                  >
+                    <span>投稿前に近い議論を確認する</span>
+                    <span
+                      style={{
+                        color: "#64748b",
+                        fontSize: currentFont.base * 0.85,
+                        fontWeight: 700,
+                      }}
+                    >
+                      必要な時だけ開く
+                    </span>
+                  </summary>
+
+                  <div style={{ marginTop: 12 }}>
                   <div
                     style={{
                       fontSize: currentFont.base,
@@ -3361,9 +3466,11 @@ function jumpToPostForm() {
                               → この話題の別スレを見る
                             </div>
                           </LinkButton>
-                        ))}
+                      ))}
                     </div>
                   </div>
+                  </div>
+                </details>
                 </div>
               </SectionCard>
             )}

@@ -261,7 +261,9 @@ export default function OpinionView({
               }}
             >
               <div style={{ display: "grid", gap: 2 }}>
-                <span>🏆 AIが選んだ注目反応（{featuredLabel}） {op.opinion.logic_score ?? "-"}</span>
+                <span>
+                  🏆 AI{featuredLabel}の注目反応 {op.opinion.logic_score ?? "-"}
+                </span>
                 <span
                   style={{
                     color: "#666",
