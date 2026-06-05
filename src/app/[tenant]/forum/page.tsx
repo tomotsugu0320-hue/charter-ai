@@ -714,6 +714,9 @@ export default function ForumPage() {
   const [topError, setTopError] = useState("");
   const [isExternalAiImportOpen, setIsExternalAiImportOpen] = useState(false);
   const [isTopMenuOpen, setIsTopMenuOpen] = useState(false);
+  const [isForumBetaLoggedIn, setIsForumBetaLoggedIn] = useState<boolean | null>(
+    null
+  );
 
   const [popularThreads, setPopularThreads] = useState<ThreadRow[]>([]);
   const [activeThreads, setActiveThreads] = useState<ThreadRow[]>([]);
@@ -899,6 +902,30 @@ export default function ForumPage() {
   useEffect(() => {
     let cancelled = false;
 
+    async function loadLoginStatus() {
+      try {
+        const res = await fetch("/api/forum/login/status", {
+          cache: "no-store",
+        });
+        const result: unknown = await res.json().catch(() => null);
+        const loggedIn = res.ok && isRecord(result) && result.loggedIn === true;
+
+        if (!cancelled) setIsForumBetaLoggedIn(loggedIn);
+      } catch {
+        if (!cancelled) setIsForumBetaLoggedIn(false);
+      }
+    }
+
+    void loadLoginStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
     async function loadTopSummary() {
       if (!tenant) return;
 
@@ -958,6 +985,7 @@ export default function ForumPage() {
       const loggedIn = isRecord(result) && result.loggedIn === true;
 
       if (!res.ok || !loggedIn) {
+        setIsForumBetaLoggedIn(false);
         setActionError("投稿・整理にはログインが必要です。");
         router.push(
           `/${tenant}/forum/login?next=${encodeURIComponent(
@@ -967,9 +995,11 @@ export default function ForumPage() {
         return false;
       }
 
+      setIsForumBetaLoggedIn(true);
       return true;
     } catch (error) {
       console.error(error);
+      setIsForumBetaLoggedIn(false);
       setActionError(
         "ログイン状態を確認できませんでした。時間をおいてもう一度お試しください。"
       );
@@ -1167,6 +1197,13 @@ export default function ForumPage() {
     setFontSizeMode(size);
   }
 
+  async function handleLogout() {
+    await fetch("/api/forum/logout", { method: "POST" }).catch(() => null);
+    setIsForumBetaLoggedIn(false);
+    setIsTopMenuOpen(false);
+    router.push(`/${tenant}/forum/login`);
+  }
+
   const renderedPremises = generatedIssue?.premises ?? [];
   const renderedReasons = generatedIssue?.reasons ?? [];
   const renderedConflicts = generatedIssue?.conflicts ?? [];
@@ -1273,6 +1310,44 @@ export default function ForumPage() {
                     {item.label}
                   </Link>
                 ))}
+                {isForumBetaLoggedIn ? (
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      padding: "9px 10px",
+                      border: 0,
+                      borderRadius: 8,
+                      background: "#fef2f2",
+                      color: "#991b1b",
+                      cursor: "pointer",
+                      font: "inherit",
+                      fontWeight: 800,
+                      textAlign: "left",
+                    }}
+                  >
+                    ログアウト
+                  </button>
+                ) : (
+                  <Link
+                    href={`/${tenant}/forum/login?next=${encodeURIComponent(
+                      `/${tenant}/forum`
+                    )}`}
+                    onClick={() => setIsTopMenuOpen(false)}
+                    style={{
+                      display: "block",
+                      padding: "9px 10px",
+                      borderRadius: 8,
+                      color: "#111827",
+                      textDecoration: "none",
+                      fontWeight: 800,
+                    }}
+                  >
+                    ログイン
+                  </Link>
+                )}
               </nav>
             )}
           </div>
