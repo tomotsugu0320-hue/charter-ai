@@ -2755,8 +2755,14 @@ function jumpToPostForm() {
           <SelectableCardButton
             key={`issue-${item}-${index}`}
             title={compactText(item, 100)}
+            hint="関連する議論を見る →"
             onClick={() => handleNodeClick("論点", item)}
-            style={{ fontSize: currentFont.base }}
+            style={{
+              fontSize: currentFont.base,
+              background: "#f5f0ff",
+              border: "1px solid #ddd6fe",
+              color: "#111827",
+            }}
           />
         ))
       ) : (
@@ -2794,8 +2800,14 @@ function jumpToPostForm() {
           <SelectableCardButton
             key={`premise-${item}-${index}`}
             title={compactText(item, 100)}
+            hint="関連する議論を見る →"
             onClick={() => handleNodeClick("前提", item)}
-            style={{ fontSize: currentFont.base }}
+            style={{
+              fontSize: currentFont.base,
+              background: "#eff6ff",
+              border: "1px solid #bfdbfe",
+              color: "#111827",
+            }}
           />
         ))
       ) : premiseQualityDisplay.mode === "empty" ? (
@@ -2847,8 +2859,14 @@ function jumpToPostForm() {
           <SelectableCardButton
             key={`reason-${item}-${index}`}
             title={compactText(item, 100)}
+            hint="関連する議論を見る →"
             onClick={() => handleNodeClick("根拠", item)}
-            style={{ fontSize: currentFont.base }}
+            style={{
+              fontSize: currentFont.base,
+              background: "#f0fdf4",
+              border: "1px solid #bbf7d0",
+              color: "#111827",
+            }}
           />
         ))
       ) : reasonQualityDisplay.mode === "empty" ? (
@@ -2919,19 +2937,27 @@ function jumpToPostForm() {
               display: "grid",
               gap: 8,
               color: "#111",
+              background: "#fff1f2",
+              border: "1px solid #fecdd3",
               marginBottom: 0,
             }}
           >
             <SelectableCardButton
-              title={`🔴 A：${compactText(c.opinion, 90)}`}
-              variant="danger"
+              title={`元の意見：${compactText(c.opinion, 90)}`}
+              hint="関連する議論を見る →"
               onClick={() => handleNodeClick("論点", c.opinion)}
-              style={{ fontSize: currentFont.base }}
+              style={{
+                fontSize: currentFont.base,
+                background: "#fff",
+                border: "1px solid #fecdd3",
+                color: "#111827",
+              }}
             />
 
             <SelectableCardButton
-              title={`🔵 B：${compactText(c.rebuttal, 90)}`}
-              variant="info"
+              title={`反論・リスク：${compactText(c.rebuttal, 90)}`}
+              hint="関連する議論を見る →"
+              variant="danger"
               onClick={() => handleNodeClick("論点", c.rebuttal)}
               style={{ fontSize: currentFont.base }}
             />
