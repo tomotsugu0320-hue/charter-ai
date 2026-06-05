@@ -2506,17 +2506,24 @@ function renderDiscussionCard({
   <div style={{ display: "grid", gap: 10 }}>
     <div>
       <div style={{ fontWeight: 800, marginBottom: 4 }}>主張</div>
-      <div style={{ color: "#333", lineHeight: 1.7, fontSize: currentFont.base }}>
-        {thread.original_post.length > 160
-          ? `${thread.original_post.slice(0, 160)}...`
-          : thread.original_post}
+      <div
+        style={{
+          color: "#333",
+          lineHeight: 1.7,
+          fontSize: currentFont.base,
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+          overflowWrap: "anywhere",
+        }}
+      >
+        {thread.original_post}
       </div>
     </div>
 
     <div>
       <div style={{ fontWeight: 800, marginBottom: 4 }}>前提</div>
       {initialPremises.length > 0 ? (
-        <ul style={{ margin: 0, paddingLeft: 20, color: "#333", lineHeight: 1.7 }}>
+        <ul style={{ margin: 0, paddingLeft: 20, color: "#333", lineHeight: 1.7, overflowWrap: "anywhere" }}>
           {initialPremises.map((premise, index) => (
             <li key={`initial-premise-${index}`}>{premise}</li>
           ))}
@@ -2531,7 +2538,7 @@ function renderDiscussionCard({
     <div>
       <div style={{ fontWeight: 800, marginBottom: 4 }}>根拠</div>
       {initialReasons.length > 0 ? (
-        <ul style={{ margin: 0, paddingLeft: 20, color: "#333", lineHeight: 1.7 }}>
+        <ul style={{ margin: 0, paddingLeft: 20, color: "#333", lineHeight: 1.7, overflowWrap: "anywhere" }}>
           {initialReasons.map((reason, index) => (
             <li key={`initial-reason-${index}`}>{reason}</li>
           ))}
@@ -2546,7 +2553,7 @@ function renderDiscussionCard({
     <div>
       <div style={{ fontWeight: 800, marginBottom: 4 }}>反論・リスク</div>
       {initialConflicts.length > 0 ? (
-        <ul style={{ margin: 0, paddingLeft: 20, color: "#333", lineHeight: 1.7 }}>
+        <ul style={{ margin: 0, paddingLeft: 20, color: "#333", lineHeight: 1.7, overflowWrap: "anywhere" }}>
           {initialConflicts.map((conflict, index) => (
             <li key={`initial-conflict-${index}`}>
               {conflict.rebuttal || conflict.opinion}
