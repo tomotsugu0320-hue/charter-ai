@@ -97,6 +97,23 @@ function nodeBorderColor(role: string) {
   }
 }
 
+function nodeBackgroundColor(role: string) {
+  switch (role) {
+    case "issue_raise":
+      return "#f5f0ff";
+    case "opinion":
+      return "#f8fafc";
+    case "rebuttal":
+      return "#fff1f2";
+    case "supplement":
+      return "#eff6ff";
+    case "explanation":
+      return "#f0fdf4";
+    default:
+      return "#fff";
+  }
+}
+
 export default function DiscussionTree({
   tenant,
   threadId,
@@ -265,6 +282,17 @@ export default function DiscussionTree({
       targetOpinion?.children.filter((c) => c.post_role === "supplement").length ??
       0;
 
+    const filteredContent = post.content
+      .split("\n")
+      .filter(
+        (line) =>
+          !line.trim().startsWith("前提:") &&
+          !line.trim().startsWith("根拠:")
+      )
+      .join("\n")
+      .trim();
+    const displayContent = filteredContent || post.content.trim();
+
     return (
       <div
         key={post.id}
@@ -285,7 +313,7 @@ export default function DiscussionTree({
             borderLeft: isCompact
               ? `2px solid ${nodeBorderColor(post.post_role)}`
               : `5px solid ${nodeBorderColor(post.post_role)}`,
-            background: "#fff",
+            background: nodeBackgroundColor(post.post_role),
             borderRadius: 10,
             padding: isCompact ? "8px 10px" : "12px 14px",
             boxShadow: isCompact
@@ -354,37 +382,28 @@ export default function DiscussionTree({
 
             </div>
           </div>
-        </div>
 
-<div
-  onClick={() =>
-    onSelectNode({
-      type: roleLabel(post.post_role),
-      text: post.content,
-    })
-  }
-  style={{
-    marginTop: 8,
-    fontSize: currentFont.base,
-    lineHeight: 1.7,
-    color: "#111",
-    whiteSpace: "pre-wrap",
-    cursor: "pointer",
-  }}
-  title="この内容について書く"
->
-{cutText(
-  post.content
-    .split("\n")
-    .filter(
-      (line) =>
-        !line.trim().startsWith("前提:") &&
-        !line.trim().startsWith("根拠:")
-    )
-    .join("\n"),
-  120
-)}
-</div>
+          <div
+            onClick={() =>
+              onSelectNode({
+                type: roleLabel(post.post_role),
+                text: post.content,
+              })
+            }
+            style={{
+              marginTop: 8,
+              fontSize: currentFont.base,
+              lineHeight: 1.7,
+              color: "#111",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              cursor: "pointer",
+            }}
+            title="この内容について書く"
+          >
+            {cutText(displayContent, 120)}
+          </div>
+        </div>
 
         {renderRelated(nodeId)}
       </div>

@@ -914,11 +914,13 @@ const handleGenerateSummary = async () => {
 
 
 const treeSourcePosts = useMemo(() => {
-  return [...visiblePosts].sort((a, b) => {
-    const at = new Date(a.created_at ?? "").getTime();
-    const bt = new Date(b.created_at ?? "").getTime();
-    return at - bt;
-  });
+  return visiblePosts
+    .filter((post) => post.content.trim().length > 0)
+    .sort((a, b) => {
+      const at = new Date(a.created_at ?? "").getTime();
+      const bt = new Date(b.created_at ?? "").getTime();
+      return at - bt;
+    });
 }, [visiblePosts]);
 
 
