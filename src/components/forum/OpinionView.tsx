@@ -186,7 +186,6 @@ export default function OpinionView({
     typeof group.sourceIndex === "number" ? group.sourceIndex : groupIndex;
   const best = bestOpinionsByIssue[sourceGroupIndex]?.best;
   const isBest = !!best && best.opinion.id === op.opinion.id;
-  const isExpanded = isBest || expandedMap[op.opinion.id] === true;
   const short = getShortSummary(op.opinion.content);
   const replyCount = op.children?.length ?? 0;
   const rawScore = op.opinion.logic_score;
@@ -201,6 +200,16 @@ export default function OpinionView({
     Number.isFinite(numericScore) &&
     numericScore > 0 &&
     numericScore < 60;
+  const isFeaturedOpinion =
+    isBest &&
+    typeof numericScore === "number" &&
+    Number.isFinite(numericScore) &&
+    numericScore >= 70;
+  const featuredLabel =
+    typeof numericScore === "number" && numericScore >= 80
+      ? "特選"
+      : "おすすめ";
+  const isExpanded = isFeaturedOpinion || expandedMap[op.opinion.id] === true;
   const cardOpacity = hideLowScore && isLowScore ? 0.5 : 1;
   const isHighlighted = highlightedPostId === String(op.opinion.id);
   const canHideOpinion =
@@ -218,10 +227,10 @@ export default function OpinionView({
         style={{
           border: isHighlighted
             ? "2px solid #f59e0b"
-            : isBest
+            : isFeaturedOpinion
             ? "2px solid #2e7d32"
             : "1px solid #ddd",
-          background: isHighlighted ? "#fffbeb" : isBest ? "#e8f5e9" : "#fff",
+          background: isHighlighted ? "#fffbeb" : isFeaturedOpinion ? "#e8f5e9" : "#fff",
           color: "#111",
           boxShadow: isHighlighted
             ? "0 0 0 3px rgba(245, 158, 11, 0.18)"
@@ -239,7 +248,7 @@ export default function OpinionView({
         }}
       >
         <div style={{ display: "grid", gap: 4 }}>
-          {isBest ? (
+          {isFeaturedOpinion ? (
             <div
               style={{
                 display: "flex",
@@ -252,7 +261,7 @@ export default function OpinionView({
               }}
             >
               <div style={{ display: "grid", gap: 2 }}>
-                <span>🏆 AIが選んだ注目反応 {op.opinion.logic_score ?? "-"}</span>
+                <span>🏆 AIが選んだ注目反応（{featuredLabel}） {op.opinion.logic_score ?? "-"}</span>
                 <span
                   style={{
                     color: "#666",
@@ -260,7 +269,9 @@ export default function OpinionView({
                     fontSize: currentFont.base * 0.85,
                   }}
                 >
-                  意見・反論・補足の中から、読む価値が高い投稿をAIが厳選しました。
+                  {featuredLabel === "特選"
+                    ? "意見・反論・補足の中から、特に読む価値が高い投稿をAIが選びました。"
+                    : "意見・反論・補足の中から、読む参考になる投稿をAIが選びました。"}
                 </span>
               </div>
               <span
