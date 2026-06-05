@@ -832,15 +832,15 @@ useEffect(() => {
   const fontSizeMap = {
     small: {
       base: 14,
-      title: 24,
+      title: 20,
     },
     medium: {
       base: 16,
-      title: 28,
+      title: 22,
     },
     large: {
-      base: 20,
-      title: 32,
+      base: 19,
+      title: 26,
     },
   };
 
