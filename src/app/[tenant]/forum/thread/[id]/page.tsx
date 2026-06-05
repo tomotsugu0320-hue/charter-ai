@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import SectionCard from "@/components/forum/SectionCard";
 import SectionTitle from "@/components/forum/SectionTitle";
 import PostCard from "@/components/forum/PostCard";
@@ -593,6 +594,7 @@ function trustBonus(label?: string) {
 }
 
 export default function ForumThreadPage({ params }: PageProps) {
+  const router = useRouter();
   const [conflicts, setConflicts] = useState<
     ConflictItem[]
   >([]);
@@ -1636,6 +1638,11 @@ if (postRole === "rebuttal" && !replyToOpinionId) {
 
     if (!res.ok) {
       alert(result?.error || "投稿の非表示に失敗しました");
+      return;
+    }
+
+    if (hideThread) {
+      router.push(`/${tenant}/forum`);
       return;
     }
 
