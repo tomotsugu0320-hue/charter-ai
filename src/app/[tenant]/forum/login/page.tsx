@@ -1,15 +1,21 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 export default function ForumLoginPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const tenantParam = params?.tenant;
   const tenant = Array.isArray(tenantParam)
     ? tenantParam[0]
     : tenantParam || "dev";
+  const nextParam = searchParams.get("next");
+  const nextPath =
+    nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
+      ? nextParam
+      : `/${tenant}/forum`;
   const [user, setUser] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -40,7 +46,7 @@ export default function ForumLoginPage() {
         return;
       }
 
-      router.replace(`/${tenant}/forum`);
+      router.replace(nextPath);
     } catch {
       setError("通信に失敗しました。時間をおいてもう一度お試しください。");
     } finally {

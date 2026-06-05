@@ -949,12 +949,42 @@ export default function ForumPage() {
     });
   }, [analyzeScrollKey]);
 
+  async function ensureForumBetaLoggedIn() {
+    try {
+      const res = await fetch("/api/forum/login/status", {
+        cache: "no-store",
+      });
+      const result: unknown = await res.json().catch(() => null);
+      const loggedIn = isRecord(result) && result.loggedIn === true;
+
+      if (!res.ok || !loggedIn) {
+        setActionError("投稿・整理にはログインが必要です。");
+        router.push(
+          `/${tenant}/forum/login?next=${encodeURIComponent(
+            `/${tenant}/forum#create`
+          )}`
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(error);
+      setActionError(
+        "ログイン状態を確認できませんでした。時間をおいてもう一度お試しください。"
+      );
+      return false;
+    }
+  }
+
   async function analyzeText(sourceText: string) {
     const trimmed = sourceText.trim();
     if (!trimmed) {
       setActionError("整理したい内容を入力してください。");
       return;
     }
+
+    if (!(await ensureForumBetaLoggedIn())) return;
 
     setLoading(true);
     setActionError("");
@@ -1022,6 +1052,8 @@ export default function ForumPage() {
       return;
     }
 
+    if (!(await ensureForumBetaLoggedIn())) return;
+
     setOrganizing(true);
     setActionError("");
     setOrganizedResult(null);
@@ -1065,6 +1097,8 @@ export default function ForumPage() {
 
   async function handleCreateThread() {
     if (!generatedIssue || selectedThreadId) return;
+
+    if (!(await ensureForumBetaLoggedIn())) return;
 
     const finalClaim =
       generatedIssue.claim.trim() || text.trim() || "新しい議論";
@@ -2365,7 +2399,7 @@ export default function ForumPage() {
         </div>
       </section>
 
-      <section style={{ ...darkPanelStyle, marginBottom: 18 }}>
+      <section id="create" style={{ ...darkPanelStyle, marginBottom: 18 }}>
         <div
           style={{
             display: "flex",
