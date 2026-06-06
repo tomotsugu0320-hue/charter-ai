@@ -209,6 +209,7 @@ const labelStyle: CSSProperties = {
 
 const inputStyle: CSSProperties = {
   width: "100%",
+  boxSizing: "border-box",
   borderRadius: 8,
   border: "1px solid #cbd5e1",
   padding: "10px 12px",
@@ -456,7 +457,9 @@ export default function ExternalAiImportModal({
       setSubmitResults({});
       setRelatedByCandidate({});
       setSavedReferences({});
-      setNotice("ログイン前の投稿候補を復元しました。");
+      setNotice(
+        "ログイン前の投稿候補を復元しました。内容を確認して「選んだ候補を投稿する」を押してください。"
+      );
     } catch (restoreError) {
       console.error("[external-ai-import draft restore failed]", restoreError);
     } finally {
@@ -1356,9 +1359,9 @@ export default function ExternalAiImportModal({
                         }}
                       >
                         {candidate.status === "post"
-                          ? "投稿する"
+                          ? "投稿対象"
                           : candidate.status === "skip"
-                          ? "投稿しない"
+                          ? "今回は投稿しない"
                           : "未選択"}
                       </span>
                     </div>
@@ -1562,7 +1565,7 @@ export default function ExternalAiImportModal({
                             candidate.status === "post" ? "#047857" : "#cbd5e1",
                         }}
                       >
-                        投稿する
+                        投稿対象にする
                       </button>
                       <button
                         type="button"
@@ -1577,7 +1580,7 @@ export default function ExternalAiImportModal({
                             candidate.status === "skip" ? "#b91c1c" : "#cbd5e1",
                         }}
                       >
-                        投稿しない
+                        今回は投稿しない
                       </button>
                       <button
                         type="button"
@@ -1842,7 +1845,7 @@ export default function ExternalAiImportModal({
                   cursor: selectedCount === 0 || isSubmitting ? "not-allowed" : "pointer",
                 }}
               >
-                {isSubmitting ? "投稿中..." : "選択した候補を投稿"}
+                {isSubmitting ? "投稿中..." : "選んだ候補を投稿する"}
               </button>
               <div style={{ marginTop: 8, color: "#64748b", lineHeight: 1.6 }}>
                 カテゴリと論点タグは参考表示です。投稿後のリンクから内容を確認できます。
