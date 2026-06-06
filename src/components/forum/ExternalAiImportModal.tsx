@@ -748,7 +748,7 @@ export default function ExternalAiImportModal({
               外部AIで整理した内容を取り込む
             </h2>
             <p style={{ margin: "8px 0 0", color: "#475569", lineHeight: 1.7 }}>
-              あなたのChatGPTや外部AIで会話ログを整理し、その結果をここに貼り付けると、複数の投稿候補として確認できます。
+              外部AIで会話ログを整理し、返ってきたJSONから投稿候補を作ります。
             </p>
           </div>
           <button type="button" onClick={onClose} style={buttonStyle}>
@@ -790,7 +790,7 @@ export default function ExternalAiImportModal({
                 fontWeight: 700,
               }}
             >
-              自分のChatGPTや外部AIで整理した会話ログ・考えを、投稿候補としてまとめて取り込めます。
+              コピーしたプロンプトを外部AIに貼り、返ってきたJSONをここに戻します。
             </p>
 
             <div
@@ -811,13 +811,10 @@ export default function ExternalAiImportModal({
                     lineHeight: 1.7,
                   }}
                 >
-                  <li>下のプロンプトをコピーする</li>
-                  <li>自分のChatGPTや外部AIに貼る</li>
-                  <li>整理したい過去の会話ログや文章も貼る</li>
-                  <li>外部AIが返したJSONをコピーする</li>
-                  <li>この画面の入力欄に貼り付ける</li>
-                  <li>「投稿候補を読み取る」を押す</li>
-                  <li>投稿する / 投稿しない / 類似スレッド確認を選ぶ</li>
+                  <li>プロンプトをコピーする</li>
+                  <li>外部AIに貼り、会話ログも渡す</li>
+                  <li>返ってきたJSONをこの画面に貼る</li>
+                  <li>候補を確認して投稿するか選ぶ</li>
                 </ol>
               </div>
 
@@ -1112,13 +1109,13 @@ export default function ExternalAiImportModal({
                 lineHeight: 1.6,
               }}
             >
-              外部AIが出力したposts配列を含むJSON、またはJSON配列だけを貼り付けてください。会話ログそのものはここでは読み取れません。
+              外部AIが返したJSONだけを貼り付けてください。会話ログ本文はここでは読み取れません。
             </div>
             <textarea
               id="external-ai-json-input"
               value={jsonInput}
               onChange={(event) => setJsonInput(event.target.value)}
-              placeholder="外部AIが出力したposts配列を含むJSON、またはJSON配列だけを貼り付けてください。会話ログそのものはここでは読み取れません。"
+              placeholder="外部AIが返したJSONだけを貼り付けてください。"
               rows={10}
               style={{ ...inputStyle, resize: "vertical", minHeight: 180 }}
             />
@@ -1180,7 +1177,7 @@ export default function ExternalAiImportModal({
                 <div>
                   <h3 style={{ margin: 0, fontSize: 18 }}>投稿候補プレビュー</h3>
                   <p style={{ margin: "6px 0 0", color: "#64748b", lineHeight: 1.6 }}>
-                    第1段階では保存しません。投稿する候補を選ぶUIだけ確認できます。
+                    投稿候補を確認・編集できます。読み取っただけでは投稿されません。
                   </p>
                 </div>
                 <span
