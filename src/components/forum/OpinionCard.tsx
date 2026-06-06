@@ -261,6 +261,7 @@ const savedCounterargumentExplanation = String(
 const stanceText = stanceLabelText(op.opinion.stance_label);
 const logicScoreReason = String(op.opinion.logic_score_reason ?? "").trim();
 const displayLogicScoreReason = logicScoreReasonText(logicScoreReason);
+const hasLogicScoreReason = logicScoreReason.length > 0;
 const logicBreakType = String(op.opinion.logic_break_type ?? "").trim();
 const logicBreakNote = String(op.opinion.logic_break_note ?? "").trim();
 const shouldShowLogicBreakNote =
@@ -306,9 +307,25 @@ const feedbackActions = [
           <span style={roleBadgeStyle(op.opinion.post_role)}>
             {roleLabel(op.opinion.post_role)}
           </span>
-<span style={scoreBadgeStyle(score)}>
-  {score === null || score === undefined ? "AI論理スコア 未評価" : `AI論理スコア ${score}点`}
+<span style={scoreBadgeStyle(hasLogicScoreReason ? score : null)}>
+  {score === null || score === undefined
+    ? "AI論理スコア 未評価"
+    : hasLogicScoreReason
+    ? `AI論理スコア ${score}点`
+    : `参考スコア ${score}点`}
 </span>
+          {score !== null && score !== undefined && !hasLogicScoreReason && (
+            <span
+              style={{
+                color: "#64748b",
+                fontSize: currentFont?.base ? currentFont.base * 0.8 : 12,
+                fontWeight: 600,
+                lineHeight: 1.4,
+              }}
+            >
+              AI再評価前の参考値です
+            </span>
+          )}
           {stanceText && (
             <span
               style={{
