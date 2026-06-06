@@ -764,6 +764,7 @@ const [treeVariant] = useState<"A" | "C">("A");
   const [predictionDeadline, setPredictionDeadline] = useState("");
 
   const replyDraftKey = threadId ? `forum_reply_draft_${threadId}` : "";
+  const replyDraftRestoreKey = thread?.id ? replyDraftKey : "";
 
   function saveReplyDraft() {
     if (!replyDraftKey) return;
@@ -885,16 +886,16 @@ const [treeVariant] = useState<"A" | "C">("A");
 
 
 useEffect(() => {
-  if (!replyDraftKey || !thread?.id) return;
+  if (!replyDraftRestoreKey) return;
 
-  const rawDraft = window.sessionStorage.getItem(replyDraftKey);
+  const rawDraft = window.sessionStorage.getItem(replyDraftRestoreKey);
   if (!rawDraft) return;
 
   try {
     const parsedDraft = JSON.parse(rawDraft);
 
     if (!parsedDraft || typeof parsedDraft !== "object") {
-      window.sessionStorage.removeItem(replyDraftKey);
+      window.sessionStorage.removeItem(replyDraftRestoreKey);
       return;
     }
 
@@ -940,9 +941,9 @@ useEffect(() => {
       el?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 150);
   } catch {
-    window.sessionStorage.removeItem(replyDraftKey);
+    window.sessionStorage.removeItem(replyDraftRestoreKey);
   }
-}, [replyDraftKey, thread?.id]);
+}, [replyDraftRestoreKey]);
 
 
 
