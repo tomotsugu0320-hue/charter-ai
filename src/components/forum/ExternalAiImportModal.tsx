@@ -61,6 +61,7 @@ type SaveReferenceState = {
 
 const MAX_CANDIDATES = 20;
 const MAX_SELECTED_CATEGORIES = 3;
+const EXTERNAL_AI_IMPORT_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const MAIN_CATEGORY_OPTIONS = [
   "経済・政策",
   "AI・技術",
@@ -80,6 +81,16 @@ const SOURCE_AI_OPTIONS = [
   "Perplexity",
   "その他",
 ];
+
+function removeExternalAiImportDraft(draftStorageKey: string) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.sessionStorage.removeItem(draftStorageKey);
+  } catch (removeError) {
+    console.error("[external-ai-import draft remove failed]", removeError);
+  }
+}
 
 function buildExternalAiPrompt(
   extractionMode: ExtractionMode,
@@ -426,13 +437,33 @@ export default function ExternalAiImportModal({
       if (!saved) return;
 
       const parsed: unknown = JSON.parse(saved);
-      if (!isRecord(parsed)) return;
+      if (!isRecord(parsed)) {
+        removeExternalAiImportDraft(draftStorageKey);
+        return;
+      }
 
-      const restoredCandidates = Array.isArray(parsed.candidates)
-        ? parsed.candidates
-            .map(normalizeStoredCandidate)
-            .filter((candidate): candidate is ExternalAiCandidate => Boolean(candidate))
-        : [];
+      const savedAt = parsed.savedAt;
+      if (
+        typeof savedAt !== "number" ||
+        !Number.isFinite(savedAt) ||
+        Date.now() - savedAt > EXTERNAL_AI_IMPORT_DRAFT_MAX_AGE_MS
+      ) {
+        removeExternalAiImportDraft(draftStorageKey);
+        return;
+      }
+
+      if (!Array.isArray(parsed.candidates)) {
+        removeExternalAiImportDraft(draftStorageKey);
+        return;
+      }
+
+      const restoredCandidates = parsed.candidates
+        .map(normalizeStoredCandidate)
+        .filter((candidate): candidate is ExternalAiCandidate => Boolean(candidate));
+      if (parsed.candidates.length > 0 && restoredCandidates.length === 0) {
+        removeExternalAiImportDraft(draftStorageKey);
+        return;
+      }
       const restoredCategories = Array.isArray(parsed.selectedCategories)
         ? parsed.selectedCategories
             .map(toText)
@@ -462,6 +493,7 @@ export default function ExternalAiImportModal({
       );
     } catch (restoreError) {
       console.error("[external-ai-import draft restore failed]", restoreError);
+      removeExternalAiImportDraft(draftStorageKey);
     } finally {
       setHasRestoredDraft(true);
     }
@@ -609,6 +641,7 @@ export default function ExternalAiImportModal({
     setSubmitError("");
     setNotice("");
 
+    let allSubmitted = true;
     for (const { candidate, index } of selected) {
       const result = await submitCandidate(candidate);
       setSubmitResults((current) => ({
@@ -625,8 +658,15 @@ export default function ExternalAiImportModal({
         redirectToLogin();
         return;
       }
+
+      if (result.status !== "success") {
+        allSubmitted = false;
+      }
     }
 
+    if (allSubmitted) {
+      removeExternalAiImportDraft(draftStorageKey);
+    }
     setIsSubmitting(false);
   };
 
