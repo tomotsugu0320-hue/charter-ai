@@ -3018,7 +3018,7 @@ function renderDiscussionCard({
           })
         )
       ) : (
-        <div style={{ color: "#666" }}>まだ論点は整理されていない。</div>
+        <div style={{ color: "#666" }}>論点の見出しはまだ生成されていません。前提・根拠・反論から確認できます。</div>
       )}
     </div>
   </div>
