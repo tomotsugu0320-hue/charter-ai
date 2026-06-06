@@ -195,6 +195,8 @@ export default function OpinionView({
       : typeof rawScore === "string" && rawScore.trim() !== ""
       ? Number(rawScore)
       : null;
+  const hasLogicScoreReason =
+    String(op.opinion.logic_score_reason ?? "").trim().length > 0;
   const isLowScore =
     typeof numericScore === "number" &&
     Number.isFinite(numericScore) &&
@@ -202,6 +204,7 @@ export default function OpinionView({
     numericScore < 60;
   const isFeaturedOpinion =
     isBest &&
+    hasLogicScoreReason &&
     typeof numericScore === "number" &&
     Number.isFinite(numericScore) &&
     numericScore >= 70;
