@@ -1952,7 +1952,7 @@ export default function ForumPage() {
             </>
           ) : (
             <div style={{ ...panelStyle, color: "#475569" }}>
-              条件に合うスレッドはありません。
+              検索条件を変えるか、投稿候補を作って新しい議論を始められます。
             </div>
           )}
         </section>
@@ -2088,7 +2088,7 @@ export default function ForumPage() {
             ))
           ) : (
             <div style={{ ...panelStyle, color: "#475569" }}>
-              条件に合うランキング対象はありません。
+              投稿が増えるとランキングが表示されます。まず投稿候補を作ってみてください。
             </div>
           )}
         </div>
@@ -2152,7 +2152,7 @@ export default function ForumPage() {
             ))
           ) : (
             <div style={{ ...panelStyle, color: "#475569" }}>
-              条件に合う新着スレッドはありません。
+              新しい議論は、投稿候補を作るところから始められます。
             </div>
           )}
         </div>
@@ -2360,7 +2360,7 @@ export default function ForumPage() {
           </div>
         ) : (
           <div style={{ ...smallMetaStyle, color: "#475569" }}>
-            保存済みのAI総括があるスレッドはまだありません。
+            投稿が増えるとAI総括が表示されます。
           </div>
         )}
       </section>
@@ -2421,7 +2421,7 @@ export default function ForumPage() {
               ))
             ) : (
               <div style={panelStyle}>
-                一致する評価が高いスレッドはありません。
+                評価対象が増えるとここに表示されます。
                 {selectedNodeLabel && (
                   <div style={{ ...smallMetaStyle, marginTop: 6 }}>
                     この論点について、下の入力欄から新しく投稿できます。
@@ -2478,7 +2478,7 @@ export default function ForumPage() {
                 />
               ))
             ) : (
-              <div style={panelStyle}>一致する投稿が多いスレッドはありません。</div>
+              <div style={panelStyle}>意見・反論・補足が集まるとここに表示されます。</div>
             )}
           </div>
         </div>
@@ -2707,7 +2707,7 @@ export default function ForumPage() {
                       <li key={`${premise}-${index}`}>{premise}</li>
                     ))
                   ) : (
-                    <li style={{ color: "#6b7280" }}>まだ整理されていません。</li>
+                    <li style={{ color: "#6b7280" }}>AIで整理するとここに表示されます。</li>
                   )}
                 </ul>
               </div>
@@ -2720,7 +2720,7 @@ export default function ForumPage() {
                       <li key={`${reason}-${index}`}>{reason}</li>
                     ))
                   ) : (
-                    <li style={{ color: "#6b7280" }}>まだ整理されていません。</li>
+                    <li style={{ color: "#6b7280" }}>AIで整理するとここに表示されます。</li>
                   )}
                 </ul>
               </div>
@@ -2737,7 +2737,7 @@ export default function ForumPage() {
                     </li>
                   ))
                 ) : (
-                  <li style={{ color: "#6b7280" }}>まだ抽出されていません。</li>
+                  <li style={{ color: "#6b7280" }}>AIで整理するとここに表示されます。</li>
                 )}
               </ul>
             </div>
