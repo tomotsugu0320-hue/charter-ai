@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 export default function ForumLoginPage() {
@@ -187,6 +188,21 @@ export default function ForumLoginPage() {
             {isLoading ? "ログイン中..." : "ログイン"}
           </button>
         </form>
+
+        <p style={{ margin: "18px 0 0", textAlign: "center" }}>
+          <Link
+            href={`/${tenant}/forum/guide`}
+            style={{
+              color: "#0f172a",
+              fontSize: 14,
+              fontWeight: 800,
+              textDecoration: "underline",
+              textUnderlineOffset: 3,
+            }}
+          >
+            使い方を見る
+          </Link>
+        </p>
       </section>
     </main>
   );
