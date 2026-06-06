@@ -125,6 +125,19 @@ function comparePostsByNew(a?: PostRow | null, b?: PostRow | null) {
 }
 
 function comparePostsByLogicScore(a?: PostRow | null, b?: PostRow | null) {
+  const aEvaluatedScore = postEvaluatedLogicScore(a);
+  const bEvaluatedScore = postEvaluatedLogicScore(b);
+
+  if (aEvaluatedScore !== null || bEvaluatedScore !== null) {
+    if (aEvaluatedScore === null) return 1;
+    if (bEvaluatedScore === null) return -1;
+    if (bEvaluatedScore !== aEvaluatedScore) {
+      return bEvaluatedScore - aEvaluatedScore;
+    }
+
+    return comparePostsByNew(a, b);
+  }
+
   const aScore = postLogicScore(a);
   const bScore = postLogicScore(b);
 
