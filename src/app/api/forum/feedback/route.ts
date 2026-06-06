@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { isForumBetaLoggedIn } from "@/lib/forum-auth";
 
 const ALLOWED_FEEDBACK_TYPES = [
   "term_unknown",
@@ -179,6 +180,13 @@ return explanation;
 }
 
 export async function POST(req: NextRequest) {
+  if (!isForumBetaLoggedIn(req)) {
+    return NextResponse.json(
+      { ok: false, error: "Login required." },
+      { status: 401 }
+    );
+  }
+
   try {
     const body = await req.json();
 
