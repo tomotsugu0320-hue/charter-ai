@@ -292,6 +292,13 @@ export default function DiscussionTree({
       .join("\n")
       .trim();
     const displayContent = filteredContent || post.content.trim();
+    const logicScore =
+      typeof post.logic_score === "number" && Number.isFinite(post.logic_score)
+        ? post.logic_score
+        : null;
+    const hasEvaluatedLogicScore = Boolean(
+      String(post.logic_score_reason ?? "").trim()
+    );
 
     return (
       <div
@@ -338,9 +345,19 @@ export default function DiscussionTree({
               }}
             >
               {roleLabel(post.post_role)}
-              <span style={{ marginLeft: 6, color: "#f59e0b", fontWeight: 700 }}>
-                ⭐{post.logic_score ?? "-"}
-              </span>
+              {logicScore !== null && (
+                <span
+                  style={{
+                    marginLeft: 6,
+                    color: hasEvaluatedLogicScore ? "#d97706" : "#64748b",
+                    fontWeight: hasEvaluatedLogicScore ? 800 : 700,
+                  }}
+                >
+                  {hasEvaluatedLogicScore
+                    ? `AI ${logicScore}点`
+                    : `参考 ${logicScore}点`}
+                </span>
+              )}
 
               {post.post_role === "opinion" && (
                 <span
