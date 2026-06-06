@@ -6,10 +6,16 @@ const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 14;
 
 type ForumBetaSessionPayload = {
   sub: "forum_beta";
+  userId?: string;
   iat: number;
   exp: number;
   nonce: string;
   v: 1;
+};
+
+type ForumBetaUserCredential = {
+  id: string;
+  password: string;
 };
 
 function getSessionSecret() {
@@ -49,24 +55,109 @@ function readCookieValue(cookieHeader: string | null | undefined, name: string) 
   return cookie ? cookie.slice(prefix.length) : null;
 }
 
+function parseForumBetaUsersJson():
+  | { users: ForumBetaUserCredential[]; error?: never }
+  | { users?: never; error: string }
+  | null {
+  const raw = process.env.FORUM_BETA_USERS_JSON?.trim();
+
+  if (!raw) return null;
+
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { error: "FORUM_BETA_USERS_JSON is not valid JSON." };
+  }
+
+  if (!Array.isArray(parsed)) {
+    return { error: "FORUM_BETA_USERS_JSON must be an array." };
+  }
+
+  const users: ForumBetaUserCredential[] = [];
+
+  for (const item of parsed) {
+    if (!item || typeof item !== "object") {
+      return { error: "FORUM_BETA_USERS_JSON entries must be objects." };
+    }
+
+    const record = item as { id?: unknown; password?: unknown };
+    const id = typeof record.id === "string" ? record.id.trim() : "";
+    const password =
+      typeof record.password === "string" ? record.password : "";
+
+    if (!id || !password) {
+      return {
+        error:
+          "FORUM_BETA_USERS_JSON entries must have non-empty string id and password.",
+      };
+    }
+
+    users.push({ id, password });
+  }
+
+  if (users.length === 0) {
+    return { error: "FORUM_BETA_USERS_JSON must include at least one user." };
+  }
+
+  return { users };
+}
+
+export function getForumBetaAuthConfigError() {
+  if (!getSessionSecret()) {
+    return "FORUM_BETA_SESSION_SECRET is not configured.";
+  }
+
+  const usersConfig = parseForumBetaUsersJson();
+
+  if (usersConfig) {
+    if ("error" in usersConfig) return usersConfig.error;
+    return null;
+  }
+
+  if (!process.env.FORUM_BETA_USER || !process.env.FORUM_BETA_PASSWORD) {
+    return "Forum beta credentials are not configured.";
+  }
+
+  return null;
+}
+
 export function isForumBetaAuthConfigured() {
-  return Boolean(
-    process.env.FORUM_BETA_USER &&
-      process.env.FORUM_BETA_PASSWORD &&
-      process.env.FORUM_BETA_SESSION_SECRET
-  );
+  return getForumBetaAuthConfigError() === null;
 }
 
 export function verifyForumBetaCredentials(user: string, password: string) {
-  const expectedUser = process.env.FORUM_BETA_USER;
+  const normalizedUser = user.trim();
+
+  if (!normalizedUser || !password || !getSessionSecret()) return false;
+
+  const usersConfig = parseForumBetaUsersJson();
+
+  if (usersConfig) {
+    if ("error" in usersConfig) return false;
+
+    const matchedUser = usersConfig.users.find(
+      (credential) =>
+        safeEqual(normalizedUser, credential.id) &&
+        safeEqual(password, credential.password)
+    );
+
+    return matchedUser?.id ?? false;
+  }
+
+  const expectedUser = process.env.FORUM_BETA_USER?.trim();
   const expectedPassword = process.env.FORUM_BETA_PASSWORD;
 
-  if (!expectedUser || !expectedPassword || !getSessionSecret()) return false;
+  if (!expectedUser || !expectedPassword) return false;
 
-  return safeEqual(user, expectedUser) && safeEqual(password, expectedPassword);
+  return safeEqual(normalizedUser, expectedUser) &&
+    safeEqual(password, expectedPassword)
+    ? expectedUser
+    : false;
 }
 
-export function createForumBetaSessionToken() {
+export function createForumBetaSessionToken(userId?: string) {
   const secret = getSessionSecret();
 
   if (!secret) {
@@ -76,6 +167,7 @@ export function createForumBetaSessionToken() {
   const now = Math.floor(Date.now() / 1000);
   const payload: ForumBetaSessionPayload = {
     sub: "forum_beta",
+    ...(userId?.trim() ? { userId: userId.trim() } : {}),
     iat: now,
     exp: now + SESSION_MAX_AGE_SECONDS,
     nonce: randomBytes(16).toString("base64url"),
@@ -87,22 +179,22 @@ export function createForumBetaSessionToken() {
   return `${payloadPart}.${signature}`;
 }
 
-export function verifyForumBetaSessionToken(token: string | null | undefined) {
+function readForumBetaSessionPayload(token: string | null | undefined) {
   const secret = getSessionSecret();
 
-  if (!secret || !token) return false;
+  if (!secret || !token) return null;
 
   const parts = token.split(".");
 
-  if (parts.length !== 2) return false;
+  if (parts.length !== 2) return null;
 
   const [payloadPart, signature] = parts;
 
-  if (!payloadPart || !signature) return false;
+  if (!payloadPart || !signature) return null;
 
   const expectedSignature = signTokenPayload(payloadPart, secret);
 
-  if (!safeEqual(signature, expectedSignature)) return false;
+  if (!safeEqual(signature, expectedSignature)) return null;
 
   try {
     const payload = JSON.parse(
@@ -110,15 +202,20 @@ export function verifyForumBetaSessionToken(token: string | null | undefined) {
     ) as Partial<ForumBetaSessionPayload>;
     const now = Math.floor(Date.now() / 1000);
 
-    return (
+    const valid =
       payload.sub === "forum_beta" &&
       payload.v === 1 &&
       typeof payload.exp === "number" &&
-      payload.exp > now
-    );
+      payload.exp > now;
+
+    return valid ? payload : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+export function verifyForumBetaSessionToken(token: string | null | undefined) {
+  return readForumBetaSessionPayload(token) !== null;
 }
 
 export function isForumBetaLoggedIn(
@@ -131,6 +228,20 @@ export function isForumBetaLoggedIn(
   const token = readCookieValue(cookieHeader, FORUM_BETA_SESSION_COOKIE);
 
   return verifyForumBetaSessionToken(token);
+}
+
+export function getForumBetaSessionUser(
+  requestOrHeaders: Request | Headers | null | undefined
+) {
+  const cookieHeader =
+    requestOrHeaders instanceof Headers
+      ? requestOrHeaders.get("cookie")
+      : requestOrHeaders?.headers.get("cookie");
+  const token = readCookieValue(cookieHeader, FORUM_BETA_SESSION_COOKIE);
+  const payload = readForumBetaSessionPayload(token);
+  const userId = payload?.userId?.trim();
+
+  return userId || null;
 }
 
 export function getForumBetaSessionCookieOptions() {

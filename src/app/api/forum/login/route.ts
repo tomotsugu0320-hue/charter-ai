@@ -3,7 +3,7 @@ import {
   createForumBetaSessionToken,
   FORUM_BETA_SESSION_COOKIE,
   getForumBetaSessionCookieOptions,
-  isForumBetaAuthConfigured,
+  getForumBetaAuthConfigError,
   verifyForumBetaCredentials,
 } from "@/lib/forum-auth";
 
@@ -15,7 +15,9 @@ function toStringValue(value: unknown) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!isForumBetaAuthConfigured()) {
+  const configError = getForumBetaAuthConfigError();
+
+  if (configError) {
     return NextResponse.json(
       { error: "Forum beta login is not configured." },
       { status: 500 }
@@ -29,7 +31,9 @@ export async function POST(request: NextRequest) {
   const user = toStringValue(body?.user).trim();
   const password = toStringValue(body?.password);
 
-  if (!verifyForumBetaCredentials(user, password)) {
+  const userId = verifyForumBetaCredentials(user, password);
+
+  if (!userId) {
     return NextResponse.json(
       { error: "IDまたはパスワードが違います。" },
       { status: 401 }
@@ -39,7 +43,7 @@ export async function POST(request: NextRequest) {
   const response = NextResponse.json({ ok: true });
   response.cookies.set(
     FORUM_BETA_SESSION_COOKIE,
-    createForumBetaSessionToken(),
+    createForumBetaSessionToken(userId),
     getForumBetaSessionCookieOptions()
   );
 
