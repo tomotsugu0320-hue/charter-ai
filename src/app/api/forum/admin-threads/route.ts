@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { isForumBetaLoggedIn } from "@/lib/forum-auth";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,6 +8,13 @@ const supabase = createClient(
 );
 
 export async function GET(req: Request) {
+  if (!isForumBetaLoggedIn(req)) {
+    return NextResponse.json(
+      { ok: false, error: "Login required." },
+      { status: 401 }
+    );
+  }
+
   const { searchParams } = new URL(req.url);
   const mode = searchParams.get("mode") ?? "visible";
 

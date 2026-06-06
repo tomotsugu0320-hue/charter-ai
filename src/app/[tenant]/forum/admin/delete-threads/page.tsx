@@ -60,7 +60,12 @@ export default function DeleteThreadsPage() {
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(json?.error || "スレッド一覧の取得に失敗しました。");
+        setThreads([]);
+        setError(
+          res.status === 401 || json?.error === "Login required."
+            ? "ログインが必要です。Forumトップからログインしてください。"
+            : json?.error || "スレッド一覧の取得に失敗しました。"
+        );
         return;
       }
 
@@ -196,6 +201,17 @@ export default function DeleteThreadsPage() {
 
   useEffect(() => {
     void load();
+  }, [mode]);
+
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        void load();
+      }
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
   }, [mode]);
 
   return (
