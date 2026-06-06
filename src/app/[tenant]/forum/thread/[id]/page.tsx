@@ -1921,9 +1921,20 @@ function renderDiscussionCard({
 
 
 
-      <div style={{ marginBottom: 16 }}>
+      <div
+        style={{
+          marginBottom: 16,
+          display: "flex",
+          gap: 12,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
         <LinkButton href={`/${tenant}/forum`} variant="subtle">
           ← 掲示板トップに戻る
+        </LinkButton>
+        <LinkButton href={`/${tenant}/forum/guide`} variant="subtle">
+          使い方
         </LinkButton>
       </div>
 

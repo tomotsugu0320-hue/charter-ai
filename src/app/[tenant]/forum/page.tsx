@@ -1549,6 +1549,21 @@ export default function ForumPage() {
         <p style={{ margin: 0 }}>
           β版です。投稿内容は公開されます。個人情報・第三者情報は貼らないでください。
         </p>
+        <p style={{ margin: "8px 0 0", fontSize: currentFontSize - 2 }}>
+          初めての方は、投稿前に{" "}
+          <Link
+            href={`/${tenant}/forum/guide`}
+            style={{
+              color: "#92400e",
+              fontWeight: 900,
+              textDecoration: "underline",
+              textUnderlineOffset: 3,
+            }}
+          >
+            使い方を見る
+          </Link>
+          ことができます。
+        </p>
       </section>
 
       <section style={{ ...panelStyle, marginBottom: 18 }}>
