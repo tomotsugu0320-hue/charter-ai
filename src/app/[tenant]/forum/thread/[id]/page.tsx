@@ -673,6 +673,10 @@ export default function ForumThreadPage({ params }: PageProps) {
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [postLoginRequired, setPostLoginRequired] = useState(false);
+  const [isThreadMenuOpen, setIsThreadMenuOpen] = useState(false);
+  const [isForumBetaLoggedIn, setIsForumBetaLoggedIn] = useState<boolean | null>(
+    null
+  );
 
 const [explanations, setExplanations] = useState<Record<string, string>>({});
 const [feedbackLoadingPostId, setFeedbackLoadingPostId] = useState<string | null>(null);
@@ -860,6 +864,32 @@ const [treeVariant] = useState<"A" | "C">("A");
   }, [params]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadLoginStatus() {
+      try {
+        const res = await fetch("/api/forum/login/status", {
+          cache: "no-store",
+        });
+        const result = (await res.json().catch(() => null)) as {
+          loggedIn?: unknown;
+        } | null;
+        const loggedIn = res.ok && result?.loggedIn === true;
+
+        if (!cancelled) setIsForumBetaLoggedIn(loggedIn);
+      } catch {
+        if (!cancelled) setIsForumBetaLoggedIn(false);
+      }
+    }
+
+    void loadLoginStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!threadId) return;
     loadThread();
   }, [threadId]);
@@ -980,6 +1010,13 @@ useEffect(() => {
   window.addEventListener("scroll-to-post-form", handler);
   return () => window.removeEventListener("scroll-to-post-form", handler);
 }, []);
+
+async function handleLogout() {
+  await fetch("/api/forum/logout", { method: "POST" }).catch(() => null);
+  setIsForumBetaLoggedIn(false);
+  setIsThreadMenuOpen(false);
+  router.push(`/${tenant}/forum/login`);
+}
 
 
   const fontSizeMap = {
@@ -1925,17 +1962,123 @@ function renderDiscussionCard({
         style={{
           marginBottom: 16,
           display: "flex",
+          justifyContent: "space-between",
           gap: 12,
           flexWrap: "wrap",
           alignItems: "center",
         }}
       >
-        <LinkButton href={`/${tenant}/forum`} variant="subtle">
-          ← 掲示板トップに戻る
-        </LinkButton>
-        <LinkButton href={`/${tenant}/forum/guide`} variant="subtle">
-          使い方
-        </LinkButton>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <LinkButton href={`/${tenant}/forum`} variant="subtle">
+            ← 掲示板トップに戻る
+          </LinkButton>
+          <LinkButton href={`/${tenant}/forum/guide`} variant="subtle">
+            使い方
+          </LinkButton>
+        </div>
+        <div style={{ position: "relative" }}>
+          <button
+            type="button"
+            aria-label="メニューを開く"
+            aria-expanded={isThreadMenuOpen}
+            onClick={() => setIsThreadMenuOpen((open) => !open)}
+            style={{
+              minWidth: 44,
+              border: "1px solid #cbd5e1",
+              borderRadius: 8,
+              padding: "8px 12px",
+              background: isThreadMenuOpen ? "#111827" : "#ffffff",
+              color: isThreadMenuOpen ? "#ffffff" : "#111827",
+              cursor: "pointer",
+              fontSize: 18,
+              fontWeight: 800,
+              lineHeight: 1,
+            }}
+          >
+            ☰
+          </button>
+          {isThreadMenuOpen && (
+            <nav
+              aria-label="スレッド詳細メニュー"
+              style={{
+                position: "absolute",
+                top: "calc(100% + 8px)",
+                right: 0,
+                zIndex: 20,
+                minWidth: 220,
+                maxWidth: "calc(100vw - 32px)",
+                display: "grid",
+                gap: 6,
+                padding: 10,
+                borderRadius: 10,
+                border: "1px solid #cbd5e1",
+                background: "#ffffff",
+                color: "#111827",
+                boxShadow: "0 12px 30px rgba(15, 23, 42, 0.18)",
+              }}
+            >
+              {[
+                { href: `/${tenant}/forum/guide`, label: "使い方" },
+                { href: `/${tenant}/forum`, label: "掲示板トップ" },
+                { href: `/${tenant}/forum/private-logs`, label: "あとで読む管理" },
+              ].map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setIsThreadMenuOpen(false)}
+                  style={{
+                    display: "block",
+                    padding: "9px 10px",
+                    borderRadius: 8,
+                    color: "#111827",
+                    textDecoration: "none",
+                    fontWeight: 800,
+                  }}
+                >
+                  {item.label}
+                </Link>
+              ))}
+              {isForumBetaLoggedIn ? (
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    padding: "9px 10px",
+                    border: 0,
+                    borderRadius: 8,
+                    background: "#fef2f2",
+                    color: "#991b1b",
+                    cursor: "pointer",
+                    font: "inherit",
+                    fontWeight: 800,
+                    textAlign: "left",
+                  }}
+                >
+                  ログアウト
+                </button>
+              ) : (
+                <Link
+                  href={`/${tenant}/forum/login?next=${encodeURIComponent(
+                    `/${tenant}/forum/thread/${threadId}`
+                  )}`}
+                  onClick={() => setIsThreadMenuOpen(false)}
+                  style={{
+                    display: "block",
+                    padding: "9px 10px",
+                    borderRadius: 8,
+                    color: "#111827",
+                    textDecoration: "none",
+                    fontWeight: 800,
+                  }}
+                >
+                  ログイン
+                </Link>
+              )}
+            </nav>
+          )}
+        </div>
       </div>
 
       <div
