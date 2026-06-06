@@ -699,6 +699,8 @@ export default function ForumPage() {
   const keyword = searchParams.get("keyword") || "";
   const goal = searchParams.get("goal") || "";
   const node = searchParams.get("node") || "";
+  const shouldOpenExternalAiImport =
+    searchParams.get("externalAiImport") === "1";
   const selectedNodeInfo = NODE_INFO[node];
   const selectedNodeLabel = selectedNodeInfo?.label;
   const selectedNodePathText =
@@ -898,6 +900,17 @@ export default function ForumPage() {
   useEffect(() => {
     sessionStorage.setItem(draftStorageKey, text);
   }, [text]);
+
+  useEffect(() => {
+    if (!shouldOpenExternalAiImport) return;
+
+    setIsExternalAiImportOpen(true);
+    requestAnimationFrame(() => {
+      document
+        .getElementById("create")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [shouldOpenExternalAiImport]);
 
   useEffect(() => {
     let cancelled = false;

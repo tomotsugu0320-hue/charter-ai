@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type CandidateStatus = "unselected" | "post" | "skip";
 type ExtractionMode = "category" | "auto";
@@ -35,6 +35,7 @@ type SubmitResult = {
   threadId?: string;
   url?: string;
   error?: string;
+  requiresLogin?: boolean;
 };
 
 type RelatedThread = {
@@ -242,6 +243,14 @@ function toTextArray(value: unknown) {
   return value.map(toText).filter(Boolean).slice(0, 8);
 }
 
+function isCandidateStatus(value: unknown): value is CandidateStatus {
+  return value === "unselected" || value === "post" || value === "skip";
+}
+
+function isExtractionMode(value: unknown): value is ExtractionMode {
+  return value === "category" || value === "auto";
+}
+
 function linesToArray(value: string) {
   return value
     .split("\n")
@@ -278,6 +287,18 @@ function normalizeCandidate(value: unknown): ExternalAiCandidate | null {
     source_ai: toText(record.source_ai) || "未指定",
     status: "unselected",
     isEditing: false,
+  };
+}
+
+function normalizeStoredCandidate(value: unknown): ExternalAiCandidate | null {
+  const candidate = normalizeCandidate(value);
+  if (!candidate || !isRecord(value)) return candidate;
+
+  return {
+    ...candidate,
+    status: isCandidateStatus(value.status) ? value.status : candidate.status,
+    isEditing:
+      typeof value.isEditing === "boolean" ? value.isEditing : candidate.isEditing,
   };
 }
 
@@ -393,8 +414,87 @@ export default function ExternalAiImportModal({
     () => buildExternalAiPrompt(extractionMode, selectedCategories),
     [extractionMode, selectedCategories]
   );
+  const draftStorageKey = `forum_external_ai_import_draft_${tenant}`;
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || hasRestoredDraft || typeof window === "undefined") return;
+
+    try {
+      const saved = window.sessionStorage.getItem(draftStorageKey);
+      if (!saved) return;
+
+      const parsed: unknown = JSON.parse(saved);
+      if (!isRecord(parsed)) return;
+
+      const restoredCandidates = Array.isArray(parsed.candidates)
+        ? parsed.candidates
+            .map(normalizeStoredCandidate)
+            .filter((candidate): candidate is ExternalAiCandidate => Boolean(candidate))
+        : [];
+      const restoredCategories = Array.isArray(parsed.selectedCategories)
+        ? parsed.selectedCategories
+            .map(toText)
+            .filter((category) => MAIN_CATEGORY_OPTIONS.includes(category))
+            .slice(0, MAX_SELECTED_CATEGORIES)
+        : [];
+      const restoredSourceAi = toText(parsed.sourceAi);
+
+      setJsonInput(toText(parsed.jsonInput));
+      setCandidates(restoredCandidates);
+      if (isExtractionMode(parsed.extractionMode)) {
+        setExtractionMode(parsed.extractionMode);
+      }
+      if (restoredCategories.length > 0) {
+        setSelectedCategories(restoredCategories);
+      }
+      if (restoredSourceAi) {
+        setSourceAi(restoredSourceAi);
+      }
+      setError("");
+      setSubmitError("");
+      setSubmitResults({});
+      setRelatedByCandidate({});
+      setSavedReferences({});
+      setNotice("ログイン前の投稿候補を復元しました。");
+    } catch (restoreError) {
+      console.error("[external-ai-import draft restore failed]", restoreError);
+    } finally {
+      setHasRestoredDraft(true);
+    }
+  }, [draftStorageKey, hasRestoredDraft, isOpen]);
 
   if (!isOpen) return null;
+
+  const saveImportDraft = () => {
+    if (typeof window === "undefined") return;
+
+    try {
+      window.sessionStorage.setItem(
+        draftStorageKey,
+        JSON.stringify({
+          jsonInput,
+          candidates,
+          extractionMode,
+          selectedCategories,
+          sourceAi,
+          savedAt: Date.now(),
+        })
+      );
+    } catch (saveError) {
+      console.error("[external-ai-import draft save failed]", saveError);
+    }
+  };
+
+  const redirectToLogin = () => {
+    if (typeof window === "undefined") return;
+
+    window.location.assign(
+      `/${tenant}/forum/login?next=${encodeURIComponent(
+        `/${tenant}/forum?externalAiImport=1#create`
+      )}`
+    );
+  };
 
   const updateCandidate = (
     index: number,
@@ -458,6 +558,13 @@ export default function ExternalAiImportModal({
         const message = isRecord(data)
           ? toText(data.error) || "投稿できませんでした。"
           : "投稿できませんでした。";
+        if (response.status === 401 || message === "Login required.") {
+          return {
+            status: "error",
+            error: "投稿するにはログインが必要です。ログイン後に投稿候補へ戻ります。",
+            requiresLogin: true,
+          };
+        }
         return { status: "error", error: message };
       }
 
@@ -505,6 +612,16 @@ export default function ExternalAiImportModal({
         ...current,
         [index]: result,
       }));
+
+      if (result.requiresLogin) {
+        saveImportDraft();
+        setSubmitError(
+          result.error ?? "投稿するにはログインが必要です。ログイン後に投稿候補へ戻ります。"
+        );
+        setIsSubmitting(false);
+        redirectToLogin();
+        return;
+      }
     }
 
     setIsSubmitting(false);
