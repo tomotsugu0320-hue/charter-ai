@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { isForumBetaLoggedIn } from "@/lib/forum-auth";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -42,6 +43,13 @@ function buildAuthorKeyCookie(authorKey: string) {
 
 export async function POST(req: NextRequest) {
   try {
+    if (!isForumBetaLoggedIn(req)) {
+      return NextResponse.json(
+        { ok: false, error: "Login required." },
+        { status: 401 }
+      );
+    }
+
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
