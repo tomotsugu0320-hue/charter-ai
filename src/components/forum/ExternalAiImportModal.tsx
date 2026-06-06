@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
 
 type CandidateStatus = "unselected" | "post" | "skip";
+type ExtractionMode = "category" | "auto";
 
 type ExternalAiCandidate = {
   title: string;
@@ -14,6 +15,9 @@ type ExternalAiCandidate = {
   risks: string[];
   supplements: string[];
   category: string;
+  related_categories: string[];
+  sub_category: string;
+  tags: string[];
   node: string;
   source_ai: string;
   status: CandidateStatus;
@@ -55,14 +59,15 @@ type SaveReferenceState = {
 };
 
 const MAX_CANDIDATES = 20;
-const DEFAULT_EXTRACT_THEME = "全テーマを分類して出す";
-const THEME_PRESETS = [
-  { label: "経済・政策", value: "経済・政策の話だけ抜き取る" },
-  { label: "恋愛", value: "恋愛の話だけ抜き取る" },
-  { label: "仕事・経営", value: "仕事・経営の話だけ抜き取る" },
-  { label: "AI・テクノロジー", value: "AI・テクノロジーの話だけ抜き取る" },
-  { label: "生活", value: "生活に関する話だけ抜き取る" },
-  { label: "全テーマを分類", value: DEFAULT_EXTRACT_THEME },
+const MAX_SELECTED_CATEGORIES = 3;
+const MAIN_CATEGORY_OPTIONS = [
+  "経済・政策",
+  "AI・技術",
+  "特許・発明",
+  "恋愛・人間関係",
+  "仕事・経営",
+  "生活・健康",
+  "その他",
 ];
 
 const SOURCE_AI_OPTIONS = [
@@ -75,17 +80,35 @@ const SOURCE_AI_OPTIONS = [
   "その他",
 ];
 
-function buildExternalAiPrompt(extractTheme: string) {
-  const theme = extractTheme.trim() || DEFAULT_EXTRACT_THEME;
+function buildExternalAiPrompt(
+  extractionMode: ExtractionMode,
+  selectedCategories: string[]
+) {
+  const categories = selectedCategories.filter(Boolean);
+  const categoryList = MAIN_CATEGORY_OPTIONS.map((category) => `- ${category}`).join("\n");
+  const selectedCategoryText = categories.length
+    ? categories.map((category) => `- ${category}`).join("\n")
+    : "- 未選択";
+  const modeInstruction =
+    extractionMode === "category"
+      ? `抽出モード：テーマを選んで抜き出す
+
+抽出対象カテゴリー：
+${selectedCategoryText}
+
+選択したカテゴリーに関係する内容だけを投稿候補にしてください。
+選択していないカテゴリーの話題は、投稿候補に含めないでください。`
+      : `抽出モード：AIに全部分類させる
+
+カテゴリー候補：
+${categoryList}
+
+会話ログ全体を読み、投稿候補ごとに最も近いカテゴリーへ分類してください。
+投稿不要な雑談、個人的内容、プライバシー情報は除外してください。`;
 
   return `以下の会話ログを、AI知恵袋の掲示板投稿用に整理してください。
 
-抽出対象テーマ：
-${theme}
-
-この会話ログの中から、上記テーマに関係する内容を優先して抽出してください。
-指定テーマと関係のない雑談、個人的すぎる話、投稿に不要な内容は除外してください。
-「全テーマを分類して出す」の場合は、複数テーマを分けて投稿候補化してください。
+${modeInstruction}
 
 目的：
 雑多な会話ログから、複数の問題・質問・回答・論点・反論・補足を抽出し、掲示板に投稿しやすい形に整理することです。
@@ -115,23 +138,33 @@ ${theme}
 - 複数の論点がある場合は、論点ごとに分けてください。
 - 事実と推測を混同しないでください。
 - 断定しすぎず、必要に応じて「可能性がある」と表現してください。
-- 出力は必ずJSON配列にしてください。
+- 各投稿候補に main_category を必ず1つ付けてください。
+- related_categories は必要に応じて複数付けてください。
+- sub_category と tags も付けてください。
+- tags は3〜8個程度にしてください。
+- 出力は必ずJSONにしてください。
 - JSON以外の説明文は出力しないでください。
 
 出力形式：
-[
-  {
-    "title": "投稿タイトル案",
-    "question": "問題・質問",
-    "ai_answer": "AI回答・整理",
-    "premises": ["前提1", "前提2"],
-    "reasons": ["根拠1", "根拠2"],
-    "risks": ["反論・リスク1", "反論・リスク2"],
-    "supplements": ["補足1", "補足2"],
-    "category": "候補カテゴリ",
-    "node": "候補ノード"
-  }
-]`;
+{
+  "posts": [
+    {
+      "main_category": "主カテゴリー",
+      "related_categories": ["関連カテゴリー"],
+      "sub_category": "小カテゴリー",
+      "tags": ["タグ1", "タグ2", "タグ3"],
+      "title": "投稿タイトル案",
+      "question": "問題・質問",
+      "ai_answer": "AI回答・整理",
+      "premises": ["前提1", "前提2"],
+      "reasons": ["根拠1", "根拠2"],
+      "risks": ["反論・リスク1", "反論・リスク2"],
+      "supplements": ["補足1", "補足2"],
+      "category": "主カテゴリー",
+      "node": "候補ノード"
+    }
+  ]
+}`;
 }
 
 const overlayStyle: CSSProperties = {
@@ -222,6 +255,8 @@ function normalizeCandidate(value: unknown): ExternalAiCandidate | null {
   const title = toText(record.title);
   const question = toText(record.question);
   const aiAnswer = toText(record.ai_answer);
+  const mainCategory = toText(record.main_category) || toText(record.category);
+  const subCategory = toText(record.sub_category);
 
   if (!title && !question && !aiAnswer) {
     return null;
@@ -235,8 +270,11 @@ function normalizeCandidate(value: unknown): ExternalAiCandidate | null {
     reasons: toTextArray(record.reasons),
     risks: toTextArray(record.risks),
     supplements: toTextArray(record.supplements),
-    category: toText(record.category),
-    node: toText(record.node),
+    category: mainCategory,
+    related_categories: toTextArray(record.related_categories),
+    sub_category: subCategory,
+    tags: toTextArray(record.tags),
+    node: toText(record.node) || subCategory,
     source_ai: toText(record.source_ai) || "未指定",
     status: "unselected",
     isEditing: false,
@@ -283,6 +321,10 @@ function buildPrivateLogCandidate(candidate: ExternalAiCandidate) {
     risks: safeItems(candidate.risks),
     supplements: safeItems(candidate.supplements),
     category: candidate.category,
+    main_category: candidate.category,
+    related_categories: safeItems(candidate.related_categories),
+    sub_category: candidate.sub_category,
+    tags: safeItems(candidate.tags),
     node: candidate.node,
     source_ai: candidate.source_ai || "未指定",
   };
@@ -324,7 +366,12 @@ export default function ExternalAiImportModal({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [copyMessage, setCopyMessage] = useState("");
-  const [extractTheme, setExtractTheme] = useState("");
+  const [extractionMode, setExtractionMode] =
+    useState<ExtractionMode>("category");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([
+    "経済・政策",
+  ]);
+  const [categoryLimitMessage, setCategoryLimitMessage] = useState("");
   const [sourceAi, setSourceAi] = useState("未指定");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -343,8 +390,8 @@ export default function ExternalAiImportModal({
     [candidates]
   );
   const externalAiPrompt = useMemo(
-    () => buildExternalAiPrompt(extractTheme),
-    [extractTheme]
+    () => buildExternalAiPrompt(extractionMode, selectedCategories),
+    [extractionMode, selectedCategories]
   );
 
   if (!isOpen) return null;
@@ -358,6 +405,25 @@ export default function ExternalAiImportModal({
         candidateIndex === index ? { ...candidate, ...patch } : candidate
       )
     );
+  };
+
+  const toggleCategory = (category: string) => {
+    setCopyMessage("");
+    setCategoryLimitMessage("");
+    setSelectedCategories((current) => {
+      if (current.includes(category)) {
+        return current.filter((item) => item !== category);
+      }
+
+      if (current.length >= MAX_SELECTED_CATEGORIES) {
+        setCategoryLimitMessage(
+          "選択できるカテゴリーは最大3つまでです。多い場合は「AIに全部分類させる」を使ってください。"
+        );
+        return current;
+      }
+
+      return [...current, category];
+    });
   };
 
   const submitCandidate = async (
@@ -597,17 +663,23 @@ export default function ExternalAiImportModal({
         .replace(/[‘’]/g, "'")
         .trim();
       const parsed: unknown = JSON.parse(normalizedJsonText);
+      const parsedCandidates =
+        Array.isArray(parsed)
+          ? parsed
+          : isRecord(parsed) && Array.isArray(parsed.posts)
+          ? parsed.posts
+          : null;
 
-      if (!Array.isArray(parsed)) {
+      if (!parsedCandidates) {
         setCandidates([]);
         setSubmitResults({});
         setRelatedByCandidate({});
         setSavedReferences({});
-        setError("JSONは配列形式で貼り付けてください。");
+        setError("JSONはposts配列を含む形式、または配列形式で貼り付けてください。");
         return;
       }
 
-      const normalized = parsed
+      const normalized = parsedCandidates
         .slice(0, MAX_CANDIDATES)
         .map(normalizeCandidate)
         .filter((candidate): candidate is ExternalAiCandidate =>
@@ -632,7 +704,7 @@ export default function ExternalAiImportModal({
       setRelatedByCandidate({});
       setSavedReferences({});
       setSubmitError("");
-      if (parsed.length > MAX_CANDIDATES) {
+      if (parsedCandidates.length > MAX_CANDIDATES) {
         setNotice(`最大${MAX_CANDIDATES}件まで読み取りました。`);
       } else {
         setNotice(`${normalized.length}件の投稿候補を読み取りました。`);
@@ -643,7 +715,7 @@ export default function ExternalAiImportModal({
       setRelatedByCandidate({});
       setSavedReferences({});
       setError(
-        "これはJSON形式ではありません。\nこの欄には、外部AIが出力したJSON配列を貼り付けてください。\n会話ログをそのまま貼る場合は、上のプロンプトをあなたのChatGPTや外部AIに貼り、返ってきたJSONだけをここに貼り付けてください。"
+        "これはJSON形式ではありません。\nこの欄には、外部AIが出力したposts配列を含むJSON、またはJSON配列を貼り付けてください。\n会話ログをそのまま貼る場合は、上のプロンプトをあなたのChatGPTや外部AIに貼り、返ってきたJSONだけをここに貼り付けてください。"
       );
     }
   };
@@ -825,9 +897,7 @@ export default function ExternalAiImportModal({
 
           <section style={sectionStyle}>
             <div style={{ marginBottom: 16 }}>
-              <label htmlFor="external-ai-extract-theme" style={labelStyle}>
-                抽出するテーマ
-              </label>
+              <div style={labelStyle}>抽出モード</div>
               <div
                 style={{
                   marginBottom: 10,
@@ -836,7 +906,7 @@ export default function ExternalAiImportModal({
                   lineHeight: 1.6,
                 }}
               >
-                会話ログに複数の話題が混ざっている場合、投稿候補にしたいテーマだけを指定できます。未入力の場合は、全テーマを分類して整理します。
+                会話ログから投稿候補にしたいテーマだけを抜き出すか、外部AIに全体を分類させるかを選べます。
               </div>
               <div
                 style={{
@@ -846,39 +916,115 @@ export default function ExternalAiImportModal({
                   marginBottom: 10,
                 }}
               >
-                {THEME_PRESETS.map((preset) => (
+                {(
+                  [
+                    {
+                      value: "category",
+                      label: "テーマを選んで抜き出す",
+                    },
+                    {
+                      value: "auto",
+                      label: "AIに全部分類させる",
+                    },
+                  ] as const
+                ).map((mode) => (
                   <button
-                    key={preset.label}
+                    key={mode.value}
                     type="button"
                     onClick={() => {
-                      setExtractTheme(preset.value);
+                      setExtractionMode(mode.value);
+                      setCategoryLimitMessage("");
                       setCopyMessage("");
                     }}
                     style={{
                       ...buttonStyle,
                       padding: "7px 10px",
                       background:
-                        extractTheme === preset.value ? "#e0f2fe" : "#ffffff",
+                        extractionMode === mode.value ? "#e0f2fe" : "#ffffff",
                       color:
-                        extractTheme === preset.value ? "#075985" : "#111827",
+                        extractionMode === mode.value ? "#075985" : "#111827",
                       borderColor:
-                        extractTheme === preset.value ? "#38bdf8" : "#cbd5e1",
+                        extractionMode === mode.value ? "#38bdf8" : "#cbd5e1",
                     }}
                   >
-                    {preset.label}
+                    {mode.label}
                   </button>
                 ))}
               </div>
-              <input
-                id="external-ai-extract-theme"
-                value={extractTheme}
-                onChange={(event) => {
-                  setExtractTheme(event.target.value);
-                  setCopyMessage("");
-                }}
-                placeholder="例：消費税と飲食店の話だけ / 恋愛相談だけ / AI掲示板開発の話だけ"
-                style={inputStyle}
-              />
+              {extractionMode === "category" ? (
+                <div
+                  style={{
+                    border: "1px solid #dbeafe",
+                    borderRadius: 10,
+                    padding: 12,
+                    background: "#eff6ff",
+                    color: "#1e3a8a",
+                  }}
+                >
+                  <div style={{ fontWeight: 900, marginBottom: 6 }}>
+                    大カテゴリーを選ぶ
+                  </div>
+                  <div
+                    style={{
+                      marginBottom: 10,
+                      color: "#334155",
+                      fontSize: 13,
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    複数選択できます。選択できるカテゴリーは最大3つまでです。
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {MAIN_CATEGORY_OPTIONS.map((category) => {
+                      const selected = selectedCategories.includes(category);
+
+                      return (
+                        <button
+                          key={category}
+                          type="button"
+                          onClick={() => toggleCategory(category)}
+                          style={{
+                            ...buttonStyle,
+                            padding: "7px 10px",
+                            background: selected ? "#1d4ed8" : "#ffffff",
+                            color: selected ? "#ffffff" : "#1e3a8a",
+                            borderColor: selected ? "#1d4ed8" : "#bfdbfe",
+                          }}
+                        >
+                          {category}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {categoryLimitMessage && (
+                    <div
+                      style={{
+                        marginTop: 10,
+                        color: "#991b1b",
+                        fontSize: 13,
+                        fontWeight: 800,
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      {categoryLimitMessage}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div
+                  style={{
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 10,
+                    padding: 12,
+                    background: "#f8fafc",
+                    color: "#334155",
+                    fontSize: 13,
+                    lineHeight: 1.7,
+                  }}
+                >
+                  会話ログ全体を外部AIに読ませ、投稿候補ごとに最も近いカテゴリーへ分類させます。投稿不要な雑談や個人的な内容は除外するよう指示します。
+                </div>
+              )}
             </div>
 
             <div style={{ marginBottom: 16 }}>
@@ -966,13 +1112,13 @@ export default function ExternalAiImportModal({
                 lineHeight: 1.6,
               }}
             >
-              外部AIが出力したJSON配列だけを貼り付けてください。会話ログそのものはここでは読み取れません。
+              外部AIが出力したposts配列を含むJSON、またはJSON配列だけを貼り付けてください。会話ログそのものはここでは読み取れません。
             </div>
             <textarea
               id="external-ai-json-input"
               value={jsonInput}
               onChange={(event) => setJsonInput(event.target.value)}
-              placeholder="外部AIが出力したJSON配列だけを貼り付けてください。会話ログそのものはここでは読み取れません。"
+              placeholder="外部AIが出力したposts配列を含むJSON、またはJSON配列だけを貼り付けてください。会話ログそのものはここでは読み取れません。"
               rows={10}
               style={{ ...inputStyle, resize: "vertical", minHeight: 180 }}
             />
@@ -1169,11 +1315,23 @@ export default function ExternalAiImportModal({
                           }}
                         >
                           <label style={labelStyle}>
-                            候補カテゴリ
+                            主カテゴリー
                             <input
                               value={candidate.category}
                               onChange={(event) =>
                                 updateCandidate(index, { category: event.target.value })
+                              }
+                              style={{ ...inputStyle, marginTop: 6 }}
+                            />
+                          </label>
+                          <label style={labelStyle}>
+                            小カテゴリー
+                            <input
+                              value={candidate.sub_category}
+                              onChange={(event) =>
+                                updateCandidate(index, {
+                                  sub_category: event.target.value,
+                                })
                               }
                               style={{ ...inputStyle, marginTop: 6 }}
                             />
@@ -1185,6 +1343,41 @@ export default function ExternalAiImportModal({
                               onChange={(event) =>
                                 updateCandidate(index, { node: event.target.value })
                               }
+                              style={{ ...inputStyle, marginTop: 6 }}
+                            />
+                          </label>
+                        </div>
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                              "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+                            gap: 10,
+                          }}
+                        >
+                          <label style={labelStyle}>
+                            関連カテゴリー
+                            <textarea
+                              value={candidate.related_categories.join("\n")}
+                              onChange={(event) =>
+                                updateCandidate(index, {
+                                  related_categories: linesToArray(event.target.value),
+                                })
+                              }
+                              rows={3}
+                              style={{ ...inputStyle, marginTop: 6 }}
+                            />
+                          </label>
+                          <label style={labelStyle}>
+                            タグ
+                            <textarea
+                              value={candidate.tags.join("\n")}
+                              onChange={(event) =>
+                                updateCandidate(index, {
+                                  tags: linesToArray(event.target.value),
+                                })
+                              }
+                              rows={3}
                               style={{ ...inputStyle, marginTop: 6 }}
                             />
                           </label>
@@ -1209,10 +1402,27 @@ export default function ExternalAiImportModal({
                             gap: 10,
                           }}
                         >
-                          <FieldBlock label="候補カテゴリ">
+                          <FieldBlock label="主カテゴリー">
                             {candidate.category}
                           </FieldBlock>
+                          <FieldBlock label="小カテゴリー">
+                            {candidate.sub_category}
+                          </FieldBlock>
                           <FieldBlock label="候補ノード">{candidate.node}</FieldBlock>
+                        </div>
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                              "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
+                            gap: 10,
+                          }}
+                        >
+                          <ListBlock
+                            label="関連カテゴリー"
+                            items={candidate.related_categories}
+                          />
+                          <ListBlock label="タグ" items={candidate.tags} />
                         </div>
                       </div>
                     )}
