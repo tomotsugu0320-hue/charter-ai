@@ -111,6 +111,15 @@ function postLogicScore(post?: PostRow | null) {
   return typeof score === "number" && Number.isFinite(score) ? score : null;
 }
 
+function hasEvaluatedLogicScore(post?: PostRow | null) {
+  return Boolean(String(post?.logic_score_reason ?? "").trim());
+}
+
+function postEvaluatedLogicScore(post?: PostRow | null) {
+  if (!hasEvaluatedLogicScore(post)) return null;
+  return postLogicScore(post);
+}
+
 function comparePostsByNew(a?: PostRow | null, b?: PostRow | null) {
   return postCreatedTime(b) - postCreatedTime(a);
 }
@@ -1208,8 +1217,9 @@ const groupedByOpinion = useMemo(() => {
 
   const bestOpinionsByIssue = useMemo(() => {
     return groupedByOpinion.map((group) => {
-      const scored = group.opinions.map((op) => {
-        const base = op.opinion.logic_score ?? 0;
+      const scored = group.opinions.flatMap((op) => {
+        const base = postEvaluatedLogicScore(op.opinion);
+        if (base === null) return [];
 
         const rebuttalCount = op.children.filter(
           (c) => c.post_role === "rebuttal"
@@ -1237,21 +1247,25 @@ const groupedByOpinion = useMemo(() => {
   }, [groupedByOpinion]);
 
   const averageLogicScore = useMemo(() => {
-    const scoredPosts = visiblePosts.filter((post) => (post.logic_score ?? 0) > 0);
+    const evaluatedScores = visiblePosts
+      .map((post) => postEvaluatedLogicScore(post))
+      .filter((score): score is number => score !== null && score > 0);
 
-    if (scoredPosts.length === 0) return 0;
+    if (evaluatedScores.length === 0) return 0;
 
-    const total = scoredPosts.reduce((sum, post) => {
-      return sum + (post.logic_score ?? 0);
+    const total = evaluatedScores.reduce((sum, score) => {
+      return sum + score;
     }, 0);
 
-    return Math.round(total / scoredPosts.length);
+    return Math.round(total / evaluatedScores.length);
   }, [visiblePosts]);
 
   const maxLogicScore = useMemo(() => {
-    const scoredPosts = visiblePosts.filter((post) => (post.logic_score ?? 0) > 0);
-    if (scoredPosts.length === 0) return null;
-    return Math.max(...scoredPosts.map((post) => post.logic_score ?? 0));
+    const evaluatedScores = visiblePosts
+      .map((post) => postEvaluatedLogicScore(post))
+      .filter((score): score is number => score !== null && score > 0);
+    if (evaluatedScores.length === 0) return null;
+    return Math.max(...evaluatedScores);
   }, [visiblePosts]);
 
   const originalStructure = useMemo(() => {
