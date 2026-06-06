@@ -179,7 +179,7 @@ type StanceLabelOption = {
 };
 
 const STANCE_LABEL_OPTIONS: StanceLabelOption[] = [
-  { value: "unknown", label: "未分類：あとでAIが整理" },
+  { value: "unknown", label: "まだ決めない" },
   { value: "support", label: "賛成" },
   { value: "oppose", label: "反対" },
   { value: "neutral", label: "中立" },
@@ -3671,7 +3671,7 @@ function renderDiscussionCard({
                   color: "#111",
                 }}
               >
-                投稿の立場
+                この投稿の立場
               </label>
 
               <select
@@ -3733,7 +3733,7 @@ function renderDiscussionCard({
                     lineHeight: 1.6,
                   }}
                 >
-                  迷ったら意見のままでOKです。あとでAIが整理できます。
+                  迷ったら「意見」のままでOKです。必要に応じてあとで整理できます。
                 </div>
 
                 <select
