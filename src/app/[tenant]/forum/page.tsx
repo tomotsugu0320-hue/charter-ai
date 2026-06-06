@@ -1473,29 +1473,42 @@ export default function ForumPage() {
 
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-            gap: 10,
-            marginTop: 18,
-          }}
-        >
-          <div>
-            <div style={{ color: "#9ca3af", fontSize: 12 }}>表示中のスレッド</div>
-            <div style={{ fontSize: 24, fontWeight: 900 }}>{allThreads.length}</div>
-          </div>
-          <div>
-            <div style={{ color: "#9ca3af", fontSize: 12 }}>表示中の投稿数</div>
-            <div style={{ fontSize: 24, fontWeight: 900 }}>{totalPostCount}</div>
-          </div>
-          <div>
-            <div style={{ color: "#9ca3af", fontSize: 12 }}>カテゴリ</div>
-            <div style={{ fontSize: 24, fontWeight: 900 }}>
-              {Math.max(categoryOptions.length - 1, 0)}
+        {allThreads.length > 0 && totalPostCount > 0 ? (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+              gap: 10,
+              marginTop: 18,
+            }}
+          >
+            <div>
+              <div style={{ color: "#9ca3af", fontSize: 12 }}>表示中のスレッド</div>
+              <div style={{ fontSize: 24, fontWeight: 900 }}>{allThreads.length}</div>
+            </div>
+            <div>
+              <div style={{ color: "#9ca3af", fontSize: 12 }}>表示中の投稿数</div>
+              <div style={{ fontSize: 24, fontWeight: 900 }}>{totalPostCount}</div>
+            </div>
+            <div>
+              <div style={{ color: "#9ca3af", fontSize: 12 }}>カテゴリ</div>
+              <div style={{ fontSize: 24, fontWeight: 900 }}>
+                {Math.max(categoryOptions.length - 1, 0)}
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <p
+            style={{
+              margin: "16px 0 0",
+              color: "#d1d5db",
+              lineHeight: 1.7,
+              fontSize: currentFontSize - 1,
+            }}
+          >
+            まずは過去の会話やメモから投稿候補を作ってみてください。
+          </p>
+        )}
       </header>
 
       <section
