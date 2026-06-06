@@ -3177,7 +3177,11 @@ function renderDiscussionCard({
   </div>
 ) : visibleConflicts.length > 0 ? (
   <div style={{ display: "grid", gap: 10 }}>
-    {visibleConflicts.map((c, i) => (
+    {visibleConflicts.map((c, i) => {
+      const shouldShowOriginalOpinion =
+        i === 0 || c.opinion !== visibleConflicts[i - 1]?.opinion;
+
+      return (
           <SectionCard
             key={i}
             variant="soft"
@@ -3192,18 +3196,19 @@ function renderDiscussionCard({
               marginBottom: 0,
             }}
           >
-            {renderDiscussionCard({
-              keyId: `conflict-opinion-${c.opinion}-${i}`,
-              text: c.opinion,
-              guideType: "論点",
-              titlePrefix: "元の意見：",
-              style: {
-                fontSize: currentFont.base,
-                background: "#fff",
-                border: "1px solid #fecdd3",
-                color: "#111827",
-              },
-            })}
+            {shouldShowOriginalOpinion &&
+              renderDiscussionCard({
+                keyId: `conflict-opinion-${c.opinion}-${i}`,
+                text: c.opinion,
+                guideType: "論点",
+                titlePrefix: "元の意見：",
+                style: {
+                  fontSize: currentFont.base,
+                  background: "#fff",
+                  border: "1px solid #fecdd3",
+                  color: "#111827",
+                },
+              })}
 
             {renderDiscussionCard({
               keyId: `conflict-rebuttal-${c.rebuttal}-${i}`,
@@ -3214,7 +3219,8 @@ function renderDiscussionCard({
               style: { fontSize: currentFont.base },
             })}
           </SectionCard>
-        ))}
+        );
+      })}
       </div>
     ) : (
       <div style={{ color: "#666" }}>対立はまだ抽出されていない。</div>
