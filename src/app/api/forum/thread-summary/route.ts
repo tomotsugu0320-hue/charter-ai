@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { isForumBetaLoggedIn } from "@/lib/forum-auth";
 
 type ForumPost = {
   id: string;
@@ -722,6 +723,13 @@ async function saveThreadSummary(
 
 export async function GET(req: NextRequest) {
   try {
+    if (!isForumBetaLoggedIn(req)) {
+      return NextResponse.json(
+        { ok: false, error: "Login required." },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const threadId = searchParams.get("threadId");
 

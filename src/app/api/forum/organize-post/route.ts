@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { isForumBetaLoggedIn } from "@/lib/forum-auth";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -42,6 +43,13 @@ function pruneCache(now: number) {
 
 export async function POST(req: NextRequest) {
   try {
+    if (!isForumBetaLoggedIn(req)) {
+      return NextResponse.json(
+        { ok: false, error: "Login required." },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const text = String(body?.text ?? "").trim();
     const tenantSlug =

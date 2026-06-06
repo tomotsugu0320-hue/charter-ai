@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
+import { isForumBetaLoggedIn } from "@/lib/forum-auth";
 
 type DbStructure = {
   premises: string[];
@@ -281,6 +282,13 @@ export async function POST(req: Request) {
   let cacheKey = "";
 
   try {
+    if (!isForumBetaLoggedIn(req)) {
+      return NextResponse.json(
+        { ok: false, error: "Login required." },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const inputText = body?.text ?? body?.content ?? body?.input;
     text = typeof inputText === "string" ? inputText : "";
