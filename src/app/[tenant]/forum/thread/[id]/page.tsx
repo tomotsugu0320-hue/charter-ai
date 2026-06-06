@@ -885,7 +885,7 @@ const [treeVariant] = useState<"A" | "C">("A");
 
 
 useEffect(() => {
-  if (!replyDraftKey) return;
+  if (!replyDraftKey || !thread?.id) return;
 
   const rawDraft = window.sessionStorage.getItem(replyDraftKey);
   if (!rawDraft) return;
@@ -935,16 +935,14 @@ useEffect(() => {
 
     setPostLoginRequired(false);
 
-    if (window.location.hash === "#post-form") {
-      setTimeout(() => {
-        const el = document.getElementById("post-form");
-        el?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 100);
-    }
+    setTimeout(() => {
+      const el = document.getElementById("post-form");
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
   } catch {
     window.sessionStorage.removeItem(replyDraftKey);
   }
-}, [replyDraftKey]);
+}, [replyDraftKey, thread?.id]);
 
 
 
