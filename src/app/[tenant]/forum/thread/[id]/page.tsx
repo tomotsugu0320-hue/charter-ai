@@ -612,6 +612,7 @@ export default function ForumThreadPage({ params }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [postLoginRequired, setPostLoginRequired] = useState(false);
 
 const [explanations, setExplanations] = useState<Record<string, string>>({});
 const [feedbackLoadingPostId, setFeedbackLoadingPostId] = useState<string | null>(null);
@@ -1528,6 +1529,7 @@ if (postRole === "rebuttal" && !replyToOpinionId) {
 
     setPosting(true);
     setError(null);
+    setPostLoginRequired(false);
 
     try {
       const res = await fetch("/api/forum/add-post", {
@@ -1551,6 +1553,11 @@ if (postRole === "rebuttal" && !replyToOpinionId) {
 
       const result = await res.json();
 
+      if (res.status === 401 || result?.error === "Login required.") {
+        setPostLoginRequired(true);
+        return;
+      }
+
       if (!res.ok) {
         throw new Error(result?.error || "投稿失敗");
       }
@@ -1563,6 +1570,7 @@ if (postRole === "rebuttal" && !replyToOpinionId) {
       setPredictionTarget("");
       setPredictionDeadline("");
       setSelectedGuide(null);
+      setPostLoginRequired(false);
       await loadThread();
     } catch (e: any) {
       console.error(e);
@@ -3686,6 +3694,44 @@ function renderDiscussionCard({
     </div>
   </>
 )}
+
+            {postLoginRequired && (
+              <div
+                role="alert"
+                style={{
+                  marginTop: 12,
+                  border: "1px solid #bfdbfe",
+                  borderRadius: 10,
+                  padding: 12,
+                  background: "#eff6ff",
+                  color: "#1e3a8a",
+                  fontSize: currentFont.base,
+                  lineHeight: 1.7,
+                }}
+              >
+                <div style={{ fontWeight: 900 }}>
+                  投稿するにはログインが必要です。
+                </div>
+                <div style={{ marginTop: 4 }}>
+                  限定ベータ用の共通ID・パスワードでログインしてください。
+                </div>
+                <Link
+                  href={`/${tenant}/forum/login?next=${encodeURIComponent(
+                    `/${tenant}/forum/thread/${threadId}#post-form`
+                  )}`}
+                  style={{
+                    display: "inline-block",
+                    marginTop: 8,
+                    color: "#1d4ed8",
+                    fontWeight: 900,
+                    textDecoration: "underline",
+                    textUnderlineOffset: 3,
+                  }}
+                >
+                  ログイン画面へ
+                </Link>
+              </div>
+            )}
 
             <div style={{ marginTop: 12, display: "flex", gap: 12, flexWrap: "wrap" }}>
               <PrimaryButton onClick={handlePost} disabled={posting}>
