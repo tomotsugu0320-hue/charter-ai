@@ -164,6 +164,44 @@ const STANCE_LABEL_OPTIONS: StanceLabelOption[] = [
   { value: "other", label: "その他" },
 ];
 
+type ReplyDraftGuide = {
+  type: "論点" | "前提" | "根拠";
+  text: string;
+};
+
+type ReplyDraft = {
+  text?: string;
+  selectedGuide?: ReplyDraftGuide | null;
+  replyToOpinionId?: string | null;
+  postRole?: PostRoleOption["value"];
+  stanceLabel?: StanceLabel;
+  predictionFlag?: boolean;
+  predictionTarget?: string;
+  predictionDeadline?: string;
+  rebuttalClaim?: string;
+  rebuttalPremise?: string;
+  rebuttalReason?: string;
+};
+
+function isPostRoleValue(value: unknown): value is PostRoleOption["value"] {
+  return POST_ROLE_OPTIONS.some((option) => option.value === value);
+}
+
+function isStanceLabelValue(value: unknown): value is StanceLabel {
+  return STANCE_LABEL_OPTIONS.some((option) => option.value === value);
+}
+
+function isReplyDraftGuide(value: unknown): value is ReplyDraftGuide {
+  if (!value || typeof value !== "object") return false;
+
+  const guide = value as { type?: unknown; text?: unknown };
+
+  return (
+    (guide.type === "論点" || guide.type === "前提" || guide.type === "根拠") &&
+    typeof guide.text === "string"
+  );
+}
+
 const DISCUSSION_CARD_TEXT_LIMIT = 120;
 
 type LocationMapNode = {
@@ -725,6 +763,33 @@ const [treeVariant] = useState<"A" | "C">("A");
   const [predictionTarget, setPredictionTarget] = useState("");
   const [predictionDeadline, setPredictionDeadline] = useState("");
 
+  const replyDraftKey = threadId ? `forum_reply_draft_${threadId}` : "";
+
+  function saveReplyDraft() {
+    if (!replyDraftKey) return;
+
+    const draft: ReplyDraft = {
+      text,
+      selectedGuide,
+      replyToOpinionId,
+      postRole,
+      stanceLabel,
+      predictionFlag,
+      predictionTarget,
+      predictionDeadline,
+      rebuttalClaim,
+      rebuttalPremise,
+      rebuttalReason,
+    };
+
+    window.sessionStorage.setItem(replyDraftKey, JSON.stringify(draft));
+  }
+
+  function clearReplyDraft() {
+    if (!replyDraftKey) return;
+    window.sessionStorage.removeItem(replyDraftKey);
+  }
+
 
   async function fetchThreadBookmarkSaved(targetThreadId: string) {
     if (!tenant || !targetThreadId) return false;
@@ -816,6 +881,70 @@ const [treeVariant] = useState<"A" | "C">("A");
 
 
 
+
+
+
+useEffect(() => {
+  if (!replyDraftKey) return;
+
+  const rawDraft = window.sessionStorage.getItem(replyDraftKey);
+  if (!rawDraft) return;
+
+  try {
+    const parsedDraft = JSON.parse(rawDraft);
+
+    if (!parsedDraft || typeof parsedDraft !== "object") {
+      window.sessionStorage.removeItem(replyDraftKey);
+      return;
+    }
+
+    const draft = parsedDraft as Partial<ReplyDraft>;
+
+    if (typeof draft.text === "string") setText(draft.text);
+    if (isReplyDraftGuide(draft.selectedGuide)) {
+      setSelectedGuide(draft.selectedGuide);
+    } else if (draft.selectedGuide === null) {
+      setSelectedGuide(null);
+    }
+    if (
+      typeof draft.replyToOpinionId === "string" ||
+      draft.replyToOpinionId === null
+    ) {
+      setReplyToOpinionId(draft.replyToOpinionId);
+    }
+    if (isPostRoleValue(draft.postRole)) setPostRole(draft.postRole);
+    if (isStanceLabelValue(draft.stanceLabel)) setStanceLabel(draft.stanceLabel);
+    if (typeof draft.predictionFlag === "boolean") {
+      setPredictionFlag(draft.predictionFlag);
+    }
+    if (typeof draft.predictionTarget === "string") {
+      setPredictionTarget(draft.predictionTarget);
+    }
+    if (typeof draft.predictionDeadline === "string") {
+      setPredictionDeadline(draft.predictionDeadline);
+    }
+    if (typeof draft.rebuttalClaim === "string") {
+      setRebuttalClaim(draft.rebuttalClaim);
+    }
+    if (typeof draft.rebuttalPremise === "string") {
+      setRebuttalPremise(draft.rebuttalPremise);
+    }
+    if (typeof draft.rebuttalReason === "string") {
+      setRebuttalReason(draft.rebuttalReason);
+    }
+
+    setPostLoginRequired(false);
+
+    if (window.location.hash === "#post-form") {
+      setTimeout(() => {
+        const el = document.getElementById("post-form");
+        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    }
+  } catch {
+    window.sessionStorage.removeItem(replyDraftKey);
+  }
+}, [replyDraftKey]);
 
 
 
@@ -1554,6 +1683,7 @@ if (postRole === "rebuttal" && !replyToOpinionId) {
       const result = await res.json();
 
       if (res.status === 401 || result?.error === "Login required.") {
+        saveReplyDraft();
         setPostLoginRequired(true);
         return;
       }
@@ -1571,6 +1701,7 @@ if (postRole === "rebuttal" && !replyToOpinionId) {
       setPredictionDeadline("");
       setSelectedGuide(null);
       setPostLoginRequired(false);
+      clearReplyDraft();
       await loadThread();
     } catch (e: any) {
       console.error(e);
@@ -3741,6 +3872,7 @@ function renderDiscussionCard({
               <PrimaryButton
                 variant="secondary"
                 onClick={() => {
+                  clearReplyDraft();
                   setText("");
                   setSelectedGuide(null);
                   setPostRole("opinion");
