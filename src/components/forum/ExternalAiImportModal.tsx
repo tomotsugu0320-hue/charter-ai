@@ -701,6 +701,13 @@ export default function ExternalAiImportModal({
 
     if (allSubmitted) {
       removeExternalAiImportDraft(draftStorageKey);
+      setJsonInput("");
+      setCandidates([]);
+      setSubmitResults({});
+      setRelatedByCandidate({});
+      setSavedReferences({});
+      setSubmitError("");
+      setNotice(`${selected.length}件の投稿候補を投稿しました。`);
     }
     setIsSubmitting(false);
   };
