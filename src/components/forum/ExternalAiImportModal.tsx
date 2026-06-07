@@ -251,8 +251,21 @@ function toText(value: unknown) {
 }
 
 function toTextArray(value: unknown) {
+  if (typeof value === "string") {
+    const text = value.trim();
+    return text ? [text] : [];
+  }
   if (!Array.isArray(value)) return [];
   return value.map(toText).filter(Boolean).slice(0, 8);
+}
+
+function getParsedCandidateList(value: unknown) {
+  if (Array.isArray(value)) return value;
+  if (!isRecord(value)) return null;
+  if (Array.isArray(value.posts)) return value.posts;
+  if (Array.isArray(value.candidates)) return value.candidates;
+  if (Array.isArray(value.items)) return value.items;
+  return null;
 }
 
 function isCandidateStatus(value: unknown): value is CandidateStatus {
@@ -293,7 +306,11 @@ function normalizeCandidate(value: unknown): ExternalAiCandidate | null {
   const record = isRecord(value) ? value : {};
   const title = toText(record.title);
   const question = toText(record.question);
-  const aiAnswer = toText(record.ai_answer);
+  const aiAnswer =
+    toText(record.ai_answer) ||
+    toText(record.answer) ||
+    toText(record.summary) ||
+    toText(record.content);
   const mainCategory = toText(record.main_category) || toText(record.category);
   const subCategory = toText(record.sub_category);
 
@@ -838,19 +855,14 @@ export default function ExternalAiImportModal({
     try {
       const normalizedJsonText = normalizeJsonInputText(jsonInput);
       const parsed: unknown = JSON.parse(normalizedJsonText);
-      const parsedCandidates =
-        Array.isArray(parsed)
-          ? parsed
-          : isRecord(parsed) && Array.isArray(parsed.posts)
-          ? parsed.posts
-          : null;
+      const parsedCandidates = getParsedCandidateList(parsed);
 
       if (!parsedCandidates) {
         setCandidates([]);
         setSubmitResults({});
         setRelatedByCandidate({});
         setSavedReferences({});
-        setError("JSONはposts配列を含む形式、または配列形式で貼り付けてください。");
+        setError("JSONはposts / candidates / items配列を含む形式、または配列形式で貼り付けてください。");
         return;
       }
 
@@ -870,7 +882,7 @@ export default function ExternalAiImportModal({
         setSubmitResults({});
         setRelatedByCandidate({});
         setSavedReferences({});
-        setError("投稿候補として読める項目がありません。title / question / ai_answer のいずれかを含めてください。");
+        setError("投稿候補として読める項目がありません。title / question / ai_answer / answer / summary / content のいずれかを含めてください。");
         return;
       }
 
@@ -890,7 +902,7 @@ export default function ExternalAiImportModal({
       setRelatedByCandidate({});
       setSavedReferences({});
       setError(
-        "これはJSON形式ではありません。\nこの欄には、外部AIが出力したposts配列を含むJSON、またはJSON配列を貼り付けてください。\n会話ログをそのまま貼る場合は、上のプロンプトをあなたのChatGPTや外部AIに貼り、返ってきたJSONだけをここに貼り付けてください。"
+        "これはJSON形式ではありません。\nこの欄には、外部AIが出力したposts / candidates / items配列を含むJSON、またはJSON配列を貼り付けてください。\n会話ログをそのまま貼る場合は、上のプロンプトをあなたのChatGPTや外部AIに貼り、返ってきたJSONだけをここに貼り付けてください。"
       );
     }
   };
