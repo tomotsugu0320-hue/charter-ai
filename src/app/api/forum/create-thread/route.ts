@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { isForumBetaLoggedIn } from "@/lib/forum-auth";
 
 
 function makeSlug(input: string) {
@@ -22,6 +23,13 @@ function makeSlug(input: string) {
 
 export async function POST(req: NextRequest) {
   try {
+    if (!isForumBetaLoggedIn(req)) {
+      return NextResponse.json(
+        { error: "Login required." },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const suggestionId = body?.suggestionId;
 
