@@ -24,6 +24,14 @@ type ExternalAiCandidate = {
   isEditing: boolean;
 };
 
+type ExternalAiPrivateItem = {
+  kind: "todo" | "idea" | "note";
+  title: string;
+  content: string;
+  tags: string[];
+  source_ai: string;
+};
+
 type ExternalAiImportModalProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -60,6 +68,7 @@ type SaveReferenceState = {
 };
 
 const MAX_CANDIDATES = 20;
+const MAX_PRIVATE_ITEMS = 20;
 const MAX_SELECTED_CATEGORIES = 3;
 const EXTERNAL_AI_IMPORT_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const MAIN_CATEGORY_OPTIONS = [
@@ -199,6 +208,8 @@ ${economyPolicyInstruction}
 - related_categories は必要に応じて複数付けてください。
 - sub_category と tags も付けてください。
 - tags は3〜8個程度にしてください。
+- 本人用のToDo、アイデア、非公開メモはpostsに混ぜず、todos / ideas / private_notesに分けてください。
+- todos / ideas / private_notesは公開投稿ではありません。
 - 出力は必ずJSONにしてください。
 - JSON以外の説明文は出力しないでください。
 
@@ -219,6 +230,27 @@ ${economyPolicyInstruction}
       "supplements": ["補足1", "補足2"],
       "category": "主カテゴリー",
       "node": "候補ノード"
+    }
+  ],
+  "todos": [
+    {
+      "title": "やること",
+      "content": "本人が後で実行する内容",
+      "tags": ["タグ"]
+    }
+  ],
+  "ideas": [
+    {
+      "title": "アイデア",
+      "content": "発信・実装・調査の候補",
+      "tags": ["タグ"]
+    }
+  ],
+  "private_notes": [
+    {
+      "title": "非公開メモ",
+      "content": "公開投稿にはしないメモ",
+      "tags": ["タグ"]
     }
   ]
 }`;
@@ -382,6 +414,60 @@ function normalizeCandidate(value: unknown): ExternalAiCandidate | null {
   };
 }
 
+function normalizePrivateItem(
+  value: unknown,
+  kind: ExternalAiPrivateItem["kind"]
+): ExternalAiPrivateItem | null {
+  const record = isRecord(value) ? value : {};
+  const rawText = typeof value === "string" ? value.trim() : "";
+  const content =
+    toText(record.content) ||
+    toText(record.body) ||
+    toText(record.description) ||
+    toText(record.memo) ||
+    toText(record.note) ||
+    toText(record.text) ||
+    rawText;
+  const title =
+    toText(record.title) ||
+    toText(record.task) ||
+    toText(record.idea) ||
+    toText(record.summary) ||
+    (content.length > 60 ? `${content.slice(0, 60)}...` : content);
+
+  if (!title && !content) return null;
+
+  return {
+    kind,
+    title,
+    content,
+    tags: toTextArray(record.tags),
+    source_ai: toText(record.source_ai) || "未指定",
+  };
+}
+
+function getParsedPrivateItems(value: unknown) {
+  if (!isRecord(value)) return [];
+
+  const groups: Array<{
+    kind: ExternalAiPrivateItem["kind"];
+    items: unknown;
+  }> = [
+    { kind: "todo", items: value.todos },
+    { kind: "idea", items: value.ideas },
+    { kind: "note", items: value.private_notes },
+  ];
+
+  return groups
+    .flatMap(({ kind, items }) =>
+      Array.isArray(items)
+        ? items.map((item) => normalizePrivateItem(item, kind))
+        : []
+    )
+    .filter((item): item is ExternalAiPrivateItem => Boolean(item))
+    .slice(0, MAX_PRIVATE_ITEMS);
+}
+
 function normalizeStoredCandidate(value: unknown): ExternalAiCandidate | null {
   const candidate = normalizeCandidate(value);
   if (!candidate || !isRecord(value)) return candidate;
@@ -469,6 +555,12 @@ function ListBlock({ label, items }: { label: string; items: string[] }) {
   );
 }
 
+function privateItemKindLabel(kind: ExternalAiPrivateItem["kind"]) {
+  if (kind === "todo") return "ToDo";
+  if (kind === "idea") return "アイデア";
+  return "非公開メモ";
+}
+
 export default function ExternalAiImportModal({
   isOpen,
   onClose,
@@ -476,6 +568,7 @@ export default function ExternalAiImportModal({
 }: ExternalAiImportModalProps) {
   const [jsonInput, setJsonInput] = useState("");
   const [candidates, setCandidates] = useState<ExternalAiCandidate[]>([]);
+  const [privateItems, setPrivateItems] = useState<ExternalAiPrivateItem[]>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [copyMessage, setCopyMessage] = useState("");
@@ -554,6 +647,7 @@ export default function ExternalAiImportModal({
 
       setJsonInput(toText(parsed.jsonInput));
       setCandidates(restoredCandidates);
+      setPrivateItems([]);
       if (isExtractionMode(parsed.extractionMode)) {
         setExtractionMode(parsed.extractionMode);
       }
@@ -748,6 +842,7 @@ export default function ExternalAiImportModal({
       removeExternalAiImportDraft(draftStorageKey);
       setJsonInput("");
       setCandidates([]);
+      setPrivateItems([]);
       setSubmitResults({});
       setRelatedByCandidate({});
       setSavedReferences({});
@@ -908,17 +1003,22 @@ export default function ExternalAiImportModal({
       const normalizedJsonText = normalizeJsonInputText(jsonInput);
       const parsed: unknown = JSON.parse(normalizedJsonText);
       const parsedCandidates = getParsedCandidateList(parsed);
+      const normalizedPrivateItems = getParsedPrivateItems(parsed).map((item) => ({
+        ...item,
+        source_ai: sourceAi || item.source_ai || "未指定",
+      }));
 
-      if (!parsedCandidates) {
+      if (!parsedCandidates && normalizedPrivateItems.length === 0) {
         setCandidates([]);
+        setPrivateItems([]);
         setSubmitResults({});
         setRelatedByCandidate({});
         setSavedReferences({});
-        setError("JSONはposts / candidates / items配列を含む形式、または配列形式で貼り付けてください。");
+        setError("JSONはposts / candidates / items配列、またはtodos / ideas / private_notes配列を含む形式で貼り付けてください。");
         return;
       }
 
-      const normalized = parsedCandidates
+      const normalized = (parsedCandidates ?? [])
         .slice(0, MAX_CANDIDATES)
         .map(normalizeCandidate)
         .filter((candidate): candidate is ExternalAiCandidate =>
@@ -929,32 +1029,35 @@ export default function ExternalAiImportModal({
           source_ai: sourceAi || "未指定",
         }));
 
-      if (normalized.length === 0) {
+      if (normalized.length === 0 && normalizedPrivateItems.length === 0) {
         setCandidates([]);
+        setPrivateItems([]);
         setSubmitResults({});
         setRelatedByCandidate({});
         setSavedReferences({});
-        setError("投稿候補として読める項目がありません。title / question / ai_answer / answer / summary / content のいずれかを含めてください。");
+        setError("投稿候補または非公開候補として読める項目がありません。公開投稿は title / question / ai_answer / answer / summary / content、非公開候補は title / content などを含めてください。");
         return;
       }
 
       setCandidates(normalized);
+      setPrivateItems(normalizedPrivateItems);
       setSubmitResults({});
       setRelatedByCandidate({});
       setSavedReferences({});
       setSubmitError("");
-      if (parsedCandidates.length > MAX_CANDIDATES) {
-        setNotice(`最大${MAX_CANDIDATES}件まで読み取りました。`);
+      if ((parsedCandidates?.length ?? 0) > MAX_CANDIDATES) {
+        setNotice(`投稿候補は最大${MAX_CANDIDATES}件まで読み取りました。非公開候補は${normalizedPrivateItems.length}件読み取りました。`);
       } else {
-        setNotice(`${normalized.length}件の投稿候補を読み取りました。`);
+        setNotice(`${normalized.length}件の投稿候補、${normalizedPrivateItems.length}件の非公開候補を読み取りました。`);
       }
     } catch {
       setCandidates([]);
+      setPrivateItems([]);
       setSubmitResults({});
       setRelatedByCandidate({});
       setSavedReferences({});
       setError(
-        "これはJSON形式ではありません。\nこの欄には、外部AIが出力したposts / candidates / items配列を含むJSON、またはJSON配列を貼り付けてください。\n会話ログをそのまま貼る場合は、上のプロンプトをあなたのChatGPTや外部AIに貼り、返ってきたJSONだけをここに貼り付けてください。"
+        "これはJSON形式ではありません。\nこの欄には、外部AIが出力したposts / candidates / items配列、またはtodos / ideas / private_notes配列を含むJSONを貼り付けてください。\n会話ログをそのまま貼る場合は、上のプロンプトをあなたのChatGPTや外部AIに貼り、返ってきたJSONだけをここに貼り付けてください。"
       );
     }
   };
@@ -1367,6 +1470,7 @@ export default function ExternalAiImportModal({
                 onClick={() => {
                   setJsonInput("");
                   setCandidates([]);
+                  setPrivateItems([]);
                   setError("");
                   setNotice("");
                   setSubmitError("");
@@ -1400,6 +1504,99 @@ export default function ExternalAiImportModal({
               </div>
             )}
           </section>
+
+          {privateItems.length > 0 && (
+            <section style={sectionStyle}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  marginBottom: 12,
+                }}
+              >
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18 }}>
+                    非公開候補
+                  </h3>
+                  <p style={{ margin: "6px 0 0", color: "#64748b", lineHeight: 1.6 }}>
+                    ToDo・アイデア・メモとして読み取った内容です。ここから公開投稿にはなりません。
+                  </p>
+                </div>
+                <span
+                  style={{
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 999,
+                    padding: "4px 10px",
+                    background: "#ffffff",
+                    color: "#334155",
+                    fontSize: 13,
+                    fontWeight: 800,
+                  }}
+                >
+                  非公開 {privateItems.length}件
+                </span>
+              </div>
+
+              <div style={{ display: "grid", gap: 10 }}>
+                {privateItems.map((item, index) => (
+                  <article
+                    key={`external-ai-private-item-${item.kind}-${index}`}
+                    style={{
+                      border: "1px solid #cbd5e1",
+                      borderRadius: 10,
+                      padding: 12,
+                      background: "#ffffff",
+                      color: "#111827",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        flexWrap: "wrap",
+                        marginBottom: 8,
+                      }}
+                    >
+                      <strong>{item.title}</strong>
+                      <span
+                        style={{
+                          border: "1px solid #cbd5e1",
+                          borderRadius: 999,
+                          padding: "2px 9px",
+                          background: "#f8fafc",
+                          color: "#475569",
+                          fontSize: 12,
+                          fontWeight: 800,
+                        }}
+                      >
+                        {privateItemKindLabel(item.kind)}
+                      </span>
+                    </div>
+                    {item.content && item.content !== item.title && (
+                      <div
+                        style={{
+                          color: "#334155",
+                          lineHeight: 1.7,
+                          whiteSpace: "pre-wrap",
+                        }}
+                      >
+                        {item.content}
+                      </div>
+                    )}
+                    {item.tags.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <ListBlock label="タグ" items={item.tags} />
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
 
           {candidates.length > 0 && (
             <section style={sectionStyle}>
