@@ -271,6 +271,24 @@ function linesToArray(value: string) {
     .slice(0, 8);
 }
 
+function stripMarkdownJsonFence(value: string) {
+  const trimmed = value.trim();
+  const fencedBlock = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fencedBlock?.[1]) return fencedBlock[1].trim();
+
+  const embeddedFence = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (embeddedFence?.[1]) return embeddedFence[1].trim();
+
+  return trimmed;
+}
+
+function normalizeJsonInputText(value: string) {
+  return stripMarkdownJsonFence(value)
+    .replace(/[“”„＂]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .trim();
+}
+
 function normalizeCandidate(value: unknown): ExternalAiCandidate | null {
   const record = isRecord(value) ? value : {};
   const title = toText(record.title);
@@ -805,7 +823,7 @@ export default function ExternalAiImportModal({
     setCopyMessage("");
 
     try {
-      await navigator.clipboard.writeText(externalAiPrompt);
+      await navigator.clipboard.writeText(stripMarkdownJsonFence(externalAiPrompt));
       setCopyMessage("プロンプトをコピーしました。");
     } catch (copyError) {
       console.error(copyError);
@@ -818,10 +836,7 @@ export default function ExternalAiImportModal({
     setNotice("");
 
     try {
-      const normalizedJsonText = jsonInput
-        .replace(/[“”„＂]/g, '"')
-        .replace(/[‘’]/g, "'")
-        .trim();
+      const normalizedJsonText = normalizeJsonInputText(jsonInput);
       const parsed: unknown = JSON.parse(normalizedJsonText);
       const parsedCandidates =
         Array.isArray(parsed)
