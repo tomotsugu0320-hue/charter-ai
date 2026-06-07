@@ -343,6 +343,17 @@ const feedbackActions = [
               立場: {stanceText}
             </span>
           )}
+          <span
+            style={{
+              color: "#64748b",
+              fontSize: currentFont?.base ? currentFont.base * 0.78 : 12,
+              fontWeight: 600,
+              lineHeight: 1.4,
+              wordBreak: "break-all",
+            }}
+          >
+            PostID: {op.opinion.id}
+          </span>
         </div>
 
         {canHideOpinion && (
