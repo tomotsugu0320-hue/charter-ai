@@ -299,6 +299,17 @@ export default function OpinionView({
               意見・AI論理スコア {op.opinion.logic_score ?? "-"}
             </div>
           )}
+          <div
+            style={{
+              color: "#64748b",
+              fontSize: currentFont.base * 0.78,
+              fontWeight: 600,
+              lineHeight: 1.4,
+              overflowWrap: "anywhere",
+            }}
+          >
+            PostID: {op.opinion.id}
+          </div>
         </div>
 
         <div
