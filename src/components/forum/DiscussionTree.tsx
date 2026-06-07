@@ -317,6 +317,9 @@ export default function DiscussionTree({
         <div
           style={{
             minWidth: 260,
+            width: "min(100%, 520px)",
+            maxWidth: "calc(100vw - 96px)",
+            boxSizing: "border-box",
             borderLeft: isCompact
               ? `2px solid ${nodeBorderColor(post.post_role)}`
               : `5px solid ${nodeBorderColor(post.post_role)}`,
@@ -414,6 +417,7 @@ export default function DiscussionTree({
               color: "#111",
               whiteSpace: "pre-wrap",
               wordBreak: "break-word",
+              overflowWrap: "anywhere",
               cursor: "pointer",
             }}
             title="この内容について書く"
