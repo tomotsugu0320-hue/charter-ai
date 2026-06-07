@@ -1498,6 +1498,8 @@ const normalizeQuestionText = (value?: string | null) =>
 const shouldShowQuestionCard =
   Boolean(thread?.original_post?.trim()) &&
   normalizeQuestionText(thread?.original_post) !== normalizeQuestionText(thread?.title);
+const shouldShowMacroEconomyGuide =
+  String(thread?.category ?? "").trim() === "経済・政策";
 const initialPostCount = summary?.counts?.total ?? posts.length;
 const showInitialDiscussionNote = initialPostCount <= 3;
 const provisionalAnswerText =
@@ -2504,6 +2506,105 @@ function renderDiscussionCard({
 
 </SectionCard>
 {/* ←ここで完全に閉じる */}
+
+{shouldShowMacroEconomyGuide && (
+  <SectionCard variant="white" style={{ marginTop: 24 }}>
+    <SectionTitle style={{ fontSize: currentFont.title, color: "#111827" }}>
+      マクロ経済で見るための確認ポイント
+    </SectionTitle>
+
+    <p
+      style={{
+        margin: "0 0 14px",
+        color: "#475569",
+        fontSize: currentFont.base,
+        lineHeight: 1.7,
+      }}
+    >
+      経済・政策カテゴリの議論を、理論・前提・指標・反論リスクに分けて読むための固定フレームです。AIによる結論ではありません。
+    </p>
+
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+        gap: 12,
+      }}
+    >
+      <div
+        style={{
+          border: "1px solid #bfdbfe",
+          borderRadius: 8,
+          background: "#eff6ff",
+          color: "#1e3a8a",
+          padding: 12,
+        }}
+      >
+        <div style={{ fontWeight: 900, marginBottom: 8 }}>関連する理論</div>
+        <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
+          <li>有効需要 / 需給ギャップ</li>
+          <li>財政乗数 / 可処分所得 / 消費性向</li>
+          <li>IS-LM / AD-AS / フィリップス曲線</li>
+          <li>クラウディングアウト / リカードの等価定理</li>
+        </ul>
+      </div>
+
+      <div
+        style={{
+          border: "1px solid #bbf7d0",
+          borderRadius: 8,
+          background: "#f0fdf4",
+          color: "#14532d",
+          padding: 12,
+        }}
+      >
+        <div style={{ fontWeight: 900, marginBottom: 8 }}>前提として見ること</div>
+        <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
+          <li>需要不足なのか、供給制約なのか</li>
+          <li>低金利・デフレ圧力が残っているか</li>
+          <li>家計、企業、政府のどこに効果が出るか</li>
+          <li>理論上の効果と制度上の実行可能性を分ける</li>
+        </ul>
+      </div>
+
+      <div
+        style={{
+          border: "1px solid #fde68a",
+          borderRadius: 8,
+          background: "#fffbeb",
+          color: "#78350f",
+          padding: 12,
+        }}
+      >
+        <div style={{ fontWeight: 900, marginBottom: 8 }}>検証ポイント</div>
+        <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
+          <li>現在の需給ギャップはマイナスか</li>
+          <li>減税・給付分は消費や投資に回るか</li>
+          <li>雇用、賃金、物価にどう波及するか</li>
+          <li>短期効果と長期副作用を分けているか</li>
+        </ul>
+      </div>
+
+      <div
+        style={{
+          border: "1px solid #fecaca",
+          borderRadius: 8,
+          background: "#fef2f2",
+          color: "#7f1d1d",
+          padding: 12,
+        }}
+      >
+        <div style={{ fontWeight: 900, marginBottom: 8 }}>反論・リスク</div>
+        <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
+          <li>財政赤字や将来負担への懸念</li>
+          <li>供給制約下では物価上昇に回る可能性</li>
+          <li>金融政策との組み合わせが弱い場合の限界</li>
+          <li>分配、対象漏れ、行政コストの問題</li>
+        </ul>
+      </div>
+    </div>
+  </SectionCard>
+)}
 
 
 <SectionCard variant="white" style={{ marginTop: 24 }}>
