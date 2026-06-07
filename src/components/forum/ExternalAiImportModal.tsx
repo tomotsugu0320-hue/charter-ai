@@ -101,6 +101,8 @@ function buildExternalAiPrompt(
   const selectedCategoryText = categories.length
     ? categories.map((category) => `- ${category}`).join("\n")
     : "- 未選択";
+  const shouldIncludeEconomyPolicyRules =
+    extractionMode === "auto" || categories.includes("経済・政策");
   const modeInstruction =
     extractionMode === "category"
       ? `抽出モード：テーマを選んで抜き出す
@@ -117,10 +119,53 @@ ${categoryList}
 
 会話ログ全体を読み、投稿候補ごとに最も近いカテゴリーへ分類してください。
 投稿不要な雑談、個人的内容、プライバシー情報は除外してください。`;
+  const economyPolicyInstruction = shouldIncludeEconomyPolicyRules
+    ? `
+経済・政策カテゴリーの追加ルール：
+経済・政策に関する投稿候補では、単なる賛否や感想ではなく、以下の観点をできるだけ反映してください。
+
+- その主張がどのマクロ経済理論・経済概念と関係するか
+- 主張が成立するための前提は何か
+- 因果関係は明確か
+- どの現実指標で検証できるか
+- どの反論・リスクがあるか
+- 経済理論上の妥当性と、政治的・制度的な実現可能性を混同していないか
+
+参照してよい理論・視点：
+- 有効需要
+- 需給ギャップ
+- 財政乗数
+- クラウディングアウト
+- 消費性向
+- 可処分所得
+- インフレ率
+- 金利
+- 金融政策と財政政策の組み合わせ
+- 労働需給
+- 賃金上昇圧力
+- 供給制約
+- 為替・輸入物価
+- 財政収支・債務残高
+
+経済政策投稿では、以下のようにJSONへ反映してください。
+
+- premises には、その主張が成立する前提を入れる
+- reasons には、経済理論上の因果関係や根拠を入れる
+- risks には、反論・副作用・成立しない条件を入れる
+- supplements には、検証すべき経済指標や補足論点を入れる
+- node には、できるだけ経済理論・政策論点に近い候補ノード名を入れる
+
+注意：
+特定の経済学派や権威を唯一の正解として扱わないでください。
+複数の理論が競合する場合は、「どの前提なら成立するか」「どの指標で確認できるか」を重視してください。
+断定しすぎず、必要に応じて「可能性がある」と表現してください。
+`
+    : "";
 
   return `以下の会話ログを、AI知恵袋の掲示板投稿用に整理してください。
 
 ${modeInstruction}
+${economyPolicyInstruction}
 
 目的：
 雑多な会話ログから、複数の問題・質問・回答・論点・反論・補足を抽出し、掲示板に投稿しやすい形に整理することです。
