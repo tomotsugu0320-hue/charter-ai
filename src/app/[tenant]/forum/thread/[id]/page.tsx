@@ -2390,7 +2390,7 @@ function renderDiscussionCard({
     <div
       style={{
         color: "#334155",
-        fontSize: currentFont.base,
+        fontSize: currentFont.base * 0.95,
         lineHeight: 1.7,
       }}
     >
