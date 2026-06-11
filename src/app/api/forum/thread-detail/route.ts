@@ -190,6 +190,53 @@ function buildProvisionalAnswerFromStored(
   return "現時点では、投稿内容と論点整理をもとに、どの見方が論理的に強いかを確認している段階です。";
 }
 
+function isQuestionLikePremise(text: string) {
+  const value = text.trim();
+  if (!value) return false;
+  return (
+    /[?？]/.test(value) ||
+    /なのか[。.]?$/.test(value) ||
+    /どちらが/.test(value) ||
+    /何か[。.]?$/.test(value)
+  );
+}
+
+function isPremiseLikeText(text: string) {
+  const value = text.trim();
+  return (
+    /確認する必要がある/.test(value) ||
+    /分ける必要がある/.test(value) ||
+    /前提/.test(value) ||
+    /条件/.test(value) ||
+    /局面/.test(value) ||
+    /検証/.test(value) ||
+    /影響を確認/.test(value)
+  );
+}
+
+function pickPremiseTexts(keyPoints: {
+  issues: string[];
+  supplements: string[];
+  explanations: string[];
+}) {
+  const usableSupplements = keyPoints.supplements.filter(
+    (item) => !isQuestionLikePremise(item)
+  );
+  if (usableSupplements.length > 0) return usableSupplements;
+
+  const explanationPremises = keyPoints.explanations.filter(
+    (item) => !isQuestionLikePremise(item) && isPremiseLikeText(item)
+  );
+  if (explanationPremises.length > 0) return explanationPremises;
+
+  const issueFallbacks = keyPoints.issues.filter(
+    (item) => !isQuestionLikePremise(item) && isPremiseLikeText(item)
+  );
+  if (issueFallbacks.length > 0) return issueFallbacks;
+
+  return ["判断に必要な前提・条件を確認する必要がある。"];
+}
+
 function buildStoredSummaryPayload(
   storedSummary: StoredSummaryRow | null,
   posts: ForumPostForSummary[]
@@ -229,7 +276,7 @@ function buildStoredSummaryPayload(
       ),
       key_points: {
         ...keyPoints,
-        premises: toSourceItems(keyPoints.issues),
+        premises: toSourceItems(pickPremiseTexts(keyPoints)),
         reasons: toSourceItems([...keyPoints.explanations, ...keyPoints.opinions]),
         counterpoints: toSourceItems(keyPoints.rebuttals),
       },

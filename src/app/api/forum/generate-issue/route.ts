@@ -282,6 +282,7 @@ const generateIssueSystemPrompt = `
 投稿文をそのまま要約するのではなく、議論として検証すべき前提・根拠・反論リスクに分けてください。
 
 出力条件:
+- claim: 1個。投稿文の丸写しではなく、親ノード化した問い
 - premises: 最小1個、最大3個
 - reasons: 最小1個、最大3個
 - conflicts: 最小1組、最大3組
@@ -290,6 +291,18 @@ const generateIssueSystemPrompt = `
 
 経済・政策に関する投稿では、投稿文をそのまま整理するだけでなく、「経済政策として何を検証すべきか」に再構成してください。
 特に、経済、政策、財政、金融、消費税、減税、生産性、賃金、雇用、失業、需要、デフレ、インフレ、価格転嫁、企業、家計、所得、消費、合成の誤謬、円安、円高、物価、社会保障、移民、人手不足に関する投稿では、以下を強く適用してください。
+
+claim の方針:
+- 投稿文の丸写しではなく、親ノード化した問いにしてください。
+- 人物対立や素朴な疑問を、そのまま claim にしないでください。
+- 経済政策として検証すべき条件が分かる問いにしてください。
+
+claim の悪い例:
+- ミクロでは正しい政策論が、マクロでは逆効果になることはあるのか
+
+claim の良い例:
+- ミクロの合理性が、需要不足下のマクロ経済で逆効果になるのはどのような局面か。
+- 企業単体では合理的に見える政策やコスト削減が、経済全体では需要低下や合成の誤謬を通じて逆効果になるのはどのような局面か。
 
 premises の方針:
 - 問いの言い換えを書かないでください。
@@ -343,6 +356,7 @@ conflicts の良い例:
 
 出力形式:
 {
+  "claim": "...",
   "premises": ["...", "..."],
   "reasons": ["...", "..."],
   "conflicts": [
@@ -350,6 +364,13 @@ conflicts の良い例:
   ]
 }
 `;
+
+function cleanGeneratedClaim(value: unknown, fallback: string) {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (text.length < 8) return fallback;
+  if (text.length > 160) return fallback;
+  return text;
+}
 
 export async function POST(req: Request) {
   let text = "";
@@ -482,7 +503,15 @@ const safeConflictsRaw =
 
 const response = {
   mode: "expand",
-claim: text,
+claim: cleanGeneratedClaim(
+  parsed?.claim ??
+    parsed?.normalized_claim ??
+    parsed?.normalizedClaim ??
+    parsed?.issue_claim ??
+    parsed?.issueClaim ??
+    parsed?.question,
+  text
+),
   premises: safePremises,
   reasons: safeReasons,
   conflicts: safeConflictsRaw.map((c: any) => ({
