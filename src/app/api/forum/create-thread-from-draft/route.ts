@@ -66,6 +66,33 @@ function conflictTextLength(conflict: Conflict) {
   return textLength(conflict?.opinion) + textLength(conflict?.rebuttal);
 }
 
+function shortText(value: string, max = 160) {
+  const text = value.replace(/\s+/g, " ").trim();
+  return text.length > max ? `${text.slice(0, max)}...` : text;
+}
+
+function toCleanStringArray(values: unknown[], max = 5) {
+  return values
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean)
+    .slice(0, max);
+}
+
+function extractAiAnswerFromClaim(claim: string) {
+  const labels = ["AI回答・整理:", "AI回答・整理："];
+  const label = labels.find((item) => claim.includes(item));
+  if (!label) return "";
+
+  const afterLabel = claim.slice(claim.indexOf(label) + label.length).trim();
+  if (!afterLabel) return "";
+
+  const nextHeading = afterLabel.search(
+    /\n\s*(補足|前提|根拠|反論|反論・リスク)[:：]/
+  );
+
+  return (nextHeading >= 0 ? afterLabel.slice(0, nextHeading) : afterLabel).trim();
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (!isForumBetaLoggedIn(req)) {
@@ -152,16 +179,17 @@ export async function POST(req: NextRequest) {
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const supabaseKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl || !supabaseKey) {
       return NextResponse.json(
         { success: false, error: "Supabase env is missing" },
         { status: 500 }
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     const slug = makeSlug(title);
 
@@ -291,6 +319,54 @@ export async function POST(req: NextRequest) {
         { success: false, error: postError.message },
         { status: 500 }
       );
+    }
+
+    const initialAiAnswer = extractAiAnswerFromClaim(claim);
+
+    if (initialAiAnswer) {
+      const initialRebuttals = conflicts
+        .map((conflict) => String(conflict?.rebuttal ?? "").trim())
+        .filter(Boolean)
+        .slice(0, 5);
+      const initialOpinions = conflicts
+        .map((conflict) => String(conflict?.opinion ?? "").trim())
+        .filter(Boolean)
+        .slice(0, 5);
+      const keyPoints = {
+        issues: [title],
+        opinions: initialOpinions,
+        rebuttals: initialRebuttals,
+        supplements: toCleanStringArray(premises),
+        explanations: toCleanStringArray(reasons),
+      };
+
+      const { error: initialSummaryError } = await supabase
+        .from("thread_ai_structures")
+        .insert({
+          thread_id: threadId,
+          original_post: claim,
+          normalized_theme: title,
+          summary_text: initialAiAnswer,
+          easy_summary_text: shortText(initialAiAnswer),
+          key_points: keyPoints,
+          issues: keyPoints.issues,
+          opinions: keyPoints.opinions,
+          rebuttals: keyPoints.rebuttals,
+          supplements: keyPoints.supplements,
+          explanations: keyPoints.explanations,
+          trust_status: "trusted",
+          status: "active",
+          summary_type: "initial_thread_summary",
+          source_post_count: 0,
+          updated_at: new Date().toISOString(),
+        });
+
+      if (initialSummaryError) {
+        console.warn(
+          "[create-thread-from-draft initial summary skipped]",
+          initialSummaryError.message
+        );
+      }
     }
 
     const response = NextResponse.json({
