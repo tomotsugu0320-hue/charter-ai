@@ -88,6 +88,7 @@ src/lib/forum-auth.ts
 - `normalizeForumBetaLoginId()`
 - `normalizeForumBetaDisplayName()`
 - `validateForumBetaLoginInput()`
+- `validateForumBetaPasswordInput()`
 - `validateForumBetaPasswordConfirmation()`
 - `validateForumBetaDisplayName()`
 - `hashForumBetaPassword()`
@@ -179,7 +180,72 @@ src/app/[tenant]/forum/register/page.tsx
 - 既存IDの場合は「このIDはすでに使われています」と表示する
 - すでにIDを持っている利用者にはログインページへのリンクを出す
 
-## 11. ログアウトAPI
+## 11. アカウント管理ページ
+
+実装場所:
+
+```txt
+src/app/[tenant]/forum/account/page.tsx
+```
+
+表示方針:
+
+- ログイン中ユーザー自身の情報だけを表示する
+- 未ログインの場合はログインページへ誘導する
+- ログインID、ハンドルネーム、最終ログイン日時を表示する
+- ハンドルネーム変更フォームを表示する
+- パスワード変更フォームを表示する
+- ログアウトボタンとForumへ戻るリンクを表示する
+- 管理者用の全ユーザー管理は行わない
+
+## 12. アカウントAPI
+
+実装場所:
+
+```txt
+src/app/api/forum/account/route.ts
+```
+
+GET:
+
+1. `forum_beta_session` Cookie からログイン中ユーザーIDを取得する
+2. 未ログインなら 401 を返す
+3. `forum_beta_users` から自分の `login_id` / `display_name` / `created_at` / `last_login_at` だけを取得する
+4. `password_hash` は返さない
+
+PATCH:
+
+1. `forum_beta_session` Cookie からログイン中ユーザーIDを取得する
+2. 未ログインなら 401 を返す
+3. request body の `displayName` を trim する
+4. 空の場合は `login_id` を代替表示名として保存する
+5. 入力する場合は 20文字以内に制限する
+6. 自分の `forum_beta_users.display_name` だけを更新する
+7. `password_hash` は触らない
+8. 成功時 `{ ok: true }` を返す
+
+## 13. パスワード変更API
+
+実装場所:
+
+```txt
+src/app/api/forum/change-password/route.ts
+```
+
+処理:
+
+1. `forum_beta_session` Cookie からログイン中ユーザーIDを取得する
+2. 未ログインなら 401 を返す
+3. request body の `currentPassword` / `newPassword` / `newPasswordConfirm` を読む
+4. `newPassword` は 6〜128文字に制限する
+5. `newPassword` と `newPasswordConfirm` が一致しない場合は 400 を返す
+6. `currentPassword` を現在の `password_hash` と照合する
+7. `currentPassword` が違う場合は 401 を返す
+8. OKなら `hashForumBetaPassword(newPassword)` で `password_hash` を更新する
+9. `currentPassword` / `newPasswordConfirm` は保存しない
+10. 成功時 `{ ok: true }` を返す
+
+## 14. ログアウトAPI
 
 実装場所:
 
@@ -189,7 +255,7 @@ src/app/api/forum/logout/route.ts
 
 `forum_beta_session` Cookie を削除し、`{ ok: true }` を返す。
 
-## 12. ログイン状態確認API
+## 15. ログイン状態確認API
 
 実装場所:
 
@@ -199,7 +265,9 @@ src/app/api/forum/login/status/route.ts
 
 `forum_beta_session` Cookie を検証し、ログイン状態を返す。
 
-## 13. ログイン必須の範囲
+ログイン済みで `forum_beta_users` を参照できる場合は、`login_id` と `display_name` も返す。`password_hash` は返さない。
+
+## 16. ログイン必須の範囲
 
 投稿・作成・AI整理系APIは、引き続き `isForumBetaLoggedIn()` でログイン確認を行う。
 
@@ -214,11 +282,11 @@ src/app/api/forum/login/status/route.ts
 
 未ログイン時は 401 を返し、本処理に入らない。
 
-## 14. 未ログインでも可能な範囲
+## 17. 未ログインでも可能な範囲
 
 Forumトップ、スレッド詳細、使い方ページなどの閲覧は未ログインでも可能である。
 
-## 15. author_key との関係
+## 18. author_key との関係
 
 `forum_beta_session` はログイン状態を確認するCookieである。
 
@@ -226,13 +294,13 @@ Forumトップ、スレッド詳細、使い方ページなどの閲覧は未ロ
 
 今回の簡易登録では、既存投稿とユーザーIDの厳密な紐づけまでは行わない。
 
-## 16. ADMIN_KEY との関係
+## 19. ADMIN_KEY との関係
 
 管理系APIや高権限APIでは、ログイン済みであっても `ADMIN_KEY` が必要なものがある。
 
 簡易登録ユーザーに管理者権限は付与しない。
 
-## 17. セキュリティ上の注意
+## 20. セキュリティ上の注意
 
 この方式はベータ向けの簡易方式であり、本格的なアカウント管理ではない。
 
@@ -240,7 +308,9 @@ Forumトップ、スレッド詳細、使い方ページなどの閲覧は未ロ
 
 - パスワードは平文保存しない
 - `passwordConfirm` は保存しない
+- `currentPassword` / `newPasswordConfirm` は保存しない
 - パスワードをログ出力しない
+- `password_hash` をAPIレスポンスに含めない
 - `login_id` は 3〜32文字
 - パスワードは 6〜128文字
 - ハンドルネームは任意、入力する場合は 20文字以内
@@ -253,12 +323,11 @@ Forumトップ、スレッド詳細、使い方ページなどの閲覧は未ロ
 - スパム・荒らし対策
 - 試行回数制限
 - アカウント停止
-- パスワード変更
 - 管理者によるユーザー管理
 - 投稿とユーザーIDの正式な紐づけ
 - 招待制やメール認証への移行
 
-## 18. 確認項目
+## 21. 確認項目
 
 - 未ログインでも閲覧できる
 - 未ログインで投稿しようとするとログインへ誘導される
@@ -272,5 +341,10 @@ Forumトップ、スレッド詳細、使い方ページなどの閲覧は未ロ
 - 未登録IDではログインページからログインできない
 - 未登録IDは新規登録ページでのみ登録できる
 - 既存IDは新規登録ページで登録できない
+- ログイン後、アカウント管理ページを開ける
+- アカウント管理ページでログインID、ハンドルネーム、最終ログイン日時を確認できる
+- 自分のハンドルネームを変更できる
+- 現在のパスワードが正しい場合だけパスワード変更できる
+- 新しいパスワードと確認が一致しない場合は変更できない
 - ログイン後、投稿・外部AI取り込み・AI整理が使える
 

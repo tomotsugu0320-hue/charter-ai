@@ -53,12 +53,15 @@ export async function GET(request: NextRequest) {
   const supabase = userId ? getSupabase() : null;
   const profile =
     userId && supabase ? await getForumBetaUserProfile(supabase, userId) : null;
+  const loginId = profile?.login_id || null;
   const displayName = profile?.display_name?.trim() || profile?.login_id || null;
 
   return NextResponse.json({
     ok: true,
     loggedIn,
     userId,
+    loginId,
+    login_id: loginId,
     displayName,
     display_name: displayName,
   });

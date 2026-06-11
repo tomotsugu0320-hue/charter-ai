@@ -50,6 +50,14 @@ export function normalizeForumBetaDisplayName(displayName: string) {
   return displayName.trim();
 }
 
+export function validateForumBetaPasswordInput(password: string) {
+  if (password.length < 6 || password.length > 128) {
+    return "パスワードは6文字以上128文字以下で入力してください。";
+  }
+
+  return null;
+}
+
 export function validateForumBetaLoginInput(loginId: string, password: string) {
   if (loginId.length < 3 || loginId.length > 32) {
     return "IDは3文字以上32文字以下で入力してください。";
@@ -59,11 +67,7 @@ export function validateForumBetaLoginInput(loginId: string, password: string) {
     return "IDに使える文字は英数字、ハイフン、アンダースコアです。";
   }
 
-  if (password.length < 6 || password.length > 128) {
-    return "パスワードは6文字以上128文字以下で入力してください。";
-  }
-
-  return null;
+  return validateForumBetaPasswordInput(password);
 }
 
 export function validateForumBetaPasswordConfirmation(
