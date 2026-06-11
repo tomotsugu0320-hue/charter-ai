@@ -117,8 +117,49 @@ function looksLikeEconomyPolicyText(text: string) {
   ].some((keyword) => text.includes(keyword));
 }
 
+function includesAnyKeyword(text: string, keywords: string[]) {
+  return keywords.some((keyword) => text.includes(keyword));
+}
+
+function looksLikePriceRateTaxPolicyText(text: string) {
+  return includesAnyKeyword(text, [
+    "物価上昇",
+    "物価高",
+    "利上げ",
+    "金融引き締め",
+    "金融引締め",
+    "増税",
+    "日銀",
+    "需要抑制",
+    "インフレ率",
+    "CPI",
+    "消費税増税",
+  ]);
+}
+
+function looksLikeLaborCostRationalizationText(text: string) {
+  return includesAnyKeyword(text, [
+    "人件費削減",
+    "省人化",
+    "企業の合理化",
+    "合理化",
+    "ミクロ",
+    "マクロ",
+    "合成の誤謬",
+    "生産性向上",
+  ]);
+}
+
 function buildInitialSummaryText(claim: string, title: string) {
   const targetText = `${claim}\n${title}`;
+
+  if (looksLikePriceRateTaxPolicyText(targetText)) {
+    return "物価が上がっているだけでは、利上げや増税が適切とは判断できません。まず雇用統計、賃金、実質賃金、個人消費を見て、労働市場と家計が本当に強い局面かを確認する必要があります。雇用・賃金・消費が強く、需要超過による物価上昇なら、利上げや増税による需要抑制が有効になる場合があります。一方、物価上昇が供給制約や輸入物価によるもので、実質賃金や消費が弱い場合は、利上げや増税が家計と企業活動をさらに弱める可能性があります。したがって、政策判断では物価だけでなく、まず雇用統計で経済が本当に過熱しているかを確認する必要があります。";
+  }
+
+  if (looksLikeLaborCostRationalizationText(targetText)) {
+    return "ミクロ企業会計として正しい主張が、マクロ経済政策として常に正しいとは限りません。企業単体では合理的でも、経済全体が需要不足の局面で多くの企業が同時に人件費削減や省人化を進めると、労働所得が減り、消費需要が弱まり、デフレ圧力が強まる可能性があります。したがって、景気局面、需要環境、労働需給、合成の誤謬を分けて検証する必要があります。";
+  }
 
   if (looksLikeEconomyPolicyText(targetText)) {
     return "ミクロ企業会計として正しい主張が、マクロ経済政策として常に正しいとは限りません。企業単体では合理的でも、経済全体が需要不足の局面で多くの企業が同時に人件費削減や省人化を進めると、労働所得が減り、消費需要が弱まり、デフレ圧力が強まる可能性があります。したがって、景気局面、需要環境、労働需給、合成の誤謬を分けて検証する必要があります。";
