@@ -18,6 +18,7 @@ export default function ForumRegisterPage() {
       ? nextParam
       : `/${tenant}/forum`;
   const [user, setUser] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -31,7 +32,11 @@ export default function ForumRegisterPage() {
       const response = await fetch("/api/forum/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user: user.trim(), password }),
+        body: JSON.stringify({
+          user: user.trim(),
+          displayName: displayName.trim(),
+          password,
+        }),
       });
       const json = (await response.json().catch(() => ({}))) as {
         error?: string;
@@ -100,7 +105,7 @@ export default function ForumRegisterPage() {
           }}
         >
           <p style={{ margin: 0 }}>
-            新しいIDとパスワードを作成してください。登録後はそのままログイン済みになります。
+            新しいIDとパスワードを作成してください。ハンドルネームは任意です。
           </p>
           <p style={{ margin: "6px 0 0" }}>
             閲覧はログインなしでもできます。投稿やAI整理を使う場合のみ登録してください。
@@ -136,6 +141,49 @@ export default function ForumRegisterPage() {
                 outline: "none",
               }}
             />
+          </label>
+
+          <label
+            style={{
+              display: "block",
+              marginBottom: 18,
+              color: "#111827",
+              fontWeight: 800,
+            }}
+          >
+            ハンドルネーム
+            <input
+              autoComplete="nickname"
+              maxLength={20}
+              placeholder="任意のハンドルネーム"
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+              style={{
+                display: "block",
+                width: "100%",
+                boxSizing: "border-box",
+                marginTop: 8,
+                border: "1px solid #cbd5e1",
+                borderRadius: 8,
+                background: "#ffffff",
+                color: "#111827",
+                fontSize: 16,
+                padding: "12px 14px",
+                outline: "none",
+              }}
+            />
+            <span
+              style={{
+                display: "block",
+                marginTop: 6,
+                color: "#64748b",
+                fontSize: 13,
+                fontWeight: 500,
+                lineHeight: 1.5,
+              }}
+            >
+              未入力の場合はIDが表示名になります。
+            </span>
           </label>
 
           <label
@@ -238,4 +286,3 @@ export default function ForumRegisterPage() {
     </main>
   );
 }
-

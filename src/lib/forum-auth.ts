@@ -46,6 +46,10 @@ export function normalizeForumBetaLoginId(loginId: string) {
   return loginId.trim().toLowerCase();
 }
 
+export function normalizeForumBetaDisplayName(displayName: string) {
+  return displayName.trim();
+}
+
 export function validateForumBetaLoginInput(loginId: string, password: string) {
   if (loginId.length < 3 || loginId.length > 32) {
     return "IDは3文字以上32文字以下で入力してください。";
@@ -57,6 +61,18 @@ export function validateForumBetaLoginInput(loginId: string, password: string) {
 
   if (password.length < 6 || password.length > 128) {
     return "パスワードは6文字以上128文字以下で入力してください。";
+  }
+
+  return null;
+}
+
+export function validateForumBetaDisplayName(displayName: string) {
+  const normalizedDisplayName = normalizeForumBetaDisplayName(displayName);
+
+  if (!normalizedDisplayName) return null;
+
+  if (normalizedDisplayName.length > 20) {
+    return "ハンドルネームは20文字以内で入力してください。";
   }
 
   return null;
