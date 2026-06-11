@@ -11,6 +11,8 @@ AI知恵袋Forum の公開ベータでは、閲覧は未ログインでも可能
 現在の方式は、ログインと新規登録を分離した簡易セルフ登録方式である。
 
 - 新規登録ページで任意のIDとパスワードを作成する
+- 新規登録時はパスワード確認入力を行う
+- 新規登録時に任意のハンドルネームを登録できる
 - ログインページでは登録済みIDだけを受け付ける
 - ログインAPIでは未登録IDを自動登録しない
 - 登録済みIDの場合だけ、保存済み `password_hash` と照合する
@@ -36,6 +38,8 @@ create table if not exists forum_beta_users (
 ```
 
 `login_id_normalized` は `trim + lowercase` した値を保存する。
+
+`display_name` は任意のハンドルネームを保存する。未入力の場合は `login_id` を表示名の代替として保存する。
 
 ## 4. パスワード保存
 
@@ -82,7 +86,10 @@ src/lib/forum-auth.ts
 主な関数:
 
 - `normalizeForumBetaLoginId()`
+- `normalizeForumBetaDisplayName()`
 - `validateForumBetaLoginInput()`
+- `validateForumBetaPasswordConfirmation()`
+- `validateForumBetaDisplayName()`
 - `hashForumBetaPassword()`
 - `verifyForumBetaPassword()`
 - `createForumBetaSessionToken()`
@@ -125,16 +132,20 @@ src/app/api/forum/register/route.ts
 
 処理:
 
-1. request body の `user` / `password` を読む
-2. 入力値を検証する
-3. `user` を trim し、`login_id_normalized` を作る
-4. `forum_beta_users` から `login_id_normalized` を検索する
-5. 既存IDなら 409 を返す
-6. 未登録IDなら `password_hash` を作成して insert する
-7. 登録成功時に `createForumBetaSessionToken(user.id)` で Cookie を発行する
-8. `{ ok: true }` を返す
+1. request body の `user` / `password` / `passwordConfirm` / `displayName` を読む
+2. ID・パスワード・パスワード確認・ハンドルネームを検証する
+3. `password` と `passwordConfirm` が一致しない場合は 400 を返す
+4. `user` を trim し、`login_id_normalized` を作る
+5. `forum_beta_users` から `login_id_normalized` を検索する
+6. 既存IDなら 409 を返す
+7. 未登録IDなら `password_hash` を作成し、`display_name` と一緒に insert する
+8. `passwordConfirm` は保存しない
+9. 登録成功時に `createForumBetaSessionToken(user.id)` で Cookie を発行する
+10. `{ ok: true }` を返す
 
 新規登録APIでのみ `forum_beta_users` に insert する。
+
+ハンドルネームは任意で、trim 後 1〜20文字までを許可する。未入力の場合は `login_id` を `display_name` に保存する。
 
 ## 9. ログインページ
 
@@ -162,6 +173,8 @@ src/app/[tenant]/forum/register/page.tsx
 表示方針:
 
 - 新しいIDとパスワードを作成する画面として表示する
+- パスワード確認入力欄を表示する
+- 任意のハンドルネーム入力欄を表示する
 - 登録後はログイン済みとしてForumへ戻す
 - 既存IDの場合は「このIDはすでに使われています」と表示する
 - すでにIDを持っている利用者にはログインページへのリンクを出す
@@ -226,9 +239,11 @@ Forumトップ、スレッド詳細、使い方ページなどの閲覧は未ロ
 最低限の制約:
 
 - パスワードは平文保存しない
+- `passwordConfirm` は保存しない
 - パスワードをログ出力しない
 - `login_id` は 3〜32文字
 - パスワードは 6〜128文字
+- ハンドルネームは任意、入力する場合は 20文字以内
 - `login_id` は英数字、ハイフン、アンダースコアを許可する
 - 未登録IDでログインしても自動登録しない
 - 登録済みIDのパスワード不一致でも、ID存在を推測しにくいエラー文言にする
@@ -248,6 +263,8 @@ Forumトップ、スレッド詳細、使い方ページなどの閲覧は未ロ
 - 未ログインでも閲覧できる
 - 未ログインで投稿しようとするとログインへ誘導される
 - 新規登録ページで新しいIDとパスワードを作成できる
+- 新規登録ページでパスワード確認が一致しない場合は登録できない
+- 新規登録ページで任意のハンドルネームを登録できる
 - 登録後はログイン済みとしてForumへ戻る
 - ログアウトできる
 - ログインページで登録済みIDと正しいパスワードならログインできる

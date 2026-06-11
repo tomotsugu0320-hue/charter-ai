@@ -20,12 +20,19 @@ export default function ForumRegisterPage() {
   const [user, setUser] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+
+    if (password !== passwordConfirm) {
+      setError("パスワードが一致しません。");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -36,6 +43,7 @@ export default function ForumRegisterPage() {
           user: user.trim(),
           displayName: displayName.trim(),
           password,
+          passwordConfirm,
         }),
       });
       const json = (await response.json().catch(() => ({}))) as {
@@ -146,6 +154,68 @@ export default function ForumRegisterPage() {
           <label
             style={{
               display: "block",
+              marginBottom: 14,
+              color: "#111827",
+              fontWeight: 800,
+            }}
+          >
+            パスワード
+            <input
+              autoComplete="new-password"
+              placeholder="パスワード"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              style={{
+                display: "block",
+                width: "100%",
+                boxSizing: "border-box",
+                marginTop: 8,
+                border: "1px solid #cbd5e1",
+                borderRadius: 8,
+                background: "#ffffff",
+                color: "#111827",
+                fontSize: 16,
+                padding: "12px 14px",
+                outline: "none",
+              }}
+            />
+          </label>
+
+          <label
+            style={{
+              display: "block",
+              marginBottom: 18,
+              color: "#111827",
+              fontWeight: 800,
+            }}
+          >
+            パスワード確認
+            <input
+              autoComplete="new-password"
+              placeholder="もう一度パスワードを入力"
+              type="password"
+              value={passwordConfirm}
+              onChange={(event) => setPasswordConfirm(event.target.value)}
+              style={{
+                display: "block",
+                width: "100%",
+                boxSizing: "border-box",
+                marginTop: 8,
+                border: "1px solid #cbd5e1",
+                borderRadius: 8,
+                background: "#ffffff",
+                color: "#111827",
+                fontSize: 16,
+                padding: "12px 14px",
+                outline: "none",
+              }}
+            />
+          </label>
+
+          <label
+            style={{
+              display: "block",
               marginBottom: 18,
               color: "#111827",
               fontWeight: 800,
@@ -184,37 +254,6 @@ export default function ForumRegisterPage() {
             >
               未入力の場合はIDが表示名になります。
             </span>
-          </label>
-
-          <label
-            style={{
-              display: "block",
-              marginBottom: 18,
-              color: "#111827",
-              fontWeight: 800,
-            }}
-          >
-            パスワード
-            <input
-              autoComplete="new-password"
-              placeholder="パスワード"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              style={{
-                display: "block",
-                width: "100%",
-                boxSizing: "border-box",
-                marginTop: 8,
-                border: "1px solid #cbd5e1",
-                borderRadius: 8,
-                background: "#ffffff",
-                color: "#111827",
-                fontSize: 16,
-                padding: "12px 14px",
-                outline: "none",
-              }}
-            />
           </label>
 
           {error && (

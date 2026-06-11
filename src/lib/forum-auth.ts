@@ -66,6 +66,17 @@ export function validateForumBetaLoginInput(loginId: string, password: string) {
   return null;
 }
 
+export function validateForumBetaPasswordConfirmation(
+  password: string,
+  passwordConfirm: string
+) {
+  if (password !== passwordConfirm) {
+    return "パスワードが一致しません。";
+  }
+
+  return null;
+}
+
 export function validateForumBetaDisplayName(displayName: string) {
   const normalizedDisplayName = normalizeForumBetaDisplayName(displayName);
 

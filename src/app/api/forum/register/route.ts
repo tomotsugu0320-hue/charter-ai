@@ -10,6 +10,7 @@ import {
   normalizeForumBetaLoginId,
   validateForumBetaDisplayName,
   validateForumBetaLoginInput,
+  validateForumBetaPasswordConfirmation,
 } from "@/lib/forum-auth";
 
 export const dynamic = "force-dynamic";
@@ -111,10 +112,12 @@ export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as {
     user?: unknown;
     password?: unknown;
+    passwordConfirm?: unknown;
     displayName?: unknown;
   } | null;
   const user = toStringValue(body?.user).trim();
   const password = toStringValue(body?.password);
+  const passwordConfirm = toStringValue(body?.passwordConfirm);
   const displayName = normalizeForumBetaDisplayName(
     toStringValue(body?.displayName)
   );
@@ -122,6 +125,15 @@ export async function POST(request: NextRequest) {
 
   if (inputError) {
     return NextResponse.json({ error: inputError }, { status: 400 });
+  }
+
+  const passwordConfirmError = validateForumBetaPasswordConfirmation(
+    password,
+    passwordConfirm
+  );
+
+  if (passwordConfirmError) {
+    return NextResponse.json({ error: passwordConfirmError }, { status: 400 });
   }
 
   const displayNameError = validateForumBetaDisplayName(displayName);
