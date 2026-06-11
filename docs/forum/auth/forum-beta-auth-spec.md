@@ -4,23 +4,24 @@
 
 AI知恵袋Forum の公開ベータでは、閲覧は未ログインでも可能にしつつ、投稿・外部AI取り込み・AI整理・新規スレッド作成はログイン必須にする。
 
-本格的な会員登録サービスではなく、ベータ向けの簡易セルフ登録方式として運用する。
+本格的な会員登録サービスではなく、ベータ向けの簡易ID/password方式として運用する。
 
 ## 2. 認証方式
 
-現在の主方式は、好きなIDとパスワードによる簡易セルフ登録である。
+現在の方式は、ログインと新規登録を分離した簡易セルフ登録方式である。
 
-- 利用者はログイン画面で任意のIDとパスワードを入力する
-- `login_id` が未登録なら、そのIDとパスワードで自動登録する
-- `login_id` が登録済みなら、パスワードが一致した場合だけログインできる
+- 新規登録ページで任意のIDとパスワードを作成する
+- ログインページでは登録済みIDだけを受け付ける
+- ログインAPIでは未登録IDを自動登録しない
+- 登録済みIDの場合だけ、保存済み `password_hash` と照合する
 - パスワードは平文保存しない
 - ログイン成功時は既存の `forum_beta_session` Cookie を発行する
 
-移行期間の救済として、既存の `FORUM_BETA_USERS_JSON` / `FORUM_BETA_USER` / `FORUM_BETA_PASSWORD` による共通ID fallback も残す。
+旧共通ID fallback は通常ログインAPIでは使わない。
 
 ## 3. DBテーブル
 
-簡易セルフ登録ユーザーは `forum_beta_users` に保存する。
+簡易登録ユーザーは `forum_beta_users` に保存する。
 
 ```sql
 create table if not exists forum_beta_users (
@@ -81,6 +82,7 @@ src/lib/forum-auth.ts
 主な関数:
 
 - `normalizeForumBetaLoginId()`
+- `validateForumBetaLoginInput()`
 - `hashForumBetaPassword()`
 - `verifyForumBetaPassword()`
 - `createForumBetaSessionToken()`
@@ -101,18 +103,40 @@ src/app/api/forum/login/route.ts
 処理:
 
 1. request body の `user` / `password` を読む
-2. `user` を trim し、`login_id_normalized` を作る
-3. 入力値を検証する
+2. 入力値を検証する
+3. `user` を trim し、`login_id_normalized` を作る
 4. `forum_beta_users` から `login_id_normalized` を検索する
-5. 未登録なら `password_hash` を作って insert する
-6. 登録済みなら `password_hash` を verify する
-7. 成功時に `createForumBetaSessionToken(user.id)` で Cookie を発行する
-8. `last_login_at` を更新する
-9. `{ ok: true }` を返す
+5. ユーザーが存在しない場合は 401 を返す
+6. ユーザーが存在する場合だけ `password_hash` を verify する
+7. パスワード不一致なら 401 を返す
+8. 成功時に `createForumBetaSessionToken(user.id)` で Cookie を発行する
+9. `last_login_at` を更新する
+10. `{ ok: true }` を返す
 
-既存の共通ID fallback は移行用として残す。
+ログインAPIでは `forum_beta_users` への insert を行わない。
 
-## 8. ログインページ
+## 8. 新規登録API
+
+実装場所:
+
+```txt
+src/app/api/forum/register/route.ts
+```
+
+処理:
+
+1. request body の `user` / `password` を読む
+2. 入力値を検証する
+3. `user` を trim し、`login_id_normalized` を作る
+4. `forum_beta_users` から `login_id_normalized` を検索する
+5. 既存IDなら 409 を返す
+6. 未登録IDなら `password_hash` を作成して insert する
+7. 登録成功時に `createForumBetaSessionToken(user.id)` で Cookie を発行する
+8. `{ ok: true }` を返す
+
+新規登録APIでのみ `forum_beta_users` に insert する。
+
+## 9. ログインページ
 
 実装場所:
 
@@ -122,13 +146,27 @@ src/app/[tenant]/forum/login/page.tsx
 
 表示方針:
 
-- 好きなIDとパスワードでログインできることを説明する
-- 初めて使うIDは自動登録されることを説明する
+- 登録済みIDでログインする画面として表示する
+- 未登録IDは自動登録されない
+- 初めての利用者には新規登録ページへのリンクを出す
 - 閲覧は未ログインでもできることを説明する
-- 実際のIDやパスワードは画面に表示しない
-- 新規登録ボタンは分けず、ログインボタンだけにする
 
-## 9. ログアウトAPI
+## 10. 新規登録ページ
+
+実装場所:
+
+```txt
+src/app/[tenant]/forum/register/page.tsx
+```
+
+表示方針:
+
+- 新しいIDとパスワードを作成する画面として表示する
+- 登録後はログイン済みとしてForumへ戻す
+- 既存IDの場合は「このIDはすでに使われています」と表示する
+- すでにIDを持っている利用者にはログインページへのリンクを出す
+
+## 11. ログアウトAPI
 
 実装場所:
 
@@ -138,7 +176,7 @@ src/app/api/forum/logout/route.ts
 
 `forum_beta_session` Cookie を削除し、`{ ok: true }` を返す。
 
-## 10. ログイン状態確認API
+## 12. ログイン状態確認API
 
 実装場所:
 
@@ -148,7 +186,7 @@ src/app/api/forum/login/status/route.ts
 
 `forum_beta_session` Cookie を検証し、ログイン状態を返す。
 
-## 11. ログイン必須の範囲
+## 13. ログイン必須の範囲
 
 投稿・作成・AI整理系APIは、引き続き `isForumBetaLoggedIn()` でログイン確認を行う。
 
@@ -163,25 +201,25 @@ src/app/api/forum/login/status/route.ts
 
 未ログイン時は 401 を返し、本処理に入らない。
 
-## 12. 未ログインでも可能な範囲
+## 14. 未ログインでも可能な範囲
 
 Forumトップ、スレッド詳細、使い方ページなどの閲覧は未ログインでも可能である。
 
-## 13. author_key との関係
+## 15. author_key との関係
 
 `forum_beta_session` はログイン状態を確認するCookieである。
 
 `author_key` は同じブラウザ・端末を識別するためのCookieであり、ログイン認証の正本ではない。
 
-今回の簡易セルフ登録では、既存投稿とユーザーIDの厳密な紐づけまでは行わない。
+今回の簡易登録では、既存投稿とユーザーIDの厳密な紐づけまでは行わない。
 
-## 14. ADMIN_KEY との関係
+## 16. ADMIN_KEY との関係
 
 管理系APIや高権限APIでは、ログイン済みであっても `ADMIN_KEY` が必要なものがある。
 
-簡易セルフ登録ユーザーに管理者権限は付与しない。
+簡易登録ユーザーに管理者権限は付与しない。
 
-## 15. セキュリティ上の注意
+## 17. セキュリティ上の注意
 
 この方式はベータ向けの簡易方式であり、本格的なアカウント管理ではない。
 
@@ -192,6 +230,7 @@ Forumトップ、スレッド詳細、使い方ページなどの閲覧は未ロ
 - `login_id` は 3〜32文字
 - パスワードは 6〜128文字
 - `login_id` は英数字、ハイフン、アンダースコアを許可する
+- 未登録IDでログインしても自動登録しない
 - 登録済みIDのパスワード不一致でも、ID存在を推測しにくいエラー文言にする
 
 今後の課題:
@@ -204,14 +243,17 @@ Forumトップ、スレッド詳細、使い方ページなどの閲覧は未ロ
 - 投稿とユーザーIDの正式な紐づけ
 - 招待制やメール認証への移行
 
-## 16. 確認項目
+## 18. 確認項目
 
 - 未ログインでも閲覧できる
 - 未ログインで投稿しようとするとログインへ誘導される
-- 好きなID・パスワードで初回ログインすると自動登録される
-- 同じID・同じパスワードで再ログインできる
-- 同じID・違うパスワードではログインできない
-- ログイン後、投稿・外部AI取り込み・AI整理が使える
+- 新規登録ページで新しいIDとパスワードを作成できる
+- 登録後はログイン済みとしてForumへ戻る
 - ログアウトできる
-- 既存の共通ID fallback でも移行期間中はログインできる
+- ログインページで登録済みIDと正しいパスワードならログインできる
+- 登録済みIDと違うパスワードではログインできない
+- 未登録IDではログインページからログインできない
+- 未登録IDは新規登録ページでのみ登録できる
+- 既存IDは新規登録ページで登録できない
+- ログイン後、投稿・外部AI取り込み・AI整理が使える
 

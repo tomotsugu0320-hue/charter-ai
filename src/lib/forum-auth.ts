@@ -5,6 +5,7 @@ export const FORUM_BETA_SESSION_COOKIE = "forum_beta_session";
 
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 14;
 const SCRYPT_KEY_LENGTH = 64;
+const LOGIN_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 const scryptAsync = promisify(scrypt);
 
 type ForumBetaSessionPayload = {
@@ -43,6 +44,22 @@ function safeEqual(left: string, right: string) {
 
 export function normalizeForumBetaLoginId(loginId: string) {
   return loginId.trim().toLowerCase();
+}
+
+export function validateForumBetaLoginInput(loginId: string, password: string) {
+  if (loginId.length < 3 || loginId.length > 32) {
+    return "IDは3文字以上32文字以下で入力してください。";
+  }
+
+  if (!LOGIN_ID_PATTERN.test(loginId)) {
+    return "IDに使える文字は英数字、ハイフン、アンダースコアです。";
+  }
+
+  if (password.length < 6 || password.length > 128) {
+    return "パスワードは6文字以上128文字以下で入力してください。";
+  }
+
+  return null;
 }
 
 export async function hashForumBetaPassword(password: string) {

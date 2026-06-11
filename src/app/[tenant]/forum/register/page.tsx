@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 
-export default function ForumLoginPage() {
+export default function ForumRegisterPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -28,7 +28,7 @@ export default function ForumLoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/forum/login", {
+      const response = await fetch("/api/forum/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user: user.trim(), password }),
@@ -40,9 +40,11 @@ export default function ForumLoginPage() {
       if (!response.ok) {
         setError(
           json.error ||
-            (response.status === 500
-              ? "ログイン設定が未完了です。管理者に確認してください。"
-              : "ログインできませんでした。IDとパスワードを確認してください。")
+            (response.status === 409
+              ? "このIDはすでに使われています。"
+              : response.status === 500
+              ? "登録設定が未完了です。管理者に確認してください。"
+              : "登録できませんでした。IDとパスワードを確認してください。")
         );
         return;
       }
@@ -87,7 +89,7 @@ export default function ForumLoginPage() {
           限定ベータ
         </p>
         <h1 style={{ margin: "0 0 10px", fontSize: 28, fontWeight: 900 }}>
-          AI知恵袋Forum ログイン
+          AI知恵袋Forum 新規登録
         </h1>
         <div
           style={{
@@ -98,10 +100,10 @@ export default function ForumLoginPage() {
           }}
         >
           <p style={{ margin: 0 }}>
-            登録済みのIDとパスワードを入力してください。
+            新しいIDとパスワードを作成してください。登録後はそのままログイン済みになります。
           </p>
           <p style={{ margin: "6px 0 0" }}>
-            閲覧はログインなしでもできます。投稿やAI整理を使う場合のみログインしてください。
+            閲覧はログインなしでもできます。投稿やAI整理を使う場合のみ登録してください。
           </p>
         </div>
 
@@ -117,7 +119,7 @@ export default function ForumLoginPage() {
             ID
             <input
               autoComplete="username"
-              placeholder="登録済みID"
+              placeholder="新しいID"
               value={user}
               onChange={(event) => setUser(event.target.value)}
               style={{
@@ -146,7 +148,7 @@ export default function ForumLoginPage() {
           >
             パスワード
             <input
-              autoComplete="current-password"
+              autoComplete="new-password"
               placeholder="パスワード"
               type="password"
               value={password}
@@ -199,15 +201,13 @@ export default function ForumLoginPage() {
               padding: "13px 16px",
             }}
           >
-            {isLoading ? "ログイン中..." : "ログイン"}
+            {isLoading ? "登録中..." : "登録してログイン"}
           </button>
         </form>
 
         <p style={{ margin: "18px 0 0", textAlign: "center" }}>
           <Link
-            href={`/${tenant}/forum/register?next=${encodeURIComponent(
-              nextPath
-            )}`}
+            href={`/${tenant}/forum/login?next=${encodeURIComponent(nextPath)}`}
             style={{
               color: "#0f172a",
               fontSize: 14,
@@ -216,7 +216,7 @@ export default function ForumLoginPage() {
               textUnderlineOffset: 3,
             }}
           >
-            初めての方はこちら
+            すでにIDを持っている方はこちら
           </Link>
         </p>
 
@@ -238,3 +238,4 @@ export default function ForumLoginPage() {
     </main>
   );
 }
+
