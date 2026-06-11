@@ -1069,6 +1069,7 @@ async function handleLogout() {
   };
 
   const currentFont = fontSizeMap[fontSize];
+  const threadTitleFontSize = currentFont.title * 0.9;
   const currentUrl =
     typeof window !== "undefined" ? window.location.href : "";
 
@@ -1978,6 +1979,8 @@ function renderDiscussionCard({
         maxWidth: 900,
         margin: "0 auto",
         padding: "24px 16px 80px",
+        fontSize: currentFont.base,
+        lineHeight: 1.7,
       }}
     >
 
@@ -2192,7 +2195,7 @@ function renderDiscussionCard({
             <h1
               style={{
                 margin: 0,
-                fontSize: currentFont.title,
+                fontSize: threadTitleFontSize,
                 fontWeight: 800,
                 lineHeight: 1.4,
                 color: "#111",
@@ -2390,7 +2393,7 @@ function renderDiscussionCard({
     <div
       style={{
         color: "#334155",
-        fontSize: currentFont.base * 0.95,
+        fontSize: currentFont.base,
         lineHeight: 1.7,
       }}
     >
@@ -2484,7 +2487,7 @@ function renderDiscussionCard({
           <div style={{ fontWeight: 800, marginBottom: 4, color: "#334155" }}>
             前提
           </div>
-          <ul style={{ margin: 0, paddingLeft: 20, color: "#333", lineHeight: 1.7 }}>
+          <ul style={{ margin: 0, paddingLeft: 20, color: "#333", fontSize: currentFont.base, lineHeight: 1.7 }}>
             {overviewPremises.map((premise, index) => (
               <li key={`overview-premise-${index}`}>{compactText(premise, 160)}</li>
             ))}
@@ -2496,7 +2499,7 @@ function renderDiscussionCard({
           <div style={{ fontWeight: 800, marginBottom: 4, color: "#334155" }}>
             根拠
           </div>
-          <ul style={{ margin: 0, paddingLeft: 20, color: "#333", lineHeight: 1.7 }}>
+          <ul style={{ margin: 0, paddingLeft: 20, color: "#333", fontSize: currentFont.base, lineHeight: 1.7 }}>
             {overviewReasons.map((reason, index) => (
               <li key={`overview-reason-${index}`}>{compactText(reason, 160)}</li>
             ))}
@@ -2529,7 +2532,7 @@ function renderDiscussionCard({
     >
       転：反論・リスク
     </h2>
-    <ul style={{ margin: "10px 0 0", paddingLeft: 20, color: "#333", lineHeight: 1.7 }}>
+    <ul style={{ margin: "10px 0 0", paddingLeft: 20, color: "#333", fontSize: currentFont.base, lineHeight: 1.7 }}>
       {overviewConflicts.map((conflict, index) => (
         <li key={`overview-conflict-${index}`}>
           {compactText(conflict.rebuttal || conflict.opinion, 160)}
@@ -2987,7 +2990,7 @@ function renderDiscussionCard({
     <div>
       <div style={{ fontWeight: 800, marginBottom: 4 }}>前提</div>
       {initialPremises.length > 0 ? (
-        <ul style={{ margin: 0, paddingLeft: 20, color: "#333", lineHeight: 1.7, overflowWrap: "anywhere" }}>
+        <ul style={{ margin: 0, paddingLeft: 20, color: "#333", fontSize: currentFont.base, lineHeight: 1.7, overflowWrap: "anywhere" }}>
           {initialPremises.map((premise, index) => (
             <li key={`initial-premise-${index}`}>{premise}</li>
           ))}
@@ -3002,7 +3005,7 @@ function renderDiscussionCard({
     <div>
       <div style={{ fontWeight: 800, marginBottom: 4 }}>根拠</div>
       {initialReasons.length > 0 ? (
-        <ul style={{ margin: 0, paddingLeft: 20, color: "#333", lineHeight: 1.7, overflowWrap: "anywhere" }}>
+        <ul style={{ margin: 0, paddingLeft: 20, color: "#333", fontSize: currentFont.base, lineHeight: 1.7, overflowWrap: "anywhere" }}>
           {initialReasons.map((reason, index) => (
             <li key={`initial-reason-${index}`}>{reason}</li>
           ))}
@@ -3017,7 +3020,7 @@ function renderDiscussionCard({
     <div>
       <div style={{ fontWeight: 800, marginBottom: 4 }}>反論・リスク</div>
       {initialConflicts.length > 0 ? (
-        <ul style={{ margin: 0, paddingLeft: 20, color: "#333", lineHeight: 1.7, overflowWrap: "anywhere" }}>
+        <ul style={{ margin: 0, paddingLeft: 20, color: "#333", fontSize: currentFont.base, lineHeight: 1.7, overflowWrap: "anywhere" }}>
           {initialConflicts.map((conflict, index) => (
             <li key={`initial-conflict-${index}`}>
               {conflict.rebuttal || conflict.opinion}
