@@ -436,6 +436,40 @@ function extractExternalAiAnswer(originalPost?: string | null) {
   return (nextHeading >= 0 ? afterLabel.slice(0, nextHeading) : afterLabel).trim();
 }
 
+function stripExternalAiInternalSections(value?: string | null) {
+  const text = value ?? "";
+  const labels = [
+    "AI回答・整理:",
+    "AI回答・整理：",
+    "補足:",
+    "補足：",
+    "前提:",
+    "前提：",
+    "根拠:",
+    "根拠：",
+    "反論・リスク:",
+    "反論・リスク：",
+    "反論:",
+    "反論：",
+  ];
+  const firstLabelIndex = labels.reduce<number | null>((current, label) => {
+    const index = text.indexOf(label);
+    if (index < 0) return current;
+    return current === null ? index : Math.min(current, index);
+  }, null);
+
+  return (firstLabelIndex === null ? text : text.slice(0, firstLabelIndex)).trim();
+}
+
+function isTemplateProvisionalAnswer(value?: string | null) {
+  const text = String(value ?? "").trim();
+  return (
+    text.startsWith("現時点では、") &&
+    (text.includes("という全体整理をもとに") ||
+      text.includes("をもとに確認できます"))
+  );
+}
+
 function normalizeSourceItems(values?: (string | SourceItem)[] | null): SourceItem[] {
   if (!Array.isArray(values)) return [];
 
@@ -1495,15 +1529,20 @@ const groupedByOpinionForDisplay = useMemo(
 );
 const normalizeQuestionText = (value?: string | null) =>
   (value ?? "").replace(/[。、．.！？!?「」『』【】（）()[\]\s]/g, "");
+const questionCardText = stripExternalAiInternalSections(thread?.original_post);
 const shouldShowQuestionCard =
-  Boolean(thread?.original_post?.trim()) &&
-  normalizeQuestionText(thread?.original_post) !== normalizeQuestionText(thread?.title);
+  Boolean(questionCardText) &&
+  normalizeQuestionText(questionCardText) !== normalizeQuestionText(thread?.title);
 const shouldShowMacroEconomyGuide =
   String(thread?.category ?? "").trim() === "経済・政策";
 const initialPostCount = summary?.counts?.total ?? posts.length;
 const showInitialDiscussionNote = initialPostCount <= 3;
+const summaryProvisionalAnswer = summary?.provisional_answer?.trim() ?? "";
+const naturalSummaryAnswer = isTemplateProvisionalAnswer(summaryProvisionalAnswer)
+  ? summary?.summary_text?.trim() || externalAiAnswerFromOriginalPost
+  : summaryProvisionalAnswer;
 const provisionalAnswerText =
-  summary?.provisional_answer?.trim() ||
+  naturalSummaryAnswer ||
   externalAiAnswerFromOriginalPost ||
   "まだAIの暫定回答はありません。AIまとめを確認・更新すると表示されます。";
 
@@ -2357,7 +2396,7 @@ function renderDiscussionCard({
         lineHeight: 1.7,
       }}
     >
-      {compactText(thread.original_post, 280)}
+      {compactText(questionCardText, 280)}
     </div>
     <div
       style={{
