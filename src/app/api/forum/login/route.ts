@@ -192,9 +192,6 @@ export async function POST(request: NextRequest) {
     );
 
     if (!passwordMatches) {
-      const fallbackResponse = createFallbackLoginResponse(user, password);
-      if (fallbackResponse) return fallbackResponse;
-
       return NextResponse.json(
         { error: INVALID_LOGIN_MESSAGE },
         { status: 401 }
@@ -204,6 +201,9 @@ export async function POST(request: NextRequest) {
     userId = existing.user.id;
     await updateLastLoginAt(supabase, userId);
   } else {
+    const fallbackResponse = createFallbackLoginResponse(user, password);
+    if (fallbackResponse) return fallbackResponse;
+
     const created = await createForumBetaUser(
       supabase,
       user,
@@ -221,9 +221,6 @@ export async function POST(request: NextRequest) {
         );
 
         if (!passwordMatches) {
-          const fallbackResponse = createFallbackLoginResponse(user, password);
-          if (fallbackResponse) return fallbackResponse;
-
           return NextResponse.json(
             { error: INVALID_LOGIN_MESSAGE },
             { status: 401 }
@@ -234,9 +231,6 @@ export async function POST(request: NextRequest) {
         await updateLastLoginAt(supabase, userId);
       } else {
         console.error("[forum beta login] user creation failed", created.error);
-        const fallbackResponse = createFallbackLoginResponse(user, password);
-        if (fallbackResponse) return fallbackResponse;
-
         return NextResponse.json(
           { error: "Forum beta login is not configured." },
           { status: 500 }
