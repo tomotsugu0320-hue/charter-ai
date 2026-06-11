@@ -89,9 +89,21 @@ export default function ForumLoginPage() {
         <h1 style={{ margin: "0 0 10px", fontSize: 28, fontWeight: 900 }}>
           AI知恵袋Forum ログイン
         </h1>
-        <p style={{ margin: "0 0 22px", color: "#475569", lineHeight: 1.7 }}>
-          共有されたIDとパスワードを入力してください。
-        </p>
+        <div
+          style={{
+            margin: "0 0 22px",
+            color: "#475569",
+            fontSize: 14,
+            lineHeight: 1.7,
+          }}
+        >
+          <p style={{ margin: 0 }}>
+            ベータ版の投稿・AI整理機能を使うにはログインが必要です。案内された共通IDと共通パスワードを入力してください。
+          </p>
+          <p style={{ margin: "6px 0 0" }}>
+            閲覧はログインなしでもできます。投稿やAI整理を行う場合のみログインしてください。
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit}>
           <label
@@ -105,6 +117,7 @@ export default function ForumLoginPage() {
             共通ID
             <input
               autoComplete="username"
+              placeholder="共通ID"
               value={user}
               onChange={(event) => setUser(event.target.value)}
               style={{
@@ -134,6 +147,7 @@ export default function ForumLoginPage() {
             パスワード
             <input
               autoComplete="current-password"
+              placeholder="共通パスワード"
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
