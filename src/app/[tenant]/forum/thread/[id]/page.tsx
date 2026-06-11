@@ -2382,10 +2382,11 @@ function renderDiscussionCard({
   >
     <div
       style={{
-        fontSize: currentFont.base * 0.9,
-        color: "#475569",
+        margin: 0,
+        fontSize: currentFont.title,
         fontWeight: 800,
-        marginBottom: 6,
+        lineHeight: 1.4,
+        color: "#111",
       }}
     >
       起：この議論の問い
