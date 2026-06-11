@@ -150,11 +150,33 @@ function looksLikeLaborCostRationalizationText(text: string) {
   ]);
 }
 
+function looksLikeFiscalConsolidationText(text: string) {
+  return includesAnyKeyword(text, [
+    "財政健全化",
+    "財政再建",
+    "政府支出削減",
+    "支出削減",
+    "歳出削減",
+    "緊縮",
+    "緊縮財政",
+    "財政赤字削減",
+    "赤字削減",
+    "プライマリーバランス",
+    "PB黒字化",
+    "政府の支出",
+    "公共支出",
+  ]);
+}
+
 function buildInitialSummaryText(claim: string, title: string) {
   const targetText = `${claim}\n${title}`;
 
   if (looksLikePriceRateTaxPolicyText(targetText)) {
     return "物価が上がっているだけでは、利上げや増税が適切とは判断できません。まず雇用統計、賃金、実質賃金、個人消費を見て、労働市場と家計が本当に強い局面かを確認する必要があります。雇用・賃金・消費が強く、需要超過による物価上昇なら、利上げや増税による需要抑制が有効になる場合があります。一方、物価上昇が供給制約や輸入物価によるもので、実質賃金や消費が弱い場合は、利上げや増税が家計と企業活動をさらに弱める可能性があります。したがって、政策判断では物価だけでなく、まず雇用統計で経済が本当に過熱しているかを確認する必要があります。";
+  }
+
+  if (looksLikeFiscalConsolidationText(targetText)) {
+    return "デフレ・需要不足の局面では、政府支出の削減は財政健全化に見えても、経済全体の需要をさらに弱める可能性があります。政府の支出は誰かの所得でもあるため、支出削減が家計所得、企業売上、雇用を弱めると、税収も伸びにくくなります。その結果、短期的な赤字削減を狙っても、景気悪化によって財政健全化がかえって遅れる可能性があります。したがって、財政健全化は重要でも、デフレ局面では支出削減だけでなく、雇用・所得・消費を支える政策とのバランスを確認する必要があります。";
   }
 
   if (looksLikeLaborCostRationalizationText(targetText)) {
