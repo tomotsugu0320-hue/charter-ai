@@ -1,63 +1,63 @@
-# AI知恵袋Forum ベータ認証仕様書
+# AI知恵袋Forum ベータ認証仕様
 
 ## 1. 目的
 
-AI知恵袋Forum の限定ベータでは、身内ベータ / 限定ベータ向けに、共通ID・共通パスワードによる簡易ログインを導入している。
+AI知恵袋Forum の公開ベータでは、閲覧は未ログインでも可能にしつつ、投稿・外部AI取り込み・AI整理・新規スレッド作成はログイン必須にする。
 
-この認証は、次の目的で使う。
+本格的な会員登録サービスではなく、ベータ向けの簡易セルフ登録方式として運用する。
 
-- 未ログインでも Forum の閲覧はできるようにする
-- 投稿、新規スレッド作成、AI整理系APIの実行はログイン必須にする
-- 未ログイン状態で OpenAI API や投稿作成APIが不要に実行されることを防ぐ
-- 本格的なユーザー登録機能を入れる前に、限定ベータとして安全に運用する
+## 2. 認証方式
 
-この方式は本格的なユーザー認証ではない。ユーザーごとのアカウント、権限、投稿者識別、パスワード変更、招待管理などはまだ扱わない。全員が同じ共通ID・共通パスワードでログインする方式である。
+現在の主方式は、好きなIDとパスワードによる簡易セルフ登録である。
 
-## 2. 現在の認証方式
+- 利用者はログイン画面で任意のIDとパスワードを入力する
+- `login_id` が未登録なら、そのIDとパスワードで自動登録する
+- `login_id` が登録済みなら、パスワードが一致した場合だけログインできる
+- パスワードは平文保存しない
+- ログイン成功時は既存の `forum_beta_session` Cookie を発行する
 
-現在の認証方式は、DBを使わない簡易セッション方式である。
+移行期間の救済として、既存の `FORUM_BETA_USERS_JSON` / `FORUM_BETA_USER` / `FORUM_BETA_PASSWORD` による共通ID fallback も残す。
 
-- 共通ID / 共通パスワード方式
-- ID、パスワード、署名secretは環境変数で管理する
-- ログイン成功時に `forum_beta_session` Cookie を発行する
-- Cookie は `HttpOnly`
-- Cookie は署名付きトークン
-- Cookie は `SameSite=Lax`
-- production では `Secure`
-- Cookie は期限付き
-- DB、Supabase、ユーザーテーブルは使わない
+## 3. DBテーブル
 
-セッショントークンは `payload.signature` 形式で、payload を HMAC-SHA256 で署名する。payload には `sub`, `iat`, `exp`, `nonce`, `v` が含まれる。
+簡易セルフ登録ユーザーは `forum_beta_users` に保存する。
 
-現在の有効期限は 14日である。
-
-## 3. 使用する環境変数
-
-```env
-FORUM_BETA_USER
-FORUM_BETA_PASSWORD
-FORUM_BETA_SESSION_SECRET
+```sql
+create table if not exists forum_beta_users (
+  id uuid primary key default gen_random_uuid(),
+  login_id text not null,
+  login_id_normalized text not null unique,
+  password_hash text not null,
+  display_name text,
+  created_at timestamptz not null default now(),
+  last_login_at timestamptz
+);
 ```
 
-それぞれの用途は次の通り。
+`login_id_normalized` は `trim + lowercase` した値を保存する。
 
-- `FORUM_BETA_USER`: 共通ログインID
-- `FORUM_BETA_PASSWORD`: 共通ログインパスワード
-- `FORUM_BETA_SESSION_SECRET`: `forum_beta_session` Cookie の署名に使うsecret
+## 4. パスワード保存
 
-`FORUM_BETA_SESSION_SECRET` が未設定の場合、セッショントークンを安全に発行・検証できない。ログインAPIでは、必要な環境変数が未設定の場合に 500 を返す。
+パスワードは Node 標準の `crypto.scrypt` でハッシュ化する。
 
-## 4. Cookie仕様
+保存形式:
+
+```txt
+scrypt$<salt>$<hash>
+```
+
+- salt はランダム生成する
+- verify 時は保存済み salt で再計算する
+- 比較には `timingSafeEqual` を使う
+- 平文パスワードはDB・ログ・コードに保存しない
+
+## 5. Cookie仕様
 
 Cookie名:
 
 ```txt
 forum_beta_session
 ```
-
-発行条件:
-
-- `POST /api/forum/login` に正しい共通ID・共通パスワードが送られた場合
 
 Cookie属性:
 
@@ -68,11 +68,9 @@ Cookie属性:
 - `maxAge`: 14日
 - `expires`: 14日後
 
-削除条件:
+Cookieの署名には `FORUM_BETA_SESSION_SECRET` を使う。
 
-- `POST /api/forum/logout` 実行時に、同名Cookieを `maxAge: 0` / `expires: new Date(0)` で上書きする
-
-## 5. 共通認証ヘルパー
+## 6. 認証ヘルパー
 
 実装場所:
 
@@ -82,19 +80,17 @@ src/lib/forum-auth.ts
 
 主な関数:
 
+- `normalizeForumBetaLoginId()`
+- `hashForumBetaPassword()`
+- `verifyForumBetaPassword()`
 - `createForumBetaSessionToken()`
 - `verifyForumBetaSessionToken()`
 - `isForumBetaLoggedIn()`
-- `getForumBetaSessionCookieOptions()`
-- `getForumBetaSessionClearCookieOptions()`
-- `isForumBetaAuthConfigured()`
-- `verifyForumBetaCredentials()`
+- `getForumBetaSessionUser()`
 
-`isForumBetaLoggedIn()` は `Request` または `Headers` から `forum_beta_session` Cookie を読み取り、署名と期限を検証する。改ざんされたCookie、期限切れCookie、secret未設定時はログイン済みとみなさない。
+`isForumBetaLoggedIn()` は既存通り、`forum_beta_session` Cookie の署名と期限を検証する。投稿API側はこの判定を使う。
 
-## 6. ログイン関連API
-
-### POST /api/forum/login
+## 7. ログインAPI
 
 実装場所:
 
@@ -104,47 +100,19 @@ src/app/api/forum/login/route.ts
 
 処理:
 
-1. `FORUM_BETA_USER` / `FORUM_BETA_PASSWORD` / `FORUM_BETA_SESSION_SECRET` が設定済みか確認する
-2. request body の `user` / `password` を読む
-3. 環境変数の共通ID・共通パスワードと照合する
-4. 一致したら `forum_beta_session` Cookie を発行する
-5. `{ ok: true }` を返す
+1. request body の `user` / `password` を読む
+2. `user` を trim し、`login_id_normalized` を作る
+3. 入力値を検証する
+4. `forum_beta_users` から `login_id_normalized` を検索する
+5. 未登録なら `password_hash` を作って insert する
+6. 登録済みなら `password_hash` を verify する
+7. 成功時に `createForumBetaSessionToken(user.id)` で Cookie を発行する
+8. `last_login_at` を更新する
+9. `{ ok: true }` を返す
 
-失敗時:
+既存の共通ID fallback は移行用として残す。
 
-- 認証設定が未完了: 500
-- IDまたはパスワード不一致: 401
-
-### POST /api/forum/logout
-
-実装場所:
-
-```txt
-src/app/api/forum/logout/route.ts
-```
-
-処理:
-
-1. `forum_beta_session` Cookie を削除する
-2. `{ ok: true }` を返す
-
-### GET /api/forum/login/status
-
-実装場所:
-
-```txt
-src/app/api/forum/login/status/route.ts
-```
-
-処理:
-
-1. `forum_beta_session` Cookie を検証する
-2. ログイン済みなら `{ ok: true, loggedIn: true }`
-3. 未ログインなら `{ ok: true, loggedIn: false }`
-
-このAPIは DB、Supabase、OpenAI を呼ばない軽量な状態確認APIである。
-
-## 7. ログインページ
+## 8. ログインページ
 
 実装場所:
 
@@ -152,266 +120,98 @@ src/app/api/forum/login/status/route.ts
 src/app/[tenant]/forum/login/page.tsx
 ```
 
-URL:
+表示方針:
 
-```txt
-/{tenant}/forum/login
-```
+- 好きなIDとパスワードでログインできることを説明する
+- 初めて使うIDは自動登録されることを説明する
+- 閲覧は未ログインでもできることを説明する
+- 実際のIDやパスワードは画面に表示しない
+- 新規登録ボタンは分けず、ログインボタンだけにする
 
-画面要素:
-
-- 共通ID入力欄
-- パスワード入力欄
-- ログインボタン
-- エラー表示
-
-ログイン成功後は、`next` query が安全な相対パスであればそこへ遷移する。`next` がない場合、または不正な値の場合は `/{tenant}/forum` へ戻る。
-
-例:
-
-```txt
-/dev/forum/login?next=%2Fdev%2Fforum%23create
-```
-
-## 8. Forumトップ側のログイン連携
+## 9. ログアウトAPI
 
 実装場所:
 
 ```txt
-src/app/[tenant]/forum/page.tsx
+src/app/api/forum/logout/route.ts
 ```
 
-Forumトップでは、次の用途で `GET /api/forum/login/status` を使う。
+`forum_beta_session` Cookie を削除し、`{ ok: true }` を返す。
 
-- 初期表示時にログイン状態を確認する
-- 右上メニューでログイン済みなら「ログアウト」、未ログインなら「ログイン」を表示する
-- 作成系操作の直前にログイン状態を確認する
-
-未ログイン時に作成系操作を行った場合は、API本体を呼ぶ前に処理を止め、ログインページへ誘導する。
-
-誘導先:
-
-```txt
-/{tenant}/forum/login?next=/{tenant}/forum#create
-```
-
-Forumトップの投稿・作成エリアには `id="create"` が付いており、ログイン後に作成エリアへ戻れる。
-
-## 9. 現在ログイン必須のAPI
-
-現在、次のAPIは `forum_beta_session` によるログイン確認を行う。
-
-### 通常投稿
-
-```txt
-POST /api/forum/add-post
-```
+## 10. ログイン状態確認API
 
 実装場所:
 
 ```txt
-src/app/api/forum/add-post/route.ts
+src/app/api/forum/login/status/route.ts
 ```
 
-未ログイン時:
+`forum_beta_session` Cookie を検証し、ログイン状態を返す。
 
-```json
-{ "ok": false, "error": "Login required." }
-```
+## 11. ログイン必須の範囲
 
-HTTP status:
+投稿・作成・AI整理系APIは、引き続き `isForumBetaLoggedIn()` でログイン確認を行う。
 
-```txt
-401
-```
+主な対象:
 
-### 新規スレッド作成
+- `POST /api/forum/create-thread-from-draft`
+- `POST /api/forum/add-post`
+- `POST /api/forum/generate-issue`
+- `POST /api/forum/organize-post`
+- `GET /api/forum/thread-summary`
+- 保存済み参考投稿や外部AI取り込み周辺API
 
-```txt
-POST /api/forum/create-thread-from-draft
-```
+未ログイン時は 401 を返し、本処理に入らない。
 
-実装場所:
+## 12. 未ログインでも可能な範囲
 
-```txt
-src/app/api/forum/create-thread-from-draft/route.ts
-```
+Forumトップ、スレッド詳細、使い方ページなどの閲覧は未ログインでも可能である。
 
-未ログイン時は 401 を返し、スレッド作成処理には入らない。
+## 13. author_key との関係
 
-### AI整理系API
+`forum_beta_session` はログイン状態を確認するCookieである。
 
-```txt
-POST /api/forum/generate-issue
-POST /api/forum/organize-post
-GET  /api/forum/thread-summary
-```
+`author_key` は同じブラウザ・端末を識別するためのCookieであり、ログイン認証の正本ではない。
 
-実装場所:
+今回の簡易セルフ登録では、既存投稿とユーザーIDの厳密な紐づけまでは行わない。
 
-```txt
-src/app/api/forum/generate-issue/route.ts
-src/app/api/forum/organize-post/route.ts
-src/app/api/forum/thread-summary/route.ts
-```
+## 14. ADMIN_KEY との関係
 
-未ログイン時は 401 を返し、OpenAI API、Supabase取得、DB保存などの本処理に入らない。
+管理系APIや高権限APIでは、ログイン済みであっても `ADMIN_KEY` が必要なものがある。
 
-## 10. 未ログインでも閲覧可能な範囲
+簡易セルフ登録ユーザーに管理者権限は付与しない。
 
-現時点では、閲覧系のページやAPIは未ログインでも利用可能である。
+## 15. セキュリティ上の注意
 
-想定:
+この方式はベータ向けの簡易方式であり、本格的なアカウント管理ではない。
 
-- Forumトップ閲覧
-- スレッド詳細閲覧
-- トップサマリー取得
-- スレッド詳細取得
-- 一覧ページ閲覧
-- 議論マップ閲覧
+最低限の制約:
 
-閲覧はベータ参加者以外にも開ける可能性があるため、限定ベータで完全クローズドにしたい場合は、別途 middleware または閲覧API側の認証が必要である。
+- パスワードは平文保存しない
+- パスワードをログ出力しない
+- `login_id` は 3〜32文字
+- パスワードは 6〜128文字
+- `login_id` は英数字、ハイフン、アンダースコアを許可する
+- 登録済みIDのパスワード不一致でも、ID存在を推測しにくいエラー文言にする
 
-## 11. 現時点で未保護または別認証の範囲
+今後の課題:
 
-### まだ `forum_beta_session` では保護していないもの
+- スパム・荒らし対策
+- 試行回数制限
+- アカウント停止
+- パスワード変更
+- 管理者によるユーザー管理
+- 投稿とユーザーIDの正式な紐づけ
+- 招待制やメール認証への移行
 
-次の系統は、現時点では限定ベータログインによるAPI保護が未完了である。
+## 16. 確認項目
 
-- 保存済み参考投稿の保存
-- 保存済み参考投稿の一覧取得
-- 近いスレッド検索
-- スレッド非表示 / 復元
-- 会員向け非表示 / 復元ページ
-
-これらは次段階でログイン必須化を検討する。
-
-### ADMIN_KEY を維持するもの
-
-次の高権限APIは、`forum_beta_session` ではなく `x-admin-key === process.env.ADMIN_KEY` を必須とする。
-
-- 完全削除
-- AI論理スコア再評価
-- 議論マップ再編案生成
-- 管理者用ユーザー確認
-- 管理者用投稿確認
-
-ログイン済みであっても、ADMIN_KEY が必要な操作は ADMIN_KEY 必須のまま維持する。
-
-## 12. author_key との関係
-
-`author_key` は、ログイン認証ではなく端末識別用のCookieである。
-
-現在の用途:
-
-- 投稿者自身の投稿判定
-- 自分のスレッド非表示などの一部操作
-- 保存済み参考投稿の端末別管理
-
-`forum_beta_session` は「限定ベータにログイン済みか」を見るためのCookieであり、`author_key` は「同じブラウザ・端末か」を見るためのCookieである。役割は別である。
-
-共通ID・共通パスワード方式では、誰が投稿したかをユーザー単位で識別できない。将来的に本格ログインへ移行する場合は、`author_key` と `user_id` の関係を整理する必要がある。
-
-## 13. localStorage / sessionStorage の現状
-
-Forumトップでは、主に表示設定と下書き保持に browser storage を使っている。
-
-- `localStorage`: 表示モード、文字サイズなど
-- `sessionStorage`: Forumトップの投稿下書きなど
-
-これらはログイン状態の正本ではない。ログイン判定は `forum_beta_session` Cookie をAPI側で検証する。
-
-## 14. セキュリティ上の注意点
-
-現在の方式は限定ベータ向けの簡易認証であり、次の制約がある。
-
-- 共通ID・共通パスワードなので、ユーザーごとの識別はできない
-- パスワードを共有された人全員が同じ権限になる
-- Cookie失効は期限切れまたはログアウトが中心で、個別ユーザー単位の失効はできない
-- DBにセッションを保存していないため、サーバー側から特定セッションだけを失効できない
-- CSRF対策は `SameSite=Lax` に依存している
-- 閲覧自体は未ログインでも可能
-
-限定ベータの運用では、ID・パスワードを信頼できる範囲にだけ共有し、漏えい時は環境変数のパスワードまたは `FORUM_BETA_SESSION_SECRET` を変更する。
-
-`FORUM_BETA_SESSION_SECRET` を変更すると、既存の `forum_beta_session` は署名検証に失敗し、実質的に全員ログアウトされる。
-
-## 15. 今後の保護対象候補
-
-次段階でログイン必須化を検討するAPI:
-
-- `POST /api/forum/save-private-log`
-- `GET /api/forum/private-import-logs`
-- `POST /api/forum/search-related`
-- `POST /api/forum/delete-thread`
-- `POST /api/forum/restore-thread`
-- `GET /api/forum/admin-threads`
-
-特に、保存済み参考投稿、外部AI取り込み、近いスレッド検索は、投稿作成の周辺機能としてログイン必須化する優先度が高い。
-
-## 16. 本格ログインへ移行する場合の方針
-
-将来的にユーザー別ログインへ移行する場合は、次の対応が必要になる。
-
-- ユーザーテーブルの設計
-- パスワードハッシュ保存
-- メール認証または招待制ログイン
-- `forum_beta_session` とは別のユーザーセッション管理
-- 投稿と `user_id` の紐づけ
-- 既存の `author_key` 投稿をどう移行するか
-- 保存済み参考投稿を端末依存からユーザー依存へ移すか
-- 管理者権限と一般ユーザー権限の分離
-- ログアウト、セッション失効、パスワード変更、退会処理
-
-本格ログインに移行しても、完全削除やAI管理系APIは管理者権限を別途確認する必要がある。
-
-## 17. 現在の確認方法
-
-### ログイン状態確認
-
-未ログイン:
-
-```txt
-GET /api/forum/login/status
-=> { ok: true, loggedIn: false }
-```
-
-ログイン済み:
-
-```txt
-GET /api/forum/login/status
-=> { ok: true, loggedIn: true }
-```
-
-### 未ログイン時の保護API確認
-
-Cookieなしで次を実行すると 401 になる。
-
-```txt
-POST /api/forum/add-post
-POST /api/forum/create-thread-from-draft
-POST /api/forum/generate-issue
-POST /api/forum/organize-post
-GET  /api/forum/thread-summary
-```
-
-レスポンス例:
-
-```json
-{ "ok": false, "error": "Login required." }
-```
-
-### ログイン画面確認
-
-```txt
-/{tenant}/forum/login
-```
-
-確認項目:
-
-- 間違ったID・パスワードでエラーになる
-- 正しいID・パスワードでログインできる
-- ログイン成功後に `next` があればそこへ戻る
-- Forumトップ右上メニューでログイン / ログアウト表示が切り替わる
-- ログアウト後は `forum_beta_session` Cookie が削除される
+- 未ログインでも閲覧できる
+- 未ログインで投稿しようとするとログインへ誘導される
+- 好きなID・パスワードで初回ログインすると自動登録される
+- 同じID・同じパスワードで再ログインできる
+- 同じID・違うパスワードではログインできない
+- ログイン後、投稿・外部AI取り込み・AI整理が使える
+- ログアウトできる
+- 既存の共通ID fallback でも移行期間中はログインできる
 

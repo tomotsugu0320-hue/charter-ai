@@ -98,10 +98,10 @@ export default function ForumLoginPage() {
           }}
         >
           <p style={{ margin: 0 }}>
-            ベータ版の投稿・AI整理機能を使うにはログインが必要です。案内された共通IDと共通パスワードを入力してください。
+            好きなIDとパスワードを入力してください。初めて使うIDの場合は、そのIDで自動登録されます。次回から同じIDとパスワードでログインできます。
           </p>
           <p style={{ margin: "6px 0 0" }}>
-            閲覧はログインなしでもできます。投稿やAI整理を行う場合のみログインしてください。
+            閲覧はログインなしでもできます。投稿やAI整理を使う場合のみログインしてください。
           </p>
         </div>
 
@@ -114,10 +114,10 @@ export default function ForumLoginPage() {
               fontWeight: 800,
             }}
           >
-            共通ID
+            ID
             <input
               autoComplete="username"
-              placeholder="共通ID"
+              placeholder="好きなID"
               value={user}
               onChange={(event) => setUser(event.target.value)}
               style={{
@@ -147,7 +147,7 @@ export default function ForumLoginPage() {
             パスワード
             <input
               autoComplete="current-password"
-              placeholder="共通パスワード"
+              placeholder="パスワード"
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}

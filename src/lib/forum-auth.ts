@@ -1,8 +1,11 @@
-import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { createHmac, randomBytes, scrypt, timingSafeEqual } from "crypto";
+import { promisify } from "util";
 
 export const FORUM_BETA_SESSION_COOKIE = "forum_beta_session";
 
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 14;
+const SCRYPT_KEY_LENGTH = 64;
+const scryptAsync = promisify(scrypt);
 
 type ForumBetaSessionPayload = {
   sub: "forum_beta";
@@ -41,6 +44,45 @@ function safeEqual(left: string, right: string) {
   if (leftBuffer.length !== rightBuffer.length) return false;
 
   return timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+export function normalizeForumBetaLoginId(loginId: string) {
+  return loginId.trim().toLowerCase();
+}
+
+export async function hashForumBetaPassword(password: string) {
+  const salt = randomBytes(16).toString("base64url");
+  const derivedKey = (await scryptAsync(
+    password,
+    salt,
+    SCRYPT_KEY_LENGTH
+  )) as Buffer;
+
+  return `scrypt$${salt}$${derivedKey.toString("base64url")}`;
+}
+
+export async function verifyForumBetaPassword(
+  password: string,
+  passwordHash: string
+) {
+  const [method, salt, storedHash] = passwordHash.split("$");
+
+  if (method !== "scrypt" || !salt || !storedHash) return false;
+
+  try {
+    const storedBuffer = Buffer.from(storedHash, "base64url");
+    const derivedKey = (await scryptAsync(
+      password,
+      salt,
+      storedBuffer.length
+    )) as Buffer;
+
+    if (derivedKey.length !== storedBuffer.length) return false;
+
+    return timingSafeEqual(derivedKey, storedBuffer);
+  } catch {
+    return false;
+  }
 }
 
 function readCookieValue(cookieHeader: string | null | undefined, name: string) {
@@ -107,17 +149,6 @@ function parseForumBetaUsersJson():
 export function getForumBetaAuthConfigError() {
   if (!getSessionSecret()) {
     return "FORUM_BETA_SESSION_SECRET is not configured.";
-  }
-
-  const usersConfig = parseForumBetaUsersJson();
-
-  if (usersConfig) {
-    if ("error" in usersConfig) return usersConfig.error;
-    return null;
-  }
-
-  if (!process.env.FORUM_BETA_USER || !process.env.FORUM_BETA_PASSWORD) {
-    return "Forum beta credentials are not configured.";
   }
 
   return null;
