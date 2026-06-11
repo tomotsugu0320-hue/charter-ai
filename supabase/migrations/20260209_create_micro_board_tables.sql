@@ -209,20 +209,28 @@ create index if not exists micro_versions_target_timeline_idx
 create index if not exists micro_versions_version_type_idx
   on micro_versions (tenant_slug, version_type, created_at desc);
 
+drop trigger if exists micro_source_data_set_updated_at on micro_source_data;
+
 create trigger micro_source_data_set_updated_at
 before update on micro_source_data
 for each row
 execute function micro_set_updated_at();
+
+drop trigger if exists micro_summaries_set_updated_at on micro_summaries;
 
 create trigger micro_summaries_set_updated_at
 before update on micro_summaries
 for each row
 execute function micro_set_updated_at();
 
+drop trigger if exists micro_groups_set_updated_at on micro_groups;
+
 create trigger micro_groups_set_updated_at
 before update on micro_groups
 for each row
 execute function micro_set_updated_at();
+
+drop trigger if exists micro_todos_set_updated_at on micro_todos;
 
 create trigger micro_todos_set_updated_at
 before update on micro_todos
