@@ -1530,9 +1530,7 @@ const groupedByOpinionForDisplay = useMemo(
 const normalizeQuestionText = (value?: string | null) =>
   (value ?? "").replace(/[。、．.！？!?「」『』【】（）()[\]\s]/g, "");
 const questionCardText = stripExternalAiInternalSections(thread?.original_post);
-const shouldShowQuestionCard =
-  Boolean(questionCardText) &&
-  normalizeQuestionText(questionCardText) !== normalizeQuestionText(thread?.title);
+const shouldShowQuestionCard = Boolean(questionCardText);
 const shouldShowMacroEconomyGuide =
   String(thread?.category ?? "").trim() === "経済・政策";
 const initialPostCount = summary?.counts?.total ?? posts.length;

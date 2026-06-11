@@ -93,6 +93,40 @@ function extractAiAnswerFromClaim(claim: string) {
   return (nextHeading >= 0 ? afterLabel.slice(0, nextHeading) : afterLabel).trim();
 }
 
+function looksLikeEconomyPolicyText(text: string) {
+  return [
+    "経済",
+    "政策",
+    "財政",
+    "金融",
+    "消費税",
+    "減税",
+    "生産性",
+    "賃金",
+    "雇用",
+    "失業",
+    "需要",
+    "デフレ",
+    "インフレ",
+    "価格転嫁",
+    "企業",
+    "家計",
+    "所得",
+    "消費",
+    "合成の誤謬",
+  ].some((keyword) => text.includes(keyword));
+}
+
+function buildInitialSummaryText(claim: string, title: string) {
+  const targetText = `${claim}\n${title}`;
+
+  if (looksLikeEconomyPolicyText(targetText)) {
+    return "ミクロ企業会計として正しい主張が、マクロ経済政策として常に正しいとは限りません。企業単体では合理的でも、経済全体が需要不足の局面で多くの企業が同時に人件費削減や省人化を進めると、労働所得が減り、消費需要が弱まり、デフレ圧力が強まる可能性があります。したがって、景気局面、需要環境、労働需給、合成の誤謬を分けて検証する必要があります。";
+  }
+
+  return "この問いは、投稿された主張だけで結論を出すのではなく、前提・根拠・反論リスクを分けて確認する必要があります。現時点では、提示された問いを軸に、根拠と反論可能性を整理する段階です。";
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (!isForumBetaLoggedIn(req)) {
@@ -321,7 +355,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const initialAiAnswer = extractAiAnswerFromClaim(claim);
+    const initialAiAnswer =
+      extractAiAnswerFromClaim(claim) || buildInitialSummaryText(claim, title);
 
     if (initialAiAnswer) {
       const initialRebuttals = conflicts
