@@ -8,7 +8,6 @@ import {
   hashForumBetaPassword,
   normalizeForumBetaLoginId,
   verifyForumBetaPassword,
-  verifyForumBetaCredentials,
 } from "@/lib/forum-auth";
 
 export const dynamic = "force-dynamic";
@@ -125,12 +124,6 @@ function createLoginResponse(userId: string) {
   return response;
 }
 
-function createFallbackLoginResponse(user: string, password: string) {
-  const fallbackUserId = verifyForumBetaCredentials(user, password);
-
-  return fallbackUserId ? createLoginResponse(fallbackUserId) : null;
-}
-
 export async function POST(request: NextRequest) {
   const configError = getForumBetaAuthConfigError();
 
@@ -151,9 +144,6 @@ export async function POST(request: NextRequest) {
   const inputError = validateLoginInput(user, password);
 
   if (inputError) {
-    const fallbackResponse = createFallbackLoginResponse(user, password);
-    if (fallbackResponse) return fallbackResponse;
-
     return NextResponse.json({ error: inputError }, { status: 400 });
   }
 
@@ -161,9 +151,6 @@ export async function POST(request: NextRequest) {
   const supabase = getSupabase();
 
   if (!supabase) {
-    const fallbackResponse = createFallbackLoginResponse(user, password);
-    if (fallbackResponse) return fallbackResponse;
-
     return NextResponse.json(
       { error: "Forum beta login is not configured." },
       { status: 500 }
@@ -174,9 +161,6 @@ export async function POST(request: NextRequest) {
 
   if (existing.error) {
     console.error("[forum beta login] user lookup failed", existing.error);
-    const fallbackResponse = createFallbackLoginResponse(user, password);
-    if (fallbackResponse) return fallbackResponse;
-
     return NextResponse.json(
       { error: "Forum beta login is not configured." },
       { status: 500 }
@@ -201,9 +185,6 @@ export async function POST(request: NextRequest) {
     userId = existing.user.id;
     await updateLastLoginAt(supabase, userId);
   } else {
-    const fallbackResponse = createFallbackLoginResponse(user, password);
-    if (fallbackResponse) return fallbackResponse;
-
     const created = await createForumBetaUser(
       supabase,
       user,
