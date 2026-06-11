@@ -2349,7 +2349,7 @@ function renderDiscussionCard({
       </span>
     </>
   ) : (
-    <>議論全体の論理性: 未評価</>
+    <>議論全体の論理性: AI再評価前</>
   )}
 </div>
 
@@ -2361,7 +2361,7 @@ function renderDiscussionCard({
     fontWeight: maxLogicScore && maxLogicScore >= 80 ? 700 : 500,
   }}
 >
-  最高評価の投稿: {maxLogicScore ?? "未評価"}
+  最高評価の投稿: {maxLogicScore ?? "AI再評価前"}
 </div>
 
   <div>
