@@ -1294,12 +1294,12 @@ export default function ForumPage() {
                   <>
                     {[
                       { href: `/${tenant}/forum/guide`, label: "使い方" },
-                      { href: `/${tenant}/forum/private-logs`, label: "あとで読む管理" },
+                      { href: `/${tenant}/forum/private-logs`, label: "☰ あとで読む管理" },
                       {
                         href: `/${tenant}/forum/admin/delete-threads`,
-                        label: "管理画面（会員）：非表示/復元",
+                        label: "☰ 管理画面（会員）：非表示/復元",
                       },
-                      { href: `/${tenant}/forum/account`, label: "アカウント管理" },
+                      { href: `/${tenant}/forum/account`, label: "☰ アカウント管理" },
                       { href: `/${tenant}/forum`, label: "トップへ戻る" },
                     ].map((item) => (
                       <Link

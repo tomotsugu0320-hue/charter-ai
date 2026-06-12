@@ -234,6 +234,21 @@ export default function ForumLoginPage() {
             使い方を見る
           </Link>
         </p>
+
+        <p style={{ margin: "12px 0 0", textAlign: "center" }}>
+          <Link
+            href={`/${tenant}/forum`}
+            style={{
+              color: "#0f172a",
+              fontSize: 14,
+              fontWeight: 800,
+              textDecoration: "underline",
+              textUnderlineOffset: 3,
+            }}
+          >
+            Forumトップへ戻る
+          </Link>
+        </p>
       </section>
     </main>
   );
