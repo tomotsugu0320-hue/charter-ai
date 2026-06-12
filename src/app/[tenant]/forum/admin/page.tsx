@@ -2,9 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState, type CSSProperties } from "react";
-
-const adminKeyStorageKey = "forum_admin_key";
+import { useState, type CSSProperties } from "react";
 
 const pageStyle: CSSProperties = {
   maxWidth: 920,
@@ -76,14 +74,6 @@ export default function ForumAdminPage() {
   const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    const saved = sessionStorage.getItem(adminKeyStorageKey);
-
-    if (saved) {
-      setAdminKey(saved);
-    }
-  }, []);
-
   async function verifyAdminKey() {
     const requestAdminKey = adminKey.trim();
 
@@ -94,6 +84,7 @@ export default function ForumAdminPage() {
 
     setIsChecking(true);
     setError("");
+    setAdminKey("");
 
     try {
       const response = await fetch("/api/forum/admin/users", {
@@ -103,12 +94,10 @@ export default function ForumAdminPage() {
 
       if (!response.ok) {
         setIsVerified(false);
-        sessionStorage.removeItem(adminKeyStorageKey);
         setError("管理者キーが正しくありません。");
         return;
       }
 
-      sessionStorage.setItem(adminKeyStorageKey, requestAdminKey);
       setIsVerified(true);
     } catch {
       setIsVerified(false);
@@ -149,6 +138,7 @@ export default function ForumAdminPage() {
             <input
               id="admin-key"
               type="password"
+              autoComplete="new-password"
               value={adminKey}
               onChange={(event) => setAdminKey(event.target.value)}
               placeholder="ADMIN_KEY"

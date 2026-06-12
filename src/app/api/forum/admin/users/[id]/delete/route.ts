@@ -56,7 +56,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json(
       {
         error:
-          "投稿とユーザーIDの正式な紐づきがないため、この投稿扱いは未対応です。",
+          "投稿とユーザーIDの正式な紐づきが確認できるまで、投稿を残して表示以外の投稿扱いは未対応です。",
       },
       { status: 400 }
     );

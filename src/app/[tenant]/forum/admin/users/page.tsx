@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 
 type AdminForumBetaUser = {
   id: string;
@@ -24,8 +24,6 @@ type CardMessage = {
   type: "success" | "error";
   text: string;
 };
-
-const adminKeyStorageKey = "forum_admin_key";
 
 const pageStyle = {
   maxWidth: 1080,
@@ -113,21 +111,13 @@ export default function AdminUsersPage() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const verifiedAdminKeyRef = useRef("");
 
-  const requestAdminKey = adminKey.trim();
-
-  useEffect(() => {
-    const saved = sessionStorage.getItem(adminKeyStorageKey);
-
-    if (saved) {
-      setAdminKey(saved);
-    }
-  }, []);
-
-  function requireAdminKey() {
-    if (requestAdminKey) return true;
+  function getVerifiedAdminKey() {
+    const requestAdminKey = verifiedAdminKeyRef.current.trim();
+    if (requestAdminKey) return requestAdminKey;
     setError("管理者キーを入力してください。");
-    return false;
+    return null;
   }
 
   function updatePasswordForm(
@@ -145,11 +135,17 @@ export default function AdminUsersPage() {
   }
 
   async function loadUsers() {
-    if (!requireAdminKey()) return;
+    const requestAdminKey = adminKey.trim() || verifiedAdminKeyRef.current.trim();
+
+    if (!requestAdminKey) {
+      setError("管理者キーを入力してください。");
+      return;
+    }
 
     setLoadingUsers(true);
     setError(null);
     setCardMessages({});
+    setAdminKey("");
 
     try {
       const res = await fetch("/api/forum/admin/users", {
@@ -162,18 +158,21 @@ export default function AdminUsersPage() {
       };
 
       if (!res.ok) {
+        verifiedAdminKeyRef.current = "";
+        setUsers([]);
         setError(json.error || "ユーザー一覧の取得に失敗しました。");
         return;
       }
 
+      verifiedAdminKeyRef.current = requestAdminKey;
       const nextUsers = Array.isArray(json.users) ? json.users : [];
       setUsers(nextUsers);
       setPasswordForms(
         Object.fromEntries(nextUsers.map((user) => [user.id, emptyPasswordForm()]))
       );
       setDeleteConfirmTexts({});
-      sessionStorage.setItem(adminKeyStorageKey, requestAdminKey);
     } catch {
+      verifiedAdminKeyRef.current = "";
       setError("ユーザー一覧の取得に失敗しました。");
     } finally {
       setLoadingUsers(false);
@@ -207,7 +206,8 @@ export default function AdminUsersPage() {
   }
 
   async function resetPassword(user: AdminForumBetaUser) {
-    if (!requireAdminKey()) return;
+    const requestAdminKey = getVerifiedAdminKey();
+    if (!requestAdminKey) return;
 
     const form = passwordForms[user.id] ?? emptyPasswordForm();
 
@@ -275,7 +275,8 @@ export default function AdminUsersPage() {
     user: AdminForumBetaUser,
     status: "active" | "disabled"
   ) {
-    if (!requireAdminKey()) return;
+    const requestAdminKey = getVerifiedAdminKey();
+    if (!requestAdminKey) return;
 
     setSavingUserId(user.id);
     setError(null);
@@ -318,7 +319,8 @@ export default function AdminUsersPage() {
   }
 
   async function deleteUser(user: AdminForumBetaUser) {
-    if (!requireAdminKey()) return;
+    const requestAdminKey = getVerifiedAdminKey();
+    if (!requestAdminKey) return;
 
     const confirmText = (deleteConfirmTexts[user.id] ?? "").trim();
 
@@ -421,6 +423,7 @@ export default function AdminUsersPage() {
           <input
             id="admin-key"
             type="password"
+            autoComplete="new-password"
             value={adminKey}
             onChange={(event) => setAdminKey(event.target.value)}
             placeholder="ADMIN_KEY"
@@ -705,7 +708,7 @@ export default function AdminUsersPage() {
                       アカウント削除
                     </div>
                     <p style={{ color: "#7f1d1d", lineHeight: 1.7 }}>
-                      現在、投稿と登録ユーザーIDの正式な紐づきがないため、投稿は残して表示する扱いのみ対応しています。投稿の非表示・完全削除は未対応です。
+                      現在は投稿と登録ユーザーIDの正式な紐づけが未対応のため、投稿の一括非表示・完全削除はまだ使えません。管理者削除では、投稿を残して表示する扱いだけに固定しています。
                     </p>
                     <div
                       style={{
@@ -725,6 +728,18 @@ export default function AdminUsersPage() {
                         >
                           <option value="keep_visible">投稿を残して表示</option>
                         </select>
+                        <span
+                          style={{
+                            display: "block",
+                            color: "#7f1d1d",
+                            fontSize: 12,
+                            fontWeight: 500,
+                            lineHeight: 1.6,
+                            marginTop: 6,
+                          }}
+                        >
+                          投稿を残して非表示・投稿を完全削除は、投稿とユーザーIDの正式な紐づき実装後に対応します。
+                        </span>
                       </label>
                       <label style={{ fontWeight: 800 }}>
                         確認文言
