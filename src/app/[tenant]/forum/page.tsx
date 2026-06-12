@@ -1290,56 +1290,34 @@ export default function ForumPage() {
                   boxShadow: "0 12px 30px rgba(15, 23, 42, 0.18)",
                 }}
               >
-                {[
-                  { href: `/${tenant}/forum/guide`, label: "使い方" },
-                  { href: `/${tenant}/forum/private-logs`, label: "あとで読む管理" },
-                  {
-                    href: `/${tenant}/forum/admin/delete-threads`,
-                    label: "管理画面（会員）：非表示/復元",
-                  },
-                  {
-                    href: `/${tenant}/forum/admin/re-evaluate-logic-score`,
-                    label: "AI論理スコア再評価",
-                  },
-                  {
-                    href: `/${tenant}/forum/admin/rebuild-discussion-map`,
-                    label: "議論マップ再編案",
-                  },
-                  { href: `/${tenant}/forum/admin`, label: "管理者用画面" },
-                  { href: `/${tenant}/forum`, label: "トップへ戻る" },
-                ].map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setIsTopMenuOpen(false)}
-                    style={{
-                      display: "block",
-                      padding: "9px 10px",
-                      borderRadius: 8,
-                      color: "#111827",
-                      textDecoration: "none",
-                      fontWeight: 800,
-                    }}
-                  >
-                    {item.label}
-                  </Link>
-                ))}
                 {isForumBetaLoggedIn ? (
                   <>
-                    <Link
-                      href={`/${tenant}/forum/account`}
-                      onClick={() => setIsTopMenuOpen(false)}
-                      style={{
-                        display: "block",
-                        padding: "9px 10px",
-                        borderRadius: 8,
-                        color: "#111827",
-                        textDecoration: "none",
-                        fontWeight: 800,
-                      }}
-                    >
-                      アカウント管理
-                    </Link>
+                    {[
+                      { href: `/${tenant}/forum/guide`, label: "使い方" },
+                      { href: `/${tenant}/forum/private-logs`, label: "あとで読む管理" },
+                      {
+                        href: `/${tenant}/forum/admin/delete-threads`,
+                        label: "管理画面（会員）：非表示/復元",
+                      },
+                      { href: `/${tenant}/forum/account`, label: "アカウント管理" },
+                      { href: `/${tenant}/forum`, label: "トップへ戻る" },
+                    ].map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setIsTopMenuOpen(false)}
+                        style={{
+                          display: "block",
+                          padding: "9px 10px",
+                          borderRadius: 8,
+                          color: "#111827",
+                          textDecoration: "none",
+                          fontWeight: 800,
+                        }}
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
                     <button
                       type="button"
                       onClick={handleLogout}
@@ -1359,24 +1337,51 @@ export default function ForumPage() {
                     >
                       ログアウト
                     </button>
+                    <Link
+                      href={`/${tenant}/forum/admin`}
+                      onClick={() => setIsTopMenuOpen(false)}
+                      style={{
+                        display: "block",
+                        padding: "9px 10px",
+                        borderRadius: 8,
+                        color: "#111827",
+                        textDecoration: "none",
+                        fontWeight: 800,
+                      }}
+                    >
+                      管理者用画面
+                    </Link>
                   </>
                 ) : (
-                  <Link
-                    href={`/${tenant}/forum/login?next=${encodeURIComponent(
-                      `/${tenant}/forum`
-                    )}`}
-                    onClick={() => setIsTopMenuOpen(false)}
-                    style={{
-                      display: "block",
-                      padding: "9px 10px",
-                      borderRadius: 8,
-                      color: "#111827",
-                      textDecoration: "none",
-                      fontWeight: 800,
-                    }}
-                  >
-                    ログイン
-                  </Link>
+                  <>
+                    {[
+                      {
+                        href: `/${tenant}/forum/login?next=${encodeURIComponent(
+                          `/${tenant}/forum`
+                        )}`,
+                        label: "ログイン",
+                      },
+                      { href: `/${tenant}/forum/guide`, label: "使い方" },
+                      { href: `/${tenant}/forum`, label: "トップへ戻る" },
+                      { href: `/${tenant}/forum/admin`, label: "管理者用画面" },
+                    ].map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setIsTopMenuOpen(false)}
+                        style={{
+                          display: "block",
+                          padding: "9px 10px",
+                          borderRadius: 8,
+                          color: "#111827",
+                          textDecoration: "none",
+                          fontWeight: 800,
+                        }}
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+                  </>
                 )}
               </nav>
             )}

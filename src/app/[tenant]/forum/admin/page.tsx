@@ -113,6 +113,19 @@ export default function ForumAdminPage() {
         forum 管理
       </h1>
 
+      <Link
+        href={`/${tenant}/forum`}
+        style={{
+          display: "inline-block",
+          marginBottom: 14,
+          color: "#2563eb",
+          fontWeight: 800,
+          textDecoration: "none",
+        }}
+      >
+        Forumトップへ戻る
+      </Link>
+
       <section style={noticeStyle}>
         <div>このページは管理者向けです。</div>
         <div>管理メニューを表示するには ADMIN_KEY が必要です。</div>
