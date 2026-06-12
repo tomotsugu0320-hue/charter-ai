@@ -719,15 +719,21 @@ export default function AdminUsersPage() {
                         alignItems: "end",
                       }}
                     >
-                      <label style={{ fontWeight: 800 }}>
+                      <div style={{ fontWeight: 800 }}>
                         投稿扱い
-                        <select
-                          disabled
-                          value="keep_visible"
-                          style={{ ...inputStyle, marginTop: 8 }}
+                        <div
+                          style={{
+                            border: "1px solid #fecaca",
+                            borderRadius: 8,
+                            background: "#fff7ed",
+                            color: "#7f1d1d",
+                            fontWeight: 800,
+                            marginTop: 8,
+                            padding: "10px 12px",
+                          }}
                         >
-                          <option value="keep_visible">投稿を残して表示</option>
-                        </select>
+                          投稿を残して表示（固定）
+                        </div>
                         <span
                           style={{
                             display: "block",
@@ -740,7 +746,7 @@ export default function AdminUsersPage() {
                         >
                           投稿を残して非表示・投稿を完全削除は、投稿とユーザーIDの正式な紐づき実装後に対応します。
                         </span>
-                      </label>
+                      </div>
                       <label style={{ fontWeight: 800 }}>
                         確認文言
                         <input
