@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import ForumHamburgerMenu from "@/components/forum/ForumHamburgerMenu";
 
 type Mode = "visible" | "hidden" | "all";
 
@@ -216,19 +217,30 @@ export default function DeleteThreadsPage() {
 
   return (
     <main style={{ padding: 20 }}>
-      <Link
-        href={`/${tenant}/forum`}
+      <div
         style={{
-          display: "inline-block",
-          color: "#1d4ed8",
-          fontWeight: 800,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
           marginBottom: 14,
-          padding: "6px 0",
-          textDecoration: "underline",
         }}
       >
-        ← Forumトップへ戻る
-      </Link>
+        <Link
+          href={`/${tenant}/forum`}
+          style={{
+            display: "inline-block",
+            color: "#1d4ed8",
+            fontWeight: 800,
+            padding: "6px 0",
+            textDecoration: "underline",
+          }}
+        >
+          ← Forumトップへ戻る
+        </Link>
+        <ForumHamburgerMenu tenant={tenant} />
+      </div>
 
       <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
         管理画面（会員）：非表示/復元

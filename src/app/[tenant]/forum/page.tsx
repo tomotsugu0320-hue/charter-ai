@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import ExternalAiImportModal from "@/components/forum/ExternalAiImportModal";
+import ForumHamburgerMenu from "@/components/forum/ForumHamburgerMenu";
 import ForumGuideTree from "@/components/forum/ForumGuideTree";
 import PrimaryButton from "@/components/forum/PrimaryButton";
 
@@ -715,7 +716,6 @@ export default function ForumPage() {
   const [actionError, setActionError] = useState("");
   const [topError, setTopError] = useState("");
   const [isExternalAiImportOpen, setIsExternalAiImportOpen] = useState(false);
-  const [isTopMenuOpen, setIsTopMenuOpen] = useState(false);
   const [isForumBetaLoggedIn, setIsForumBetaLoggedIn] = useState<boolean | null>(
     null
   );
@@ -1210,13 +1210,6 @@ export default function ForumPage() {
     setFontSizeMode(size);
   }
 
-  async function handleLogout() {
-    await fetch("/api/forum/logout", { method: "POST" }).catch(() => null);
-    setIsForumBetaLoggedIn(false);
-    setIsTopMenuOpen(false);
-    router.push(`/${tenant}/forum/login`);
-  }
-
   const renderedPremises = generatedIssue?.premises ?? [];
   const renderedReasons = generatedIssue?.reasons ?? [];
   const renderedConflicts = generatedIssue?.conflicts ?? [];
@@ -1252,140 +1245,11 @@ export default function ForumPage() {
           <div style={{ fontWeight: 900, fontSize: currentFontSize }}>
             表示設定
           </div>
-          <div style={{ position: "relative" }}>
-            <button
-              type="button"
-              aria-label="メニューを開く"
-              aria-expanded={isTopMenuOpen}
-              onClick={() => setIsTopMenuOpen((open) => !open)}
-              style={{
-                ...ghostButtonStyle,
-                minWidth: 44,
-                background: isTopMenuOpen ? "#111827" : "#ffffff",
-                color: isTopMenuOpen ? "#ffffff" : "#111827",
-                borderColor: isTopMenuOpen ? "#111827" : "#cbd5e1",
-                fontSize: 18,
-                lineHeight: 1,
-              }}
-            >
-              ☰
-            </button>
-            {isTopMenuOpen && (
-              <nav
-                aria-label="Forumメニュー"
-                style={{
-                  position: "absolute",
-                  top: "calc(100% + 8px)",
-                  right: 0,
-                  zIndex: 20,
-                  minWidth: 240,
-                  maxWidth: "calc(100vw - 32px)",
-                  display: "grid",
-                  gap: 6,
-                  padding: 10,
-                  borderRadius: 10,
-                  border: "1px solid #cbd5e1",
-                  background: "#ffffff",
-                  color: "#111827",
-                  boxShadow: "0 12px 30px rgba(15, 23, 42, 0.18)",
-                }}
-              >
-                {isForumBetaLoggedIn ? (
-                  <>
-                    {[
-                      { href: `/${tenant}/forum/guide`, label: "使い方" },
-                      { href: `/${tenant}/forum/private-logs`, label: "☰ あとで読む管理" },
-                      {
-                        href: `/${tenant}/forum/admin/delete-threads`,
-                        label: "☰ 管理画面（会員）：非表示/復元",
-                      },
-                      { href: `/${tenant}/forum/account`, label: "☰ アカウント管理" },
-                      { href: `/${tenant}/forum`, label: "トップへ戻る" },
-                    ].map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setIsTopMenuOpen(false)}
-                        style={{
-                          display: "block",
-                          padding: "9px 10px",
-                          borderRadius: 8,
-                          color: "#111827",
-                          textDecoration: "none",
-                          fontWeight: 800,
-                        }}
-                      >
-                        {item.label}
-                      </Link>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        padding: "9px 10px",
-                        border: 0,
-                        borderRadius: 8,
-                        background: "#fef2f2",
-                        color: "#991b1b",
-                        cursor: "pointer",
-                        font: "inherit",
-                        fontWeight: 800,
-                        textAlign: "left",
-                      }}
-                    >
-                      ログアウト
-                    </button>
-                    <Link
-                      href={`/${tenant}/forum/admin`}
-                      onClick={() => setIsTopMenuOpen(false)}
-                      style={{
-                        display: "block",
-                        padding: "9px 10px",
-                        borderRadius: 8,
-                        color: "#111827",
-                        textDecoration: "none",
-                        fontWeight: 800,
-                      }}
-                    >
-                      管理者用画面
-                    </Link>
-                  </>
-                ) : (
-                  <>
-                    {[
-                      {
-                        href: `/${tenant}/forum/login?next=${encodeURIComponent(
-                          `/${tenant}/forum`
-                        )}`,
-                        label: "ログイン",
-                      },
-                      { href: `/${tenant}/forum/guide`, label: "使い方" },
-                      { href: `/${tenant}/forum`, label: "トップへ戻る" },
-                      { href: `/${tenant}/forum/admin`, label: "管理者用画面" },
-                    ].map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setIsTopMenuOpen(false)}
-                        style={{
-                          display: "block",
-                          padding: "9px 10px",
-                          borderRadius: 8,
-                          color: "#111827",
-                          textDecoration: "none",
-                          fontWeight: 800,
-                        }}
-                      >
-                        {item.label}
-                      </Link>
-                    ))}
-                  </>
-                )}
-              </nav>
-            )}
-          </div>
+          <ForumHamburgerMenu
+            tenant={tenant}
+            isLoggedIn={isForumBetaLoggedIn}
+            onLoggedOut={() => setIsForumBetaLoggedIn(false)}
+          />
         </div>
         <div
           style={{

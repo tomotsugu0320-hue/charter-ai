@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import ForumHamburgerMenu from "@/components/forum/ForumHamburgerMenu";
 
 type PrivateImportLog = {
   id: string;
@@ -415,18 +416,29 @@ export default function PrivateLogsPage() {
   return (
     <main style={pageStyle}>
       <header style={headerStyle}>
-        <Link
-          href={`/${tenant}/forum`}
+        <div
           style={{
-            display: "inline-flex",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap",
             marginBottom: 12,
-            color: "#0369a1",
-            fontWeight: 800,
-            textDecoration: "none",
           }}
         >
-          ← フォーラムへ戻る
-        </Link>
+          <Link
+            href={`/${tenant}/forum`}
+            style={{
+              display: "inline-flex",
+              color: "#0369a1",
+              fontWeight: 800,
+              textDecoration: "none",
+            }}
+          >
+            ← フォーラムへ戻る
+          </Link>
+          <ForumHamburgerMenu tenant={tenant} />
+        </div>
         <h1 style={{ margin: "0 0 8px", fontSize: 30, fontWeight: 900 }}>
           保存済み参考投稿
         </h1>

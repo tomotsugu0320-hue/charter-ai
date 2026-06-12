@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import ForumHamburgerMenu from "@/components/forum/ForumHamburgerMenu";
 
 type Account = {
   login_id: string;
@@ -273,16 +274,27 @@ export default function ForumAccountPage() {
           boxShadow: "0 16px 40px rgba(15, 23, 42, 0.08)",
         }}
       >
-        <p
+        <div
           style={{
-            margin: "0 0 8px",
-            color: "#475569",
-            fontSize: 14,
-            fontWeight: 700,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 8,
           }}
         >
-          限定ベータ
-        </p>
+          <p
+            style={{
+              margin: 0,
+              color: "#475569",
+              fontSize: 14,
+              fontWeight: 700,
+            }}
+          >
+            限定ベータ
+          </p>
+          <ForumHamburgerMenu tenant={tenant} />
+        </div>
         <h1 style={{ margin: "0 0 10px", fontSize: 28, fontWeight: 900 }}>
           アカウント管理
         </h1>
