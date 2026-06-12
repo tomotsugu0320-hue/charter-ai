@@ -1325,25 +1325,41 @@ export default function ForumPage() {
                   </Link>
                 ))}
                 {isForumBetaLoggedIn ? (
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    style={{
-                      display: "block",
-                      width: "100%",
-                      padding: "9px 10px",
-                      border: 0,
-                      borderRadius: 8,
-                      background: "#fef2f2",
-                      color: "#991b1b",
-                      cursor: "pointer",
-                      font: "inherit",
-                      fontWeight: 800,
-                      textAlign: "left",
-                    }}
-                  >
-                    ログアウト
-                  </button>
+                  <>
+                    <Link
+                      href={`/${tenant}/forum/account`}
+                      onClick={() => setIsTopMenuOpen(false)}
+                      style={{
+                        display: "block",
+                        padding: "9px 10px",
+                        borderRadius: 8,
+                        color: "#111827",
+                        textDecoration: "none",
+                        fontWeight: 800,
+                      }}
+                    >
+                      アカウント管理
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "9px 10px",
+                        border: 0,
+                        borderRadius: 8,
+                        background: "#fef2f2",
+                        color: "#991b1b",
+                        cursor: "pointer",
+                        font: "inherit",
+                        fontWeight: 800,
+                        textAlign: "left",
+                      }}
+                    >
+                      ログアウト
+                    </button>
+                  </>
                 ) : (
                   <Link
                     href={`/${tenant}/forum/login?next=${encodeURIComponent(

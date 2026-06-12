@@ -152,6 +152,21 @@ export function isForumBetaAuthConfigured() {
   return getForumBetaAuthConfigError() === null;
 }
 
+export function isForumAdminKeyValid(
+  requestOrHeaders: Request | Headers | null | undefined
+) {
+  const adminKey = process.env.ADMIN_KEY?.trim();
+
+  if (!adminKey) return false;
+
+  const requestAdminKey =
+    requestOrHeaders instanceof Headers
+      ? requestOrHeaders.get("x-admin-key")
+      : requestOrHeaders?.headers.get("x-admin-key");
+
+  return requestAdminKey === adminKey;
+}
+
 export function createForumBetaSessionToken(userId?: string) {
   const secret = getSessionSecret();
 

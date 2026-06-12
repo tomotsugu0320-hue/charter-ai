@@ -4,27 +4,17 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState, type CSSProperties } from "react";
 
-type AdminUserSummary = {
-  author_key: string;
-  post_count: number;
-  hidden_post_count: number;
-  latest_post_at: string | null;
-};
-
-type ThreadInfo = {
-  title?: string | null;
-  is_deleted?: boolean | null;
-};
-
-type AdminUserPost = {
+type AdminForumBetaUser = {
   id: string;
-  thread_id: string | null;
-  content: string | null;
-  post_role: string | null;
-  logic_score: number | null;
-  is_deleted: boolean | null;
+  login_id: string;
+  display_name: string;
   created_at: string | null;
-  forum_threads?: ThreadInfo | ThreadInfo[] | null;
+  last_login_at: string | null;
+};
+
+type PasswordFormState = {
+  newPassword: string;
+  newPasswordConfirm: string;
 };
 
 const pageStyle = {
@@ -69,7 +59,7 @@ const secondaryButtonStyle = {
   color: "#111827",
   cursor: "pointer",
   fontWeight: 800,
-  padding: "8px 12px",
+  padding: "9px 12px",
 } satisfies CSSProperties;
 
 function formatDate(value: string | null) {
@@ -79,21 +69,11 @@ function formatDate(value: string | null) {
   return date.toLocaleString("ja-JP");
 }
 
-function threadInfoOf(post: AdminUserPost) {
-  const thread = Array.isArray(post.forum_threads)
-    ? post.forum_threads[0]
-    : post.forum_threads;
-
+function emptyPasswordForm(): PasswordFormState {
   return {
-    title: thread?.title?.trim() || "無題のスレッド",
-    isDeleted: thread?.is_deleted === true,
+    newPassword: "",
+    newPasswordConfirm: "",
   };
-}
-
-function previewText(value: string | null, maxLength = 240) {
-  const text = String(value ?? "").trim();
-  if (!text) return "-";
-  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 }
 
 export default function AdminUsersPage() {
@@ -104,13 +84,13 @@ export default function AdminUsersPage() {
     : tenantParam ?? "dev";
 
   const [adminKey, setAdminKey] = useState("");
-  const [users, setUsers] = useState<AdminUserSummary[]>([]);
-  const [posts, setPosts] = useState<AdminUserPost[]>([]);
-  const [selectedAuthorKey, setSelectedAuthorKey] = useState<string | null>(
-    null
-  );
+  const [users, setUsers] = useState<AdminForumBetaUser[]>([]);
+  const [passwordForms, setPasswordForms] = useState<
+    Record<string, PasswordFormState>
+  >({});
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [savingUserId, setSavingUserId] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const requestAdminKey = adminKey.trim();
@@ -121,55 +101,100 @@ export default function AdminUsersPage() {
     return false;
   }
 
+  function updatePasswordForm(
+    userId: string,
+    field: keyof PasswordFormState,
+    value: string
+  ) {
+    setPasswordForms((current) => ({
+      ...current,
+      [userId]: {
+        ...(current[userId] ?? emptyPasswordForm()),
+        [field]: value,
+      },
+    }));
+  }
+
   async function loadUsers() {
     if (!requireAdminKey()) return;
 
     setLoadingUsers(true);
     setError(null);
+    setMessage(null);
 
     try {
-      const res = await fetch("/api/forum/admin-users", {
+      const res = await fetch("/api/forum/admin/users", {
         headers: { "x-admin-key": requestAdminKey },
+        cache: "no-store",
       });
-      const json = await res.json().catch(() => ({}));
+      const json = (await res.json().catch(() => ({}))) as {
+        users?: AdminForumBetaUser[];
+        error?: string;
+      };
 
       if (!res.ok) {
-        setError(json?.error || "利用者一覧の取得に失敗しました。");
+        setError(json.error || "ユーザー一覧の取得に失敗しました。");
         return;
       }
 
-      setUsers(Array.isArray(json.users) ? json.users : []);
-      setPosts([]);
-      setSelectedAuthorKey(null);
+      const nextUsers = Array.isArray(json.users) ? json.users : [];
+      setUsers(nextUsers);
+      setPasswordForms(
+        Object.fromEntries(nextUsers.map((user) => [user.id, emptyPasswordForm()]))
+      );
+    } catch {
+      setError("ユーザー一覧の取得に失敗しました。");
     } finally {
       setLoadingUsers(false);
     }
   }
 
-  async function loadPosts(authorKey: string) {
+  async function resetPassword(user: AdminForumBetaUser) {
     if (!requireAdminKey()) return;
 
-    setLoadingPosts(true);
+    const form = passwordForms[user.id] ?? emptyPasswordForm();
+
     setError(null);
-    setSelectedAuthorKey(authorKey);
+    setMessage(null);
+
+    if (form.newPassword !== form.newPasswordConfirm) {
+      setError("新しいパスワードが一致しません。");
+      return;
+    }
+
+    setSavingUserId(user.id);
 
     try {
       const res = await fetch(
-        `/api/forum/admin-users?authorKey=${encodeURIComponent(authorKey)}`,
+        `/api/forum/admin/users/${encodeURIComponent(user.id)}/reset-password`,
         {
-          headers: { "x-admin-key": requestAdminKey },
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-admin-key": requestAdminKey,
+          },
+          body: JSON.stringify({
+            newPassword: form.newPassword,
+            newPasswordConfirm: form.newPasswordConfirm,
+          }),
         }
       );
-      const json = await res.json().catch(() => ({}));
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
 
       if (!res.ok) {
-        setError(json?.error || "投稿一覧の取得に失敗しました。");
+        setError(json.error || "パスワード再設定に失敗しました。");
         return;
       }
 
-      setPosts(Array.isArray(json.posts) ? json.posts : []);
+      setPasswordForms((current) => ({
+        ...current,
+        [user.id]: emptyPasswordForm(),
+      }));
+      setMessage(`${user.login_id} のパスワードを再設定しました。`);
+    } catch {
+      setError("パスワード再設定に失敗しました。");
     } finally {
-      setLoadingPosts(false);
+      setSavingUserId(null);
     }
   }
 
@@ -189,11 +214,11 @@ export default function AdminUsersPage() {
       </Link>
 
       <h1 style={{ margin: "0 0 8px", fontSize: 28, fontWeight: 900 }}>
-        利用者別投稿管理
+        登録ユーザー管理
       </h1>
       <p style={{ margin: "0 0 18px", color: "#475569", lineHeight: 1.7 }}>
-        author_key ごとに投稿数や投稿内容を確認します。公開画面には
-        author_key は表示されません。
+        ベータ登録ユーザーのID、ハンドルネーム、作成日、最終ログインを確認し、
+        必要な場合だけパスワードを再設定します。現在のパスワードは表示できません。
       </p>
 
       <section style={{ ...cardStyle, marginBottom: 18 }}>
@@ -228,10 +253,24 @@ export default function AdminUsersPage() {
               opacity: loadingUsers ? 0.65 : 1,
             }}
           >
-            {loadingUsers ? "読み込み中..." : "利用者一覧を読み込む"}
+            {loadingUsers ? "読み込み中..." : "ユーザー一覧を読み込む"}
           </button>
         </div>
       </section>
+
+      {message && (
+        <div
+          style={{
+            ...cardStyle,
+            marginBottom: 18,
+            borderColor: "#86efac",
+            background: "#f0fdf4",
+            color: "#166534",
+          }}
+        >
+          {message}
+        </div>
+      )}
 
       {error && (
         <div
@@ -249,7 +288,7 @@ export default function AdminUsersPage() {
 
       <section style={{ ...cardStyle, marginBottom: 18 }}>
         <h2 style={{ margin: "0 0 12px", fontSize: 22 }}>
-          author_key ごとの一覧
+          登録ユーザー一覧
         </h2>
 
         {users.length === 0 ? (
@@ -257,166 +296,150 @@ export default function AdminUsersPage() {
             まだ一覧は読み込まれていません。
           </p>
         ) : (
-          <div style={{ display: "grid", gap: 10 }}>
-            {users.map((user) => (
-              <article
-                key={user.author_key}
-                style={{
-                  border: "1px solid #e2e8f0",
-                  borderRadius: 8,
-                  padding: 12,
-                  background:
-                    selectedAuthorKey === user.author_key
-                      ? "#eff6ff"
-                      : "#ffffff",
-                  color: "#111827",
-                }}
-              >
-                <div
+          <div style={{ display: "grid", gap: 12 }}>
+            {users.map((user) => {
+              const form = passwordForms[user.id] ?? emptyPasswordForm();
+              const isSaving = savingUserId === user.id;
+
+              return (
+                <article
+                  key={user.id}
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 10,
-                    flexWrap: "wrap",
-                    alignItems: "center",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 8,
+                    padding: 14,
+                    background: "#ffffff",
+                    color: "#111827",
                   }}
                 >
-                  <div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+                      gap: 12,
+                    }}
+                  >
+                    <div>
+                      <div style={{ color: "#64748b", fontSize: 13 }}>
+                        登録ID
+                      </div>
+                      <div
+                        style={{
+                          fontWeight: 900,
+                          marginTop: 4,
+                          wordBreak: "break-all",
+                        }}
+                      >
+                        {user.login_id}
+                      </div>
+                      <div
+                        style={{
+                          color: "#64748b",
+                          fontSize: 12,
+                          marginTop: 6,
+                          wordBreak: "break-all",
+                        }}
+                      >
+                        ユーザーID: {user.id}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ color: "#64748b", fontSize: 13 }}>
+                        ハンドルネーム
+                      </div>
+                      <div style={{ fontWeight: 800, marginTop: 4 }}>
+                        {user.display_name || "-"}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ color: "#64748b", fontSize: 13 }}>
+                        作成日 / 最終ログイン
+                      </div>
+                      <div style={{ marginTop: 4, lineHeight: 1.7 }}>
+                        <div>作成日: {formatDate(user.created_at)}</div>
+                        <div>最終ログイン: {formatDate(user.last_login_at)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      borderTop: "1px solid #e2e8f0",
+                      marginTop: 14,
+                      paddingTop: 14,
+                    }}
+                  >
                     <div
                       style={{
                         fontWeight: 900,
-                        wordBreak: "break-all",
-                        marginBottom: 6,
+                        marginBottom: 10,
                       }}
                     >
-                      {user.author_key}
+                      パスワード再設定
                     </div>
                     <div
                       style={{
-                        display: "flex",
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
                         gap: 10,
-                        flexWrap: "wrap",
-                        color: "#475569",
-                        fontSize: 13,
+                        alignItems: "end",
                       }}
                     >
-                      <span>投稿数: {user.post_count}</span>
-                      <span>非表示投稿数: {user.hidden_post_count}</span>
-                      <span>最新投稿: {formatDate(user.latest_post_at)}</span>
+                      <label style={{ fontWeight: 800 }}>
+                        新しいパスワード
+                        <input
+                          type="password"
+                          autoComplete="new-password"
+                          value={form.newPassword}
+                          onChange={(event) =>
+                            updatePasswordForm(
+                              user.id,
+                              "newPassword",
+                              event.target.value
+                            )
+                          }
+                          placeholder="新しいパスワード"
+                          style={{ ...inputStyle, marginTop: 8 }}
+                        />
+                      </label>
+                      <label style={{ fontWeight: 800 }}>
+                        新しいパスワード確認
+                        <input
+                          type="password"
+                          autoComplete="new-password"
+                          value={form.newPasswordConfirm}
+                          onChange={(event) =>
+                            updatePasswordForm(
+                              user.id,
+                              "newPasswordConfirm",
+                              event.target.value
+                            )
+                          }
+                          placeholder="もう一度入力"
+                          style={{ ...inputStyle, marginTop: 8 }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => void resetPassword(user)}
+                        disabled={isSaving}
+                        style={{
+                          ...secondaryButtonStyle,
+                          opacity: isSaving ? 0.65 : 1,
+                        }}
+                      >
+                        {isSaving ? "再設定中..." : "再設定する"}
+                      </button>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void loadPosts(user.author_key)}
-                    disabled={loadingPosts && selectedAuthorKey === user.author_key}
-                    style={{
-                      ...secondaryButtonStyle,
-                      opacity:
-                        loadingPosts && selectedAuthorKey === user.author_key
-                          ? 0.65
-                          : 1,
-                    }}
-                  >
-                    {loadingPosts && selectedAuthorKey === user.author_key
-                      ? "読み込み中..."
-                      : "投稿を見る"}
-                  </button>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
       </section>
-
-      {selectedAuthorKey && (
-        <section style={cardStyle}>
-          <h2 style={{ margin: "0 0 8px", fontSize: 22 }}>投稿一覧</h2>
-          <p
-            style={{
-              margin: "0 0 12px",
-              color: "#475569",
-              wordBreak: "break-all",
-            }}
-          >
-            author_key: {selectedAuthorKey}
-          </p>
-
-          {posts.length === 0 ? (
-            <p style={{ margin: 0, color: "#64748b" }}>
-              この利用者の投稿は見つかりませんでした。
-            </p>
-          ) : (
-            <div style={{ display: "grid", gap: 12 }}>
-              {posts.map((post) => {
-                const thread = threadInfoOf(post);
-                const threadHref = post.thread_id
-                  ? `/${tenant}/forum/thread/${post.thread_id}`
-                  : "";
-
-                return (
-                  <article
-                    key={post.id}
-                    style={{
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 8,
-                      padding: 12,
-                      background: post.is_deleted ? "#f8fafc" : "#ffffff",
-                      color: "#111827",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 8,
-                        flexWrap: "wrap",
-                        marginBottom: 8,
-                        color: "#475569",
-                        fontSize: 13,
-                      }}
-                    >
-                      <span>post_role: {post.post_role || "-"}</span>
-                      <span>logic_score: {post.logic_score ?? "-"}</span>
-                      <span>
-                        投稿状態: {post.is_deleted ? "非表示" : "表示中"}
-                      </span>
-                      <span>
-                        スレッド状態: {thread.isDeleted ? "非表示" : "表示中"}
-                      </span>
-                      <span>作成: {formatDate(post.created_at)}</span>
-                    </div>
-                    <h3 style={{ margin: "0 0 8px", fontSize: 18 }}>
-                      {thread.title}
-                    </h3>
-                    <p
-                      style={{
-                        margin: "0 0 10px",
-                        lineHeight: 1.7,
-                        whiteSpace: "pre-wrap",
-                      }}
-                    >
-                      {previewText(post.content)}
-                    </p>
-                    {threadHref && (
-                      <Link
-                        href={threadHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          color: "#2563eb",
-                          fontWeight: 800,
-                          textDecoration: "none",
-                        }}
-                      >
-                        スレッド詳細を開く
-                      </Link>
-                    )}
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      )}
     </main>
   );
 }
