@@ -168,6 +168,93 @@ function looksLikeFiscalConsolidationText(text: string) {
   ]);
 }
 
+const ANSWER_LAYER_LABELS = [
+  "【誰でも分かる説明】",
+  "【もう少し詳しい説明】",
+  "【深層・専門的な補足】",
+] as const;
+
+function hasLayeredProvisionalAnswerText(text: string) {
+  return ANSWER_LAYER_LABELS.every((label) => text.includes(label));
+}
+
+function buildLayeredAnswerText({
+  simple,
+  detailed,
+  deep,
+}: {
+  simple: string;
+  detailed: string;
+  deep: string;
+}) {
+  return [
+    `${ANSWER_LAYER_LABELS[0]}\n${simple.trim()}`,
+    `${ANSWER_LAYER_LABELS[1]}\n${detailed.trim()}`,
+    `${ANSWER_LAYER_LABELS[2]}\n${deep.trim()}`,
+  ].join("\n\n");
+}
+
+function buildLayeredInitialSummaryText(
+  rawAnswer: string,
+  claim: string,
+  title: string
+) {
+  const answer = rawAnswer.trim();
+  if (hasLayeredProvisionalAnswerText(answer)) return answer;
+
+  const targetText = `${claim}\n${title}\n${answer}`;
+
+  if (looksLikePriceRateTaxPolicyText(targetText)) {
+    return buildLayeredAnswerText({
+      simple:
+        "物価が上がっているだけでは、利上げや増税が正しいとは言えません。物価高の原因が、景気の強さなのか、輸入品やエネルギーの値上がりなのかを分けて考える必要があります。",
+      detailed:
+        "需要が強すぎて物価が上がっているなら、利上げや増税で需要を抑える意味があります。一方、円安、輸入物価、エネルギー価格などが原因で、実質賃金や個人消費が弱いなら、需要を冷やす政策は家計と企業活動をさらに弱める可能性があります。雇用、賃金、消費が本当に強いかを確認することが重要です。",
+      deep:
+        "専門的には、需要超過型インフレと供給制約・輸入物価型インフレを分ける必要があります。AD-ASモデルでは、需要が右に動く物価上昇と、供給制約で供給が左に動く物価上昇では政策判断が変わります。フィリップス曲線的にも、雇用と賃金が強い局面なら引き締めが有効になり得ますが、実質賃金や消費が弱い局面では逆効果になり得ます。財源問題、将来増税予想、インフレ再燃リスクも反論として残ります。",
+    });
+  }
+
+  if (looksLikeFiscalConsolidationText(targetText)) {
+    return buildLayeredAnswerText({
+      simple:
+        "財政を健全にすることは大切ですが、不景気のときに政府支出を急に減らすと、かえって景気が悪くなることがあります。政府の支出は、誰かの所得にもなっているからです。",
+      detailed:
+        "デフレや需要不足の局面では、政府支出の削減は家計所得、企業売上、雇用を弱める可能性があります。景気が悪くなると税収も伸びにくくなり、短期的な赤字削減を狙っても、財政健全化が遅れる場合があります。一方、需要が強すぎる局面では支出抑制が有効になることもあるため、景気局面を分ける必要があります。",
+      deep:
+        "専門的には、財政乗数と自動安定化装置を確認する論点です。需要不足下では政府支出の削減が乗数効果を通じて所得と消費を縮小させ、税収減で財政改善を弱める可能性があります。一方、完全雇用に近い局面ではクラウディングアウトやインフレ再燃リスクもあります。財源制約、将来増税予想、金利上昇リスクは反論として残るため、財政健全化そのものではなく、時期と手段が問題になります。",
+    });
+  }
+
+  if (
+    looksLikeLaborCostRationalizationText(targetText) ||
+    looksLikeEconomyPolicyText(targetText)
+  ) {
+    return buildLayeredAnswerText({
+      simple:
+        "会社にとって正しい節約が、社会全体でも正しいとは限りません。多くの会社が同時に人件費を削ると、家計の収入が減り、買い物も減って、結局は企業の売上も弱くなることがあります。",
+      detailed:
+        "企業単体では、人件費削減や省人化は短期的に利益改善につながります。しかし需要不足の局面で多くの企業が同じことをすると、家計所得が減り、消費需要が弱まり、企業の売上期待も下がります。その結果、投資、雇用、賃上げが抑えられ、デフレ圧力が強まる可能性があります。ミクロの合理性とマクロの合成の誤謬を分ける必要があります。",
+      deep:
+        "専門的には、合成の誤謬、有効需要、フィリップス曲線的な労働需給を確認する論点です。個別企業のコスト削減は合理的でも、経済全体では誰かの支出が誰かの所得になります。需要不足下では所得減が消費減を通じて売上期待を下げ、さらに雇用や賃金を抑える循環が起き得ます。一方、需要超過や人手不足が強い局面では、省力化投資や生産性向上が賃金上昇を支える場合もあります。",
+    });
+  }
+
+  const fallbackAnswer =
+    answer ||
+    "この問いは、投稿された主張だけで結論を出すのではなく、前提・根拠・反論リスクを分けて確認する必要があります。";
+
+  return buildLayeredAnswerText({
+    simple: shortText(fallbackAnswer, 160),
+    detailed:
+      fallbackAnswer.length > 180
+        ? fallbackAnswer
+        : `${fallbackAnswer} 現時点では、どの前提なら主張が成り立つのか、どの根拠が強いのか、どの反論リスクが残るのかを分けて見る段階です。`,
+    deep:
+      "専門的には、主張の前提、因果関係、検証できる指標、反論可能性を分けて確認します。まだ投稿が少ない場合は、結論を固定するよりも、どの条件で成立し、どの条件で弱くなるかを整理することが重要です。今後の補足や反論によって、この暫定回答は更新される可能性があります。",
+  });
+}
+
 function buildInitialSummaryText(claim: string, title: string) {
   const targetText = `${claim}\n${title}`;
 
@@ -419,8 +506,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const initialAiAnswer =
+    const rawInitialAiAnswer =
       extractAiAnswerFromClaim(claim) || buildInitialSummaryText(claim, title);
+    const initialAiAnswer = buildLayeredInitialSummaryText(
+      rawInitialAiAnswer,
+      claim,
+      title
+    );
 
     if (initialAiAnswer) {
       const initialRebuttals = conflicts

@@ -144,6 +144,14 @@ function isImmatureSummaryText(text: string) {
   ].some((phrase) => normalized.includes(phrase.replace(/\s+/g, "")));
 }
 
+function hasLayeredProvisionalAnswerText(text: string) {
+  return (
+    text.includes("【誰でも分かる説明】") &&
+    text.includes("【もう少し詳しい説明】") &&
+    text.includes("【深層・専門的な補足】")
+  );
+}
+
 function buildProvisionalAnswerFromStored(
   summaryText: string,
   keyPoints: {
@@ -155,6 +163,10 @@ function buildProvisionalAnswerFromStored(
   },
   conflictPairs: ConflictPair[]
 ) {
+  if (hasLayeredProvisionalAnswerText(summaryText)) {
+    return summaryText;
+  }
+
   const wholeSummary = isImmatureSummaryText(summaryText)
     ? ""
     : shortText(summaryText, 140);
