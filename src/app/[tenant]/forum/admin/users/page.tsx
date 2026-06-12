@@ -25,6 +25,8 @@ type CardMessage = {
   text: string;
 };
 
+type UserStatus = "active" | "disabled" | "deleted";
+
 const pageStyle = {
   maxWidth: 1080,
   margin: "0 auto",
@@ -83,6 +85,11 @@ function statusLabel(status: string | null | undefined) {
   return "有効";
 }
 
+function normalizeUserStatus(status: string | null | undefined): UserStatus {
+  if (status === "disabled" || status === "deleted") return status;
+  return "active";
+}
+
 function emptyPasswordForm(): PasswordFormState {
   return {
     newPassword: "",
@@ -103,6 +110,9 @@ export default function AdminUsersPage() {
     Record<string, PasswordFormState>
   >({});
   const [deleteConfirmTexts, setDeleteConfirmTexts] = useState<
+    Record<string, string>
+  >({});
+  const [purgeConfirmTexts, setPurgeConfirmTexts] = useState<
     Record<string, string>
   >({});
   const [cardMessages, setCardMessages] = useState<Record<string, CardMessage>>(
@@ -171,6 +181,7 @@ export default function AdminUsersPage() {
         Object.fromEntries(nextUsers.map((user) => [user.id, emptyPasswordForm()]))
       );
       setDeleteConfirmTexts({});
+      setPurgeConfirmTexts({});
     } catch {
       verifiedAdminKeyRef.current = "";
       setError("ユーザー一覧の取得に失敗しました。");
@@ -203,6 +214,30 @@ export default function AdminUsersPage() {
           : user
       )
     );
+  }
+
+  function removeUser(userId: string) {
+    setUsers((current) => current.filter((user) => user.id !== userId));
+    setPasswordForms((current) => {
+      const next = { ...current };
+      delete next[userId];
+      return next;
+    });
+    setDeleteConfirmTexts((current) => {
+      const next = { ...current };
+      delete next[userId];
+      return next;
+    });
+    setPurgeConfirmTexts((current) => {
+      const next = { ...current };
+      delete next[userId];
+      return next;
+    });
+    setCardMessages((current) => {
+      const next = { ...current };
+      delete next[userId];
+      return next;
+    });
   }
 
   async function resetPassword(user: AdminForumBetaUser) {
@@ -382,6 +417,93 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function purgeUser(user: AdminForumBetaUser) {
+    const requestAdminKey = getVerifiedAdminKey();
+    if (!requestAdminKey) return;
+
+    const confirmText = (purgeConfirmTexts[user.id] ?? "").trim();
+
+    if (confirmText !== "完全削除") {
+      setCardMessage(user.id, {
+        type: "error",
+        text: "確認文言を入力してください",
+      });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `${user.login_id} のアカウント情報を完全削除します。投稿データは削除しません。よろしいですか？`
+    );
+
+    if (!confirmed) return;
+
+    setSavingUserId(user.id);
+    setError(null);
+
+    try {
+      const res = await fetch(
+        `/api/forum/admin/users/${encodeURIComponent(user.id)}/purge`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-admin-key": requestAdminKey,
+          },
+          body: JSON.stringify({ confirmText }),
+        }
+      );
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+
+      if (!res.ok) {
+        setCardMessage(user.id, {
+          type: "error",
+          text: json.error || "入力内容を確認してください",
+        });
+        return;
+      }
+
+      removeUser(user.id);
+    } catch {
+      setCardMessage(user.id, {
+        type: "error",
+        text: "入力内容を確認してください",
+      });
+    } finally {
+      setSavingUserId(null);
+    }
+  }
+
+  const activeUsers = users.filter(
+    (user) => normalizeUserStatus(user.status) === "active"
+  );
+  const disabledUsers = users.filter(
+    (user) => normalizeUserStatus(user.status) === "disabled"
+  );
+  const deletedUsers = users.filter(
+    (user) => normalizeUserStatus(user.status) === "deleted"
+  );
+  const userSections = [
+    {
+      title: "有効アカウント",
+      description: "通常ログインできるアカウントです。",
+      users: activeUsers,
+      emptyText: "有効アカウントはありません。",
+    },
+    {
+      title: "無効化アカウント",
+      description: "管理者が一時的にログイン不可にしたアカウントです。",
+      users: disabledUsers,
+      emptyText: "無効化アカウントはありません。",
+    },
+    {
+      title: "削除済みアカウント",
+      description:
+        "退会または管理者削除により再ログイン不可になったアカウントです。テスト用など不要なものだけ完全削除できます。",
+      users: deletedUsers,
+      emptyText: "削除済みアカウントはありません。",
+    },
+  ];
+
   return (
     <main style={pageStyle}>
       <Link
@@ -467,13 +589,42 @@ export default function AdminUsersPage() {
             まだ一覧は読み込まれていません。
           </p>
         ) : (
-          <div style={{ display: "grid", gap: 12 }}>
-            {users.map((user) => {
+          <div style={{ display: "grid", gap: 18 }}>
+            {userSections.map((section) => (
+              <section
+                key={section.title}
+                style={{
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 8,
+                  padding: 14,
+                }}
+              >
+                <h3 style={{ margin: "0 0 4px", fontSize: 18 }}>
+                  {section.title}（{section.users.length}件）
+                </h3>
+                <p
+                  style={{
+                    color: "#64748b",
+                    lineHeight: 1.7,
+                    margin: "0 0 12px",
+                  }}
+                >
+                  {section.description}
+                </p>
+
+                {section.users.length === 0 ? (
+                  <p style={{ margin: 0, color: "#64748b" }}>
+                    {section.emptyText}
+                  </p>
+                ) : (
+                  <div style={{ display: "grid", gap: 12 }}>
+                    {section.users.map((user) => {
               const form = passwordForms[user.id] ?? emptyPasswordForm();
               const cardMessage = cardMessages[user.id];
               const isSaving = savingUserId === user.id;
-              const isDeleted = user.status === "deleted";
-              const isDisabled = user.status === "disabled";
+              const userStatus = normalizeUserStatus(user.status);
+              const isDeleted = userStatus === "deleted";
+              const isDisabled = userStatus === "disabled";
 
               return (
                 <article
@@ -646,145 +797,211 @@ export default function AdminUsersPage() {
                     </div>
                   </div>
 
-                  <div
-                    style={{
-                      borderTop: "1px solid #e2e8f0",
-                      marginTop: 14,
-                      paddingTop: 14,
-                    }}
-                  >
-                    <div style={{ fontWeight: 900, marginBottom: 10 }}>
-                      アカウント操作
-                    </div>
+                  {!isDeleted && (
                     <div
                       style={{
-                        display: "flex",
-                        flexWrap: "wrap",
-                        gap: 10,
-                        alignItems: "center",
+                        borderTop: "1px solid #e2e8f0",
+                        marginTop: 14,
+                        paddingTop: 14,
                       }}
                     >
-                      {isDisabled ? (
-                        <button
-                          type="button"
-                          onClick={() => void changeUserStatus(user, "active")}
-                          disabled={isSaving || isDeleted}
-                          style={{
-                            ...secondaryButtonStyle,
-                            opacity: isSaving || isDeleted ? 0.65 : 1,
-                          }}
-                        >
-                          復活する
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void changeUserStatus(user, "disabled")
-                          }
-                          disabled={isSaving || isDeleted}
-                          style={{
-                            ...secondaryButtonStyle,
-                            opacity: isSaving || isDeleted ? 0.65 : 1,
-                          }}
-                        >
-                          無効化する
-                        </button>
-                      )}
-                      <span style={{ color: "#64748b", fontSize: 13 }}>
-                        無効化すると再ログインできません。投稿は残ります。
-                      </span>
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      borderTop: "1px solid #fecaca",
-                      marginTop: 14,
-                      paddingTop: 14,
-                    }}
-                  >
-                    <div style={{ color: "#991b1b", fontWeight: 900 }}>
-                      アカウント削除
-                    </div>
-                    <p style={{ color: "#7f1d1d", lineHeight: 1.7 }}>
-                      現在は投稿と登録ユーザーIDの正式な紐づけが未対応のため、投稿の一括非表示・完全削除はまだ使えません。管理者削除では、投稿を残して表示する扱いだけに固定しています。
-                    </p>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                          "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
-                        gap: 10,
-                        alignItems: "end",
-                      }}
-                    >
-                      <div style={{ fontWeight: 800 }}>
-                        投稿扱い
-                        <div
-                          style={{
-                            border: "1px solid #fecaca",
-                            borderRadius: 8,
-                            background: "#fff7ed",
-                            color: "#7f1d1d",
-                            fontWeight: 800,
-                            marginTop: 8,
-                            padding: "10px 12px",
-                          }}
-                        >
-                          投稿を残して表示（固定）
-                        </div>
-                        <span
-                          style={{
-                            display: "block",
-                            color: "#7f1d1d",
-                            fontSize: 12,
-                            fontWeight: 500,
-                            lineHeight: 1.6,
-                            marginTop: 6,
-                          }}
-                        >
-                          投稿を残して非表示・投稿を完全削除は、投稿とユーザーIDの正式な紐づき実装後に対応します。
-                        </span>
+                      <div style={{ fontWeight: 900, marginBottom: 10 }}>
+                        アカウント操作
                       </div>
-                      <label style={{ fontWeight: 800 }}>
-                        確認文言
-                        <input
-                          value={deleteConfirmTexts[user.id] ?? ""}
-                          onChange={(event) =>
-                            setDeleteConfirmTexts((current) => ({
-                              ...current,
-                              [user.id]: event.target.value,
-                            }))
-                          }
-                          placeholder="削除する"
-                          disabled={isDeleted}
-                          style={{ ...inputStyle, marginTop: 8 }}
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => void deleteUser(user)}
-                        disabled={isSaving || isDeleted}
+                      <div
                         style={{
-                          border: "1px solid #991b1b",
-                          borderRadius: 8,
-                          background: "#991b1b",
-                          color: "#ffffff",
-                          cursor:
-                            isSaving || isDeleted ? "not-allowed" : "pointer",
-                          fontWeight: 800,
-                          opacity: isSaving || isDeleted ? 0.65 : 1,
-                          padding: "9px 12px",
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 10,
+                          alignItems: "center",
                         }}
                       >
-                        {isDeleted ? "削除済み" : "削除状態にする"}
-                      </button>
+                        {isDisabled ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void changeUserStatus(user, "active")
+                            }
+                            disabled={isSaving}
+                            style={{
+                              ...secondaryButtonStyle,
+                              opacity: isSaving ? 0.65 : 1,
+                            }}
+                          >
+                            復活する
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void changeUserStatus(user, "disabled")
+                            }
+                            disabled={isSaving}
+                            style={{
+                              ...secondaryButtonStyle,
+                              opacity: isSaving ? 0.65 : 1,
+                            }}
+                          >
+                            無効化する
+                          </button>
+                        )}
+                        <span style={{ color: "#64748b", fontSize: 13 }}>
+                          無効化すると再ログインできません。投稿は残ります。
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {!isDeleted && (
+                    <div
+                      style={{
+                        borderTop: "1px solid #fecaca",
+                        marginTop: 14,
+                        paddingTop: 14,
+                      }}
+                    >
+                      <div style={{ color: "#991b1b", fontWeight: 900 }}>
+                        アカウント削除
+                      </div>
+                      <p style={{ color: "#7f1d1d", lineHeight: 1.7 }}>
+                        現在は投稿と登録ユーザーIDの正式な紐づけが未対応のため、投稿の一括非表示・完全削除はまだ使えません。管理者削除では、投稿を残して表示する扱いだけに固定しています。
+                      </p>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+                          gap: 10,
+                          alignItems: "end",
+                        }}
+                      >
+                        <div style={{ fontWeight: 800 }}>
+                          投稿扱い
+                          <div
+                            style={{
+                              border: "1px solid #fecaca",
+                              borderRadius: 8,
+                              background: "#fff7ed",
+                              color: "#7f1d1d",
+                              fontWeight: 800,
+                              marginTop: 8,
+                              padding: "10px 12px",
+                            }}
+                          >
+                            投稿を残して表示（固定）
+                          </div>
+                          <span
+                            style={{
+                              display: "block",
+                              color: "#7f1d1d",
+                              fontSize: 12,
+                              fontWeight: 500,
+                              lineHeight: 1.6,
+                              marginTop: 6,
+                            }}
+                          >
+                            投稿を残して非表示・投稿を完全削除は、投稿とユーザーIDの正式な紐づき実装後に対応します。
+                          </span>
+                        </div>
+                        <label style={{ fontWeight: 800 }}>
+                          確認文言
+                          <input
+                            value={deleteConfirmTexts[user.id] ?? ""}
+                            onChange={(event) =>
+                              setDeleteConfirmTexts((current) => ({
+                                ...current,
+                                [user.id]: event.target.value,
+                              }))
+                            }
+                            placeholder="削除する"
+                            style={{ ...inputStyle, marginTop: 8 }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => void deleteUser(user)}
+                          disabled={isSaving}
+                          style={{
+                            border: "1px solid #991b1b",
+                            borderRadius: 8,
+                            background: "#991b1b",
+                            color: "#ffffff",
+                            cursor: isSaving ? "not-allowed" : "pointer",
+                            fontWeight: 800,
+                            opacity: isSaving ? 0.65 : 1,
+                            padding: "9px 12px",
+                          }}
+                        >
+                          削除状態にする
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {isDeleted && (
+                    <div
+                      style={{
+                        borderTop: "1px solid #7f1d1d",
+                        marginTop: 14,
+                        paddingTop: 14,
+                      }}
+                    >
+                      <div style={{ color: "#7f1d1d", fontWeight: 900 }}>
+                        アカウント完全削除
+                      </div>
+                      <p style={{ color: "#7f1d1d", lineHeight: 1.7 }}>
+                        この操作はアカウント情報だけを完全削除します。投稿データは削除しません。投稿とユーザーIDの正式な紐づきが未対応のため、投稿の一括削除はまだできません。
+                      </p>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+                          gap: 10,
+                          alignItems: "end",
+                        }}
+                      >
+                        <label style={{ fontWeight: 800 }}>
+                          確認文言
+                          <input
+                            value={purgeConfirmTexts[user.id] ?? ""}
+                            onChange={(event) =>
+                              setPurgeConfirmTexts((current) => ({
+                                ...current,
+                                [user.id]: event.target.value,
+                              }))
+                            }
+                            placeholder="完全削除"
+                            style={{ ...inputStyle, marginTop: 8 }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => void purgeUser(user)}
+                          disabled={isSaving}
+                          style={{
+                            border: "1px solid #7f1d1d",
+                            borderRadius: 8,
+                            background: "#7f1d1d",
+                            color: "#ffffff",
+                            cursor: isSaving ? "not-allowed" : "pointer",
+                            fontWeight: 800,
+                            opacity: isSaving ? 0.65 : 1,
+                            padding: "9px 12px",
+                          }}
+                        >
+                          完全削除する
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </article>
               );
-            })}
+                    })}
+                  </div>
+                )}
+              </section>
+            ))}
           </div>
         )}
       </section>

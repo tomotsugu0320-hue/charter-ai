@@ -16,6 +16,11 @@ type ForumBetaAdminUserRow = {
   deleted_at?: string | null;
 };
 
+function normalizeStatus(status: string | null | undefined) {
+  if (status === "disabled" || status === "deleted") return status;
+  return "active";
+}
+
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key =
@@ -65,7 +70,7 @@ export async function GET(request: NextRequest) {
     display_name: user.display_name?.trim() || user.login_id,
     created_at: user.created_at,
     last_login_at: user.last_login_at,
-    status: user.status || "active",
+    status: normalizeStatus(user.status),
     disabled_at: user.disabled_at,
     deleted_at: user.deleted_at,
   }));

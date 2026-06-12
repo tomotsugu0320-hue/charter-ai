@@ -348,9 +348,19 @@ src/app/api/forum/admin/users/route.ts
 src/app/api/forum/admin/users/[id]/reset-password/route.ts
 src/app/api/forum/admin/users/[id]/disable/route.ts
 src/app/api/forum/admin/users/[id]/delete/route.ts
+src/app/api/forum/admin/users/[id]/purge/route.ts
 ```
 
 管理者用ユーザー管理は `ADMIN_KEY` 必須とする。通常ログイン済みユーザーだけでは利用できない。
+
+登録ユーザー管理ページでは、アカウントを状態別に分けて表示する。
+
+- `active`: 有効アカウント
+- `disabled`: 無効化アカウント
+- `deleted`: 削除済みアカウント
+- 不明な `status` は安全側で `active` 扱いにする
+
+削除済みアカウントは有効アカウント一覧には表示せず、削除済みセクションに分離する。
 
 管理者が確認できる情報:
 
@@ -378,8 +388,19 @@ src/app/api/forum/admin/users/[id]/delete/route.ts
 - `active` から `disabled` への無効化
 - `disabled` から `active` への復活
 - `deleted` への削除状態変更
+- `deleted` のアカウント情報だけを完全削除
 
 無効化・削除状態のユーザーは再ログイン不可とする。
+
+完全削除:
+
+- `ADMIN_KEY` 必須
+- 対象ユーザーが `deleted` の場合だけ実行できる
+- `active` / `disabled` ユーザーは、先に削除状態にする必要がある
+- 確認文言 `完全削除` を必須にする
+- `forum_beta_users` のアカウント情報だけを物理削除する
+- 投稿データは削除しない
+- `password_hash` はレスポンスに含めない
 
 投稿の扱い:
 
@@ -388,6 +409,7 @@ src/app/api/forum/admin/users/[id]/delete/route.ts
 - 管理者削除時の投稿扱いは `投稿を残して表示` のみ対応する
 - `投稿を残して非表示` / `投稿を完全削除` は、投稿とユーザーIDの正式な紐づき実装後に対応する
 - API側でも `投稿を残して表示` 以外の投稿扱いが送られた場合は 400 で拒否する
+- 管理者のアカウント完全削除でも、投稿データは削除しない
 - `author_key` だけを使った推測削除は行わない
 
 ## 22. セキュリティ上の注意
@@ -447,9 +469,12 @@ src/app/api/forum/admin/users/[id]/delete/route.ts
 - `ADMIN_KEY` ありで管理者用ユーザー管理を利用できる
 - `ADMIN_KEY` なしでは管理者用ユーザー管理APIを利用できない
 - 管理者用ユーザー一覧に `password_hash` が含まれない
+- 管理者用ユーザー一覧で有効・無効化・削除済みアカウントが分けて表示される
 - 管理者は現在のパスワードを閲覧できず、新しいパスワードへ再設定だけできる
 - 管理者はユーザーを無効化・復活できる
 - 管理者はユーザーを削除状態にできる
+- 管理者は削除済みアカウントだけ完全削除できる
+- 完全削除しても投稿データは削除されない
 - 投稿のユーザー単位非表示・完全削除は、正式なユーザーID紐づきがないため未対応と表示する
 - ログイン後、投稿・外部AI取り込み・AI整理が使える
 
