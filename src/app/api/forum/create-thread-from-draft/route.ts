@@ -113,6 +113,12 @@ function looksLikeEconomyPolicyText(text: string) {
     "家計",
     "所得",
     "消費",
+    "社会保険料",
+    "社会保険",
+    "社会保障",
+    "可処分所得",
+    "現役世代",
+    "少子化",
     "合成の誤謬",
   ].some((keyword) => text.includes(keyword));
 }
@@ -134,6 +140,26 @@ function looksLikePriceRateTaxPolicyText(text: string) {
     "インフレ率",
     "CPI",
     "消費税増税",
+  ]);
+}
+
+function looksLikeSocialInsuranceBurdenText(text: string) {
+  return includesAnyKeyword(text, [
+    "社会保険料",
+    "社会保険",
+    "保険料",
+    "厚生年金",
+    "健康保険",
+    "介護保険",
+    "年金保険",
+    "可処分所得",
+    "給与天引き",
+    "天引き",
+    "労使折半",
+    "現役世代",
+    "少子化",
+    "子育て",
+    "賃上げ",
   ]);
 }
 
@@ -178,6 +204,15 @@ function hasLayeredProvisionalAnswerText(text: string) {
   return ANSWER_LAYER_LABELS.every((label) => text.includes(label));
 }
 
+function getInitialSummaryTopic(claim: string, title: string) {
+  const text = (title || claim)
+    .replace(/\s*(AI回答・整理|補足|前提|根拠|反論|反論・リスク)[:：][\s\S]*$/u, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return shortText(text || "この投稿の論点", 72);
+}
+
 function buildLayeredAnswerText({
   simple,
   detailed,
@@ -203,6 +238,18 @@ function buildLayeredInitialSummaryText(
   if (hasLayeredProvisionalAnswerText(answer)) return answer;
 
   const targetText = `${claim}\n${title}\n${answer}`;
+  const topic = getInitialSummaryTopic(claim, title);
+
+  if (looksLikeSocialInsuranceBurdenText(targetText)) {
+    return buildLayeredAnswerText({
+      simple:
+        "社会保険料が重くなると、給料から引かれるお金が増えて手取りが減ります。会社側の負担も増えるため、賃上げに回せる余地や、現役世代の生活設計に影響する可能性があります。",
+      detailed:
+        "社会保険料は家計の可処分所得を減らすだけでなく、企業にとっては雇用コストにもなります。そのため、現役世代の消費、企業の賃上げ余地、雇用判断、少子化対策への影響を分けて検証する必要があります。消費税との比較では、給与天引きで負担が見えにくい点や、現役世代に負担が集中しやすい点も重要です。",
+      deep:
+        "専門的には、社会保険料を税に近い負担として見るだけでなく、労働コスト、手取り賃金、社会保障財源の三つに分けて確認します。労使折半と表示されても、経済的には企業の雇用コストや賃金形成に影響し、負担増が可処分所得、労働需要、賃上げ余地、出生行動に波及する可能性があります。一方で、医療・年金・介護の財源をどう確保するかという反論も残るため、消費税との比較では負担の見え方、世代配分、給付との対応関係を検証する必要があります。",
+    });
+  }
 
   if (looksLikePriceRateTaxPolicyText(targetText)) {
     return buildLayeredAnswerText({
@@ -227,8 +274,7 @@ function buildLayeredInitialSummaryText(
   }
 
   if (
-    looksLikeLaborCostRationalizationText(targetText) ||
-    looksLikeEconomyPolicyText(targetText)
+    looksLikeLaborCostRationalizationText(targetText)
   ) {
     return buildLayeredAnswerText({
       simple:
@@ -237,6 +283,22 @@ function buildLayeredInitialSummaryText(
         "企業単体では、人件費削減や省人化は短期的に利益改善につながります。しかし需要不足の局面で多くの企業が同じことをすると、家計所得が減り、消費需要が弱まり、企業の売上期待も下がります。その結果、投資、雇用、賃上げが抑えられ、デフレ圧力が強まる可能性があります。ミクロの合理性とマクロの合成の誤謬を分ける必要があります。",
       deep:
         "専門的には、合成の誤謬、有効需要、フィリップス曲線的な労働需給を確認する論点です。個別企業のコスト削減は合理的でも、経済全体では誰かの支出が誰かの所得になります。需要不足下では所得減が消費減を通じて売上期待を下げ、さらに雇用や賃金を抑える循環が起き得ます。一方、需要超過や人手不足が強い局面では、省力化投資や生産性向上が賃金上昇を支える場合もあります。",
+    });
+  }
+
+  if (looksLikeEconomyPolicyText(targetText)) {
+    const baseAnswer =
+      answer ||
+      `${topic}については、家計、企業、雇用、物価、財源への影響を分けて確認する必要があります。`;
+
+    return buildLayeredAnswerText({
+      simple: `${topic}については、単純に良い悪いで決めず、誰の負担が増え、誰の所得や消費が弱くなるのかを見る必要があります。まず家計と企業への影響を分けて考える論点です。`,
+      detailed:
+        baseAnswer.length > 180
+          ? baseAnswer
+          : `${baseAnswer} とくに、需要不足か需要超過か、家計の可処分所得、企業のコスト、雇用や賃上げへの影響を分けて確認する必要があります。政策の効果は、負担の見え方だけでなく、消費、投資、財源、世代間の配分によって変わります。`,
+      deep:
+        `専門的には、「${topic}」を所得分配、労働需要、消費需要、財源制約の四つに分けて検証します。税や保険料、補助金、支出削減は、家計の可処分所得と企業行動を通じて需要に影響します。一方で、財源の持続性、将来負担、インフレ再燃、制度の公平性という反論も残ります。投稿直後の初期回答では結論を固定せず、どの条件なら成立し、どの条件なら逆効果になるかを整理する段階です。`,
     });
   }
 
@@ -257,6 +319,11 @@ function buildLayeredInitialSummaryText(
 
 function buildInitialSummaryText(claim: string, title: string) {
   const targetText = `${claim}\n${title}`;
+  const topic = getInitialSummaryTopic(claim, title);
+
+  if (looksLikeSocialInsuranceBurdenText(targetText)) {
+    return "社会保険料は、家計の可処分所得を減らし、企業側の雇用コストも増やすため、賃上げや少子化対策に影響する可能性があります。消費税との比較では、給与天引きで負担が見えにくい点、現役世代に負担が集中しやすい点、社会保障財源として何を維持するかを分けて確認する必要があります。";
+  }
 
   if (looksLikePriceRateTaxPolicyText(targetText)) {
     return "物価が上がっているだけでは、利上げや増税が適切とは判断できません。まず雇用統計、賃金、実質賃金、個人消費を見て、労働市場と家計が本当に強い局面かを確認する必要があります。雇用・賃金・消費が強く、需要超過による物価上昇なら、利上げや増税による需要抑制が有効になる場合があります。一方、物価上昇が供給制約や輸入物価によるもので、実質賃金や消費が弱い場合は、利上げや増税が家計と企業活動をさらに弱める可能性があります。したがって、政策判断では物価だけでなく、まず雇用統計で経済が本当に過熱しているかを確認する必要があります。";
@@ -271,7 +338,7 @@ function buildInitialSummaryText(claim: string, title: string) {
   }
 
   if (looksLikeEconomyPolicyText(targetText)) {
-    return "ミクロ企業会計として正しい主張が、マクロ経済政策として常に正しいとは限りません。企業単体では合理的でも、経済全体が需要不足の局面で多くの企業が同時に人件費削減や省人化を進めると、労働所得が減り、消費需要が弱まり、デフレ圧力が強まる可能性があります。したがって、景気局面、需要環境、労働需給、合成の誤謬を分けて検証する必要があります。";
+    return `${topic}については、投稿された主張だけで結論を出すのではなく、家計、企業、雇用、物価、財源への影響を分けて確認する必要があります。現時点では、どの前提なら主張が成り立つのか、どの根拠が強いのか、どの反論リスクが残るのかを整理する段階です。`;
   }
 
   return "この問いは、投稿された主張だけで結論を出すのではなく、前提・根拠・反論リスクを分けて確認する必要があります。現時点では、提示された問いを軸に、根拠と反論可能性を整理する段階です。";
