@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import {
-  hashForumBetaPassword,
-  isForumAdminKeyValid,
-  validateForumBetaPasswordConfirmation,
-  validateForumBetaPasswordInput,
-} from "@/lib/forum-auth";
+import { isForumAdminKeyValid } from "@/lib/forum-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -44,24 +39,27 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
 
   const body = (await request.json().catch(() => null)) as {
-    newPassword?: unknown;
-    newPasswordConfirm?: unknown;
+    postHandling?: unknown;
+    confirmText?: unknown;
   } | null;
-  const newPassword = toStringValue(body?.newPassword);
-  const newPasswordConfirm = toStringValue(body?.newPasswordConfirm);
-  const newPasswordError = validateForumBetaPasswordInput(newPassword);
+  const postHandling = toStringValue(body?.postHandling).trim();
+  const confirmText = toStringValue(body?.confirmText).trim();
 
-  if (newPasswordError) {
-    return NextResponse.json({ error: newPasswordError }, { status: 400 });
+  if (confirmText !== "削除する") {
+    return NextResponse.json(
+      { error: "確認文言を入力してください。" },
+      { status: 400 }
+    );
   }
 
-  const passwordConfirmError = validateForumBetaPasswordConfirmation(
-    newPassword,
-    newPasswordConfirm
-  );
-
-  if (passwordConfirmError) {
-    return NextResponse.json({ error: passwordConfirmError }, { status: 400 });
+  if (postHandling !== "keep_visible") {
+    return NextResponse.json(
+      {
+        error:
+          "投稿とユーザーIDの正式な紐づきがないため、この投稿扱いは未対応です。",
+      },
+      { status: 400 }
+    );
   }
 
   const supabase = getSupabase();
@@ -73,17 +71,21 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
   }
 
-  const passwordHash = await hashForumBetaPassword(newPassword);
+  const now = new Date().toISOString();
   const { data, error } = await supabase
     .from("forum_beta_users")
-    .update({ password_hash: passwordHash })
+    .update({
+      status: "deleted",
+      display_name: "退会ユーザー",
+      disabled_at: now,
+      deleted_at: now,
+    })
     .eq("id", userId)
-    .neq("status", "deleted")
     .select("id")
     .maybeSingle();
 
   if (error) {
-    console.error("[forum beta admin users] password reset failed", {
+    console.error("[forum beta admin users] account delete failed", {
       userId,
       message: error.message,
     });

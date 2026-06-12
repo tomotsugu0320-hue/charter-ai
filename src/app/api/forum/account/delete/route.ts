@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
+  FORUM_BETA_SESSION_COOKIE,
+  getForumBetaSessionClearCookieOptions,
   getForumBetaSessionUser,
-  hashForumBetaPassword,
   isForumBetaUserActive,
   isForumBetaLoggedIn,
-  validateForumBetaPasswordConfirmation,
-  validateForumBetaPasswordInput,
   verifyForumBetaPassword,
 } from "@/lib/forum-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-type ForumBetaPasswordRow = {
+type ForumBetaDeleteAccountRow = {
   password_hash: string;
   status?: string | null;
 };
@@ -41,7 +40,10 @@ function getLoggedInUserId(request: NextRequest) {
   return getForumBetaSessionUser(request);
 }
 
-async function findPasswordHash(supabase: ForumSupabaseClient, userId: string) {
+async function findAccountForDelete(
+  supabase: ForumSupabaseClient,
+  userId: string
+) {
   const { data, error } = await supabase
     .from("forum_beta_users")
     .select("password_hash, status")
@@ -49,10 +51,24 @@ async function findPasswordHash(supabase: ForumSupabaseClient, userId: string) {
     .maybeSingle();
 
   if (error) {
-    return { user: null, error };
+    return { account: null, error };
   }
 
-  return { user: (data as ForumBetaPasswordRow | null) ?? null, error: null };
+  return {
+    account: (data as ForumBetaDeleteAccountRow | null) ?? null,
+    error: null,
+  };
+}
+
+function createLogoutResponse() {
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set(
+    FORUM_BETA_SESSION_COOKIE,
+    "",
+    getForumBetaSessionClearCookieOptions()
+  );
+
+  return response;
 }
 
 export async function POST(request: NextRequest) {
@@ -64,25 +80,16 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json().catch(() => null)) as {
     currentPassword?: unknown;
-    newPassword?: unknown;
-    newPasswordConfirm?: unknown;
+    confirmText?: unknown;
   } | null;
   const currentPassword = toStringValue(body?.currentPassword);
-  const newPassword = toStringValue(body?.newPassword);
-  const newPasswordConfirm = toStringValue(body?.newPasswordConfirm);
-  const newPasswordError = validateForumBetaPasswordInput(newPassword);
+  const confirmText = toStringValue(body?.confirmText).trim();
 
-  if (newPasswordError) {
-    return NextResponse.json({ error: newPasswordError }, { status: 400 });
-  }
-
-  const passwordConfirmError = validateForumBetaPasswordConfirmation(
-    newPassword,
-    newPasswordConfirm
-  );
-
-  if (passwordConfirmError) {
-    return NextResponse.json({ error: passwordConfirmError }, { status: 400 });
+  if (confirmText !== "退会する") {
+    return NextResponse.json(
+      { error: "確認文言を入力してください。" },
+      { status: 400 }
+    );
   }
 
   const supabase = getSupabase();
@@ -94,10 +101,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { user, error: findError } = await findPasswordHash(supabase, userId);
+  const { account, error: findError } = await findAccountForDelete(
+    supabase,
+    userId
+  );
 
   if (findError) {
-    console.error("[forum beta change password] user lookup failed", {
+    console.error("[forum beta account delete] account lookup failed", {
       userId,
       message: findError.message,
     });
@@ -107,30 +117,35 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!user || !isForumBetaUserActive(user.status)) {
+  if (!account || !isForumBetaUserActive(account.status)) {
     return NextResponse.json({ error: "Login required." }, { status: 401 });
   }
 
-  const currentPasswordMatches = await verifyForumBetaPassword(
+  const passwordMatches = await verifyForumBetaPassword(
     currentPassword,
-    user.password_hash
+    account.password_hash
   );
 
-  if (!currentPasswordMatches) {
+  if (!passwordMatches) {
     return NextResponse.json(
       { error: "現在のパスワードが違います。" },
       { status: 401 }
     );
   }
 
-  const passwordHash = await hashForumBetaPassword(newPassword);
+  const now = new Date().toISOString();
   const { error } = await supabase
     .from("forum_beta_users")
-    .update({ password_hash: passwordHash })
+    .update({
+      status: "deleted",
+      display_name: "退会ユーザー",
+      disabled_at: now,
+      deleted_at: now,
+    })
     .eq("id", userId);
 
   if (error) {
-    console.error("[forum beta change password] password update failed", {
+    console.error("[forum beta account delete] account update failed", {
       userId,
       message: error.message,
     });
@@ -140,5 +155,5 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ ok: true });
+  return createLogoutResponse();
 }

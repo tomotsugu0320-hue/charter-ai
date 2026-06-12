@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 type AdminForumBetaUser = {
   id: string;
@@ -10,12 +10,22 @@ type AdminForumBetaUser = {
   display_name: string;
   created_at: string | null;
   last_login_at: string | null;
+  status?: string | null;
+  disabled_at?: string | null;
+  deleted_at?: string | null;
 };
 
 type PasswordFormState = {
   newPassword: string;
   newPasswordConfirm: string;
 };
+
+type CardMessage = {
+  type: "success" | "error";
+  text: string;
+};
+
+const adminKeyStorageKey = "forum_admin_key";
 
 const pageStyle = {
   maxWidth: 1080,
@@ -69,6 +79,12 @@ function formatDate(value: string | null) {
   return date.toLocaleString("ja-JP");
 }
 
+function statusLabel(status: string | null | undefined) {
+  if (status === "disabled") return "無効";
+  if (status === "deleted") return "削除済み";
+  return "有効";
+}
+
 function emptyPasswordForm(): PasswordFormState {
   return {
     newPassword: "",
@@ -88,12 +104,25 @@ export default function AdminUsersPage() {
   const [passwordForms, setPasswordForms] = useState<
     Record<string, PasswordFormState>
   >({});
+  const [deleteConfirmTexts, setDeleteConfirmTexts] = useState<
+    Record<string, string>
+  >({});
+  const [cardMessages, setCardMessages] = useState<Record<string, CardMessage>>(
+    {}
+  );
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const requestAdminKey = adminKey.trim();
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem(adminKeyStorageKey);
+
+    if (saved) {
+      setAdminKey(saved);
+    }
+  }, []);
 
   function requireAdminKey() {
     if (requestAdminKey) return true;
@@ -120,7 +149,7 @@ export default function AdminUsersPage() {
 
     setLoadingUsers(true);
     setError(null);
-    setMessage(null);
+    setCardMessages({});
 
     try {
       const res = await fetch("/api/forum/admin/users", {
@@ -142,11 +171,39 @@ export default function AdminUsersPage() {
       setPasswordForms(
         Object.fromEntries(nextUsers.map((user) => [user.id, emptyPasswordForm()]))
       );
+      setDeleteConfirmTexts({});
+      sessionStorage.setItem(adminKeyStorageKey, requestAdminKey);
     } catch {
       setError("ユーザー一覧の取得に失敗しました。");
     } finally {
       setLoadingUsers(false);
     }
+  }
+
+  function setCardMessage(userId: string, message: CardMessage) {
+    setCardMessages((current) => ({
+      ...current,
+      [userId]: message,
+    }));
+  }
+
+  function updateUserStatus(userId: string, status: string) {
+    const now = new Date().toISOString();
+
+    setUsers((current) =>
+      current.map((user) =>
+        user.id === userId
+          ? {
+              ...user,
+              status,
+              disabled_at: status === "disabled" ? now : null,
+              deleted_at: status === "deleted" ? now : user.deleted_at,
+              display_name:
+                status === "deleted" ? "退会ユーザー" : user.display_name,
+            }
+          : user
+      )
+    );
   }
 
   async function resetPassword(user: AdminForumBetaUser) {
@@ -155,10 +212,17 @@ export default function AdminUsersPage() {
     const form = passwordForms[user.id] ?? emptyPasswordForm();
 
     setError(null);
-    setMessage(null);
+    setCardMessages((current) => {
+      const next = { ...current };
+      delete next[user.id];
+      return next;
+    });
 
     if (form.newPassword !== form.newPasswordConfirm) {
-      setError("新しいパスワードが一致しません。");
+      setCardMessage(user.id, {
+        type: "error",
+        text: "入力内容を確認してください",
+      });
       return;
     }
 
@@ -182,7 +246,10 @@ export default function AdminUsersPage() {
       const json = (await res.json().catch(() => ({}))) as { error?: string };
 
       if (!res.ok) {
-        setError(json.error || "パスワード再設定に失敗しました。");
+        setCardMessage(user.id, {
+          type: "error",
+          text: json.error || "入力内容を確認してください",
+        });
         return;
       }
 
@@ -190,9 +257,124 @@ export default function AdminUsersPage() {
         ...current,
         [user.id]: emptyPasswordForm(),
       }));
-      setMessage(`${user.login_id} のパスワードを再設定しました。`);
+      setCardMessage(user.id, {
+        type: "success",
+        text: "パスワードを再設定しました",
+      });
     } catch {
-      setError("パスワード再設定に失敗しました。");
+      setCardMessage(user.id, {
+        type: "error",
+        text: "入力内容を確認してください",
+      });
+    } finally {
+      setSavingUserId(null);
+    }
+  }
+
+  async function changeUserStatus(
+    user: AdminForumBetaUser,
+    status: "active" | "disabled"
+  ) {
+    if (!requireAdminKey()) return;
+
+    setSavingUserId(user.id);
+    setError(null);
+
+    try {
+      const res = await fetch(
+        `/api/forum/admin/users/${encodeURIComponent(user.id)}/disable`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-admin-key": requestAdminKey,
+          },
+          body: JSON.stringify({ status }),
+        }
+      );
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+
+      if (!res.ok) {
+        setCardMessage(user.id, {
+          type: "error",
+          text: json.error || "入力内容を確認してください",
+        });
+        return;
+      }
+
+      updateUserStatus(user.id, status);
+      setCardMessage(user.id, {
+        type: "success",
+        text: status === "disabled" ? "無効化しました" : "復活しました",
+      });
+    } catch {
+      setCardMessage(user.id, {
+        type: "error",
+        text: "入力内容を確認してください",
+      });
+    } finally {
+      setSavingUserId(null);
+    }
+  }
+
+  async function deleteUser(user: AdminForumBetaUser) {
+    if (!requireAdminKey()) return;
+
+    const confirmText = (deleteConfirmTexts[user.id] ?? "").trim();
+
+    if (confirmText !== "削除する") {
+      setCardMessage(user.id, {
+        type: "error",
+        text: "確認文言を入力してください",
+      });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `${user.login_id} を削除状態にします。投稿は残して表示します。よろしいですか？`
+    );
+
+    if (!confirmed) return;
+
+    setSavingUserId(user.id);
+    setError(null);
+
+    try {
+      const res = await fetch(
+        `/api/forum/admin/users/${encodeURIComponent(user.id)}/delete`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-admin-key": requestAdminKey,
+          },
+          body: JSON.stringify({
+            postHandling: "keep_visible",
+            confirmText,
+          }),
+        }
+      );
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+
+      if (!res.ok) {
+        setCardMessage(user.id, {
+          type: "error",
+          text: json.error || "入力内容を確認してください",
+        });
+        return;
+      }
+
+      updateUserStatus(user.id, "deleted");
+      setDeleteConfirmTexts((current) => ({ ...current, [user.id]: "" }));
+      setCardMessage(user.id, {
+        type: "success",
+        text: "削除状態にしました",
+      });
+    } catch {
+      setCardMessage(user.id, {
+        type: "error",
+        text: "入力内容を確認してください",
+      });
     } finally {
       setSavingUserId(null);
     }
@@ -258,20 +440,6 @@ export default function AdminUsersPage() {
         </div>
       </section>
 
-      {message && (
-        <div
-          style={{
-            ...cardStyle,
-            marginBottom: 18,
-            borderColor: "#86efac",
-            background: "#f0fdf4",
-            color: "#166534",
-          }}
-        >
-          {message}
-        </div>
-      )}
-
       {error && (
         <div
           style={{
@@ -299,7 +467,10 @@ export default function AdminUsersPage() {
           <div style={{ display: "grid", gap: 12 }}>
             {users.map((user) => {
               const form = passwordForms[user.id] ?? emptyPasswordForm();
+              const cardMessage = cardMessages[user.id];
               const isSaving = savingUserId === user.id;
+              const isDeleted = user.status === "deleted";
+              const isDisabled = user.status === "disabled";
 
               return (
                 <article
@@ -361,7 +532,44 @@ export default function AdminUsersPage() {
                         <div>最終ログイン: {formatDate(user.last_login_at)}</div>
                       </div>
                     </div>
+                    <div>
+                      <div style={{ color: "#64748b", fontSize: 13 }}>
+                        ステータス
+                      </div>
+                      <div style={{ fontWeight: 900, marginTop: 4 }}>
+                        {statusLabel(user.status)}
+                      </div>
+                      {user.disabled_at && (
+                        <div style={{ color: "#64748b", fontSize: 12 }}>
+                          無効化: {formatDate(user.disabled_at)}
+                        </div>
+                      )}
+                      {user.deleted_at && (
+                        <div style={{ color: "#64748b", fontSize: 12 }}>
+                          削除: {formatDate(user.deleted_at)}
+                        </div>
+                      )}
+                    </div>
                   </div>
+
+                  {cardMessage && (
+                    <div
+                      style={{
+                        border: `1px solid ${
+                          cardMessage.type === "success" ? "#86efac" : "#fca5a5"
+                        }`,
+                        borderRadius: 8,
+                        background:
+                          cardMessage.type === "success" ? "#f0fdf4" : "#fef2f2",
+                        color:
+                          cardMessage.type === "success" ? "#166534" : "#991b1b",
+                        marginTop: 12,
+                        padding: "9px 10px",
+                      }}
+                    >
+                      {cardMessage.text}
+                    </div>
+                  )}
 
                   <div
                     style={{
@@ -424,13 +632,132 @@ export default function AdminUsersPage() {
                       <button
                         type="button"
                         onClick={() => void resetPassword(user)}
-                        disabled={isSaving}
+                        disabled={isSaving || isDeleted}
                         style={{
                           ...secondaryButtonStyle,
-                          opacity: isSaving ? 0.65 : 1,
+                          opacity: isSaving || isDeleted ? 0.65 : 1,
                         }}
                       >
                         {isSaving ? "再設定中..." : "再設定する"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      borderTop: "1px solid #e2e8f0",
+                      marginTop: 14,
+                      paddingTop: 14,
+                    }}
+                  >
+                    <div style={{ fontWeight: 900, marginBottom: 10 }}>
+                      アカウント操作
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 10,
+                        alignItems: "center",
+                      }}
+                    >
+                      {isDisabled ? (
+                        <button
+                          type="button"
+                          onClick={() => void changeUserStatus(user, "active")}
+                          disabled={isSaving || isDeleted}
+                          style={{
+                            ...secondaryButtonStyle,
+                            opacity: isSaving || isDeleted ? 0.65 : 1,
+                          }}
+                        >
+                          復活する
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void changeUserStatus(user, "disabled")
+                          }
+                          disabled={isSaving || isDeleted}
+                          style={{
+                            ...secondaryButtonStyle,
+                            opacity: isSaving || isDeleted ? 0.65 : 1,
+                          }}
+                        >
+                          無効化する
+                        </button>
+                      )}
+                      <span style={{ color: "#64748b", fontSize: 13 }}>
+                        無効化すると再ログインできません。投稿は残ります。
+                      </span>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      borderTop: "1px solid #fecaca",
+                      marginTop: 14,
+                      paddingTop: 14,
+                    }}
+                  >
+                    <div style={{ color: "#991b1b", fontWeight: 900 }}>
+                      アカウント削除
+                    </div>
+                    <p style={{ color: "#7f1d1d", lineHeight: 1.7 }}>
+                      現在、投稿と登録ユーザーIDの正式な紐づきがないため、投稿は残して表示する扱いのみ対応しています。投稿の非表示・完全削除は未対応です。
+                    </p>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+                        gap: 10,
+                        alignItems: "end",
+                      }}
+                    >
+                      <label style={{ fontWeight: 800 }}>
+                        投稿扱い
+                        <select
+                          disabled
+                          value="keep_visible"
+                          style={{ ...inputStyle, marginTop: 8 }}
+                        >
+                          <option value="keep_visible">投稿を残して表示</option>
+                        </select>
+                      </label>
+                      <label style={{ fontWeight: 800 }}>
+                        確認文言
+                        <input
+                          value={deleteConfirmTexts[user.id] ?? ""}
+                          onChange={(event) =>
+                            setDeleteConfirmTexts((current) => ({
+                              ...current,
+                              [user.id]: event.target.value,
+                            }))
+                          }
+                          placeholder="削除する"
+                          disabled={isDeleted}
+                          style={{ ...inputStyle, marginTop: 8 }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => void deleteUser(user)}
+                        disabled={isSaving || isDeleted}
+                        style={{
+                          border: "1px solid #991b1b",
+                          borderRadius: 8,
+                          background: "#991b1b",
+                          color: "#ffffff",
+                          cursor:
+                            isSaving || isDeleted ? "not-allowed" : "pointer",
+                          fontWeight: 800,
+                          opacity: isSaving || isDeleted ? 0.65 : 1,
+                          padding: "9px 12px",
+                        }}
+                      >
+                        {isDeleted ? "削除済み" : "削除状態にする"}
                       </button>
                     </div>
                   </div>

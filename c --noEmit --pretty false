@@ -1,0 +1,22 @@
+warning: in the working copy of 'docs/forum/auth/forum-beta-auth-spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/[tenant]/forum/account/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/[tenant]/forum/admin/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/[tenant]/forum/admin/users/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/api/forum/account/route.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/api/forum/admin/users/[id]/reset-password/route.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/api/forum/admin/users/route.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/api/forum/change-password/route.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/api/forum/login/route.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/api/forum/login/status/route.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/lib/forum-auth.ts', LF will be replaced by CRLF the next time Git touches it
+docs/forum/auth/forum-beta-auth-spec.md
+src/app/[tenant]/forum/account/page.tsx
+src/app/[tenant]/forum/admin/page.tsx
+src/app/[tenant]/forum/admin/users/page.tsx
+src/app/api/forum/account/route.ts
+src/app/api/forum/admin/users/[id]/reset-password/route.ts
+src/app/api/forum/admin/users/route.ts
+src/app/api/forum/change-password/route.ts
+src/app/api/forum/login/route.ts
+src/app/api/forum/login/status/route.ts
+src/lib/forum-auth.ts

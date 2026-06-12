@@ -5,6 +5,7 @@ import {
   FORUM_BETA_SESSION_COOKIE,
   getForumBetaSessionCookieOptions,
   getForumBetaAuthConfigError,
+  isForumBetaUserActive,
   normalizeForumBetaLoginId,
   validateForumBetaLoginInput,
   verifyForumBetaPassword,
@@ -21,6 +22,7 @@ type ForumBetaUserRow = {
   id: string;
   login_id: string;
   password_hash: string;
+  status?: string | null;
 };
 
 type ForumSupabaseClient = ReturnType<typeof createClient<any, "public", any>>;
@@ -58,7 +60,7 @@ async function findForumBetaUser(
 ) {
   const { data, error } = await supabase
     .from("forum_beta_users")
-    .select("id, login_id, password_hash")
+    .select("id, login_id, password_hash, status")
     .eq("login_id_normalized", normalizedLoginId)
     .maybeSingle();
 
@@ -124,6 +126,10 @@ export async function POST(request: NextRequest) {
   }
 
   if (!existing.user) {
+    return NextResponse.json({ error: INVALID_LOGIN_MESSAGE }, { status: 401 });
+  }
+
+  if (!isForumBetaUserActive(existing.user.status)) {
     return NextResponse.json({ error: INVALID_LOGIN_MESSAGE }, { status: 401 });
   }
 

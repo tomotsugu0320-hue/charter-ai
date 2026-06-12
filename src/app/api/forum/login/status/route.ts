@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
   getForumBetaSessionUser,
+  isForumBetaUserActive,
   isForumBetaLoggedIn,
 } from "@/lib/forum-auth";
 
@@ -11,6 +12,7 @@ export const revalidate = 0;
 type ForumBetaUserProfileRow = {
   login_id: string;
   display_name: string | null;
+  status?: string | null;
 };
 
 type ForumSupabaseClient = ReturnType<typeof createClient<any, "public", any>>;
@@ -32,7 +34,7 @@ async function getForumBetaUserProfile(
 ) {
   const { data, error } = await supabase
     .from("forum_beta_users")
-    .select("login_id, display_name")
+    .select("login_id, display_name, status")
     .eq("id", userId)
     .maybeSingle();
 
@@ -53,15 +55,17 @@ export async function GET(request: NextRequest) {
   const supabase = userId ? getSupabase() : null;
   const profile =
     userId && supabase ? await getForumBetaUserProfile(supabase, userId) : null;
+  const active = Boolean(loggedIn && profile && isForumBetaUserActive(profile.status));
   const loginId = profile?.login_id || null;
-  const displayName = profile?.display_name?.trim() || profile?.login_id || null;
+  const displayName =
+    active && profile ? profile.display_name?.trim() || profile.login_id : null;
 
   return NextResponse.json({
     ok: true,
-    loggedIn,
-    userId,
-    loginId,
-    login_id: loginId,
+    loggedIn: active,
+    userId: active ? userId : null,
+    loginId: active ? loginId : null,
+    login_id: active ? loginId : null,
     displayName,
     display_name: displayName,
   });

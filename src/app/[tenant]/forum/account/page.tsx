@@ -44,13 +44,17 @@ export default function ForumAccountPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingName, setIsSavingName] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -176,7 +180,52 @@ export default function ForumAccountPage() {
 
   async function handleLogout() {
     await fetch("/api/forum/logout", { method: "POST" }).catch(() => null);
-    router.replace(`/${tenant}/forum/login?next=${encodeURIComponent(forumPath)}`);
+    router.replace(
+      `/${tenant}/forum/login?next=${encodeURIComponent(forumPath)}`
+    );
+  }
+
+  async function handleDeleteAccount(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setDeleteError("");
+
+    if (deleteConfirmText.trim() !== "退会する") {
+      setDeleteError("確認文言を入力してください。");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "退会すると、このIDでは再ログインできなくなります。投稿は残して表示されます。退会しますか？"
+    );
+
+    if (!confirmed) return;
+
+    setIsDeletingAccount(true);
+
+    try {
+      const response = await fetch("/api/forum/account/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: deletePassword,
+          confirmText: deleteConfirmText.trim(),
+        }),
+      });
+      const json = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setDeleteError(json.error || "入力内容を確認してください");
+        return;
+      }
+
+      router.replace(`/${tenant}/forum/login`);
+    } catch {
+      setDeleteError("入力内容を確認してください");
+    } finally {
+      setIsDeletingAccount(false);
+    }
   }
 
   const inputStyle = {
@@ -437,6 +486,83 @@ export default function ForumAccountPage() {
                 }}
               >
                 {isChangingPassword ? "変更中..." : "パスワードを変更する"}
+              </button>
+            </form>
+
+            <form
+              onSubmit={handleDeleteAccount}
+              style={{
+                border: "1px solid #fecaca",
+                borderRadius: 10,
+                background: "#fef2f2",
+                marginBottom: 20,
+                padding: 16,
+              }}
+            >
+              <h2 style={{ margin: "0 0 10px", fontSize: 18 }}>
+                退会
+              </h2>
+              <p style={{ color: "#7f1d1d", lineHeight: 1.7, margin: "0 0 14px" }}>
+                退会すると、このIDでは再ログインできなくなります。投稿は削除せず、原則として残して表示します。表示名は退会ユーザー扱いになります。
+              </p>
+              <label
+                style={{
+                  display: "block",
+                  color: "#111827",
+                  fontWeight: 800,
+                  marginBottom: 14,
+                }}
+              >
+                現在のパスワード
+                <input
+                  autoComplete="current-password"
+                  placeholder="現在のパスワード"
+                  type="password"
+                  value={deletePassword}
+                  onChange={(event) => setDeletePassword(event.target.value)}
+                  style={inputStyle}
+                />
+              </label>
+              <label
+                style={{
+                  display: "block",
+                  color: "#111827",
+                  fontWeight: 800,
+                }}
+              >
+                確認文言
+                <input
+                  placeholder="退会する"
+                  value={deleteConfirmText}
+                  onChange={(event) => setDeleteConfirmText(event.target.value)}
+                  style={inputStyle}
+                />
+              </label>
+              <p style={{ color: "#7f1d1d", fontSize: 13, lineHeight: 1.6 }}>
+                退会する場合は、確認文言に「退会する」と入力してください。
+              </p>
+              {deleteError && (
+                <p style={{ color: "#991b1b", margin: "10px 0 0" }}>
+                  {deleteError}
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={isDeletingAccount}
+                style={{
+                  border: "1px solid #991b1b",
+                  borderRadius: 8,
+                  background: "#991b1b",
+                  color: "#ffffff",
+                  cursor: isDeletingAccount ? "not-allowed" : "pointer",
+                  fontSize: 15,
+                  fontWeight: 900,
+                  marginTop: 14,
+                  opacity: isDeletingAccount ? 0.75 : 1,
+                  padding: "11px 14px",
+                }}
+              >
+                {isDeletingAccount ? "退会処理中..." : "退会する"}
               </button>
             </form>
 

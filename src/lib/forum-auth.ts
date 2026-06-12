@@ -17,6 +17,8 @@ type ForumBetaSessionPayload = {
   v: 1;
 };
 
+export type ForumBetaUserStatus = "active" | "disabled" | "deleted";
+
 function getSessionSecret() {
   return process.env.FORUM_BETA_SESSION_SECRET;
 }
@@ -48,6 +50,18 @@ export function normalizeForumBetaLoginId(loginId: string) {
 
 export function normalizeForumBetaDisplayName(displayName: string) {
   return displayName.trim();
+}
+
+export function normalizeForumBetaUserStatus(
+  status: string | null | undefined
+): ForumBetaUserStatus {
+  if (status === "disabled" || status === "deleted") return status;
+
+  return "active";
+}
+
+export function isForumBetaUserActive(status: string | null | undefined) {
+  return normalizeForumBetaUserStatus(status) === "active";
 }
 
 export function validateForumBetaPasswordInput(password: string) {

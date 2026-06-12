@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import {
-  hashForumBetaPassword,
-  isForumAdminKeyValid,
-  validateForumBetaPasswordConfirmation,
-  validateForumBetaPasswordInput,
-} from "@/lib/forum-auth";
+import { isForumAdminKeyValid } from "@/lib/forum-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -44,24 +39,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
 
   const body = (await request.json().catch(() => null)) as {
-    newPassword?: unknown;
-    newPasswordConfirm?: unknown;
+    status?: unknown;
   } | null;
-  const newPassword = toStringValue(body?.newPassword);
-  const newPasswordConfirm = toStringValue(body?.newPasswordConfirm);
-  const newPasswordError = validateForumBetaPasswordInput(newPassword);
+  const nextStatus = toStringValue(body?.status).trim();
 
-  if (newPasswordError) {
-    return NextResponse.json({ error: newPasswordError }, { status: 400 });
-  }
-
-  const passwordConfirmError = validateForumBetaPasswordConfirmation(
-    newPassword,
-    newPasswordConfirm
-  );
-
-  if (passwordConfirmError) {
-    return NextResponse.json({ error: passwordConfirmError }, { status: 400 });
+  if (nextStatus !== "active" && nextStatus !== "disabled") {
+    return NextResponse.json({ error: "invalid status" }, { status: 400 });
   }
 
   const supabase = getSupabase();
@@ -73,17 +56,21 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
   }
 
-  const passwordHash = await hashForumBetaPassword(newPassword);
+  const now = new Date().toISOString();
   const { data, error } = await supabase
     .from("forum_beta_users")
-    .update({ password_hash: passwordHash })
+    .update({
+      status: nextStatus,
+      disabled_at: nextStatus === "disabled" ? now : null,
+      deleted_at: null,
+    })
     .eq("id", userId)
     .neq("status", "deleted")
     .select("id")
     .maybeSingle();
 
   if (error) {
-    console.error("[forum beta admin users] password reset failed", {
+    console.error("[forum beta admin users] status update failed", {
       userId,
       message: error.message,
     });

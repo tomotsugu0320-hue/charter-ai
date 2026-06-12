@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
   getForumBetaSessionUser,
+  isForumBetaUserActive,
   isForumBetaLoggedIn,
   normalizeForumBetaDisplayName,
   validateForumBetaDisplayName,
@@ -15,6 +16,7 @@ type ForumBetaAccountRow = {
   display_name: string | null;
   created_at: string | null;
   last_login_at: string | null;
+  status?: string | null;
 };
 
 type ForumSupabaseClient = ReturnType<typeof createClient<any, "public", any>>;
@@ -43,7 +45,7 @@ function getLoggedInUserId(request: NextRequest) {
 async function findAccount(supabase: ForumSupabaseClient, userId: string) {
   const { data, error } = await supabase
     .from("forum_beta_users")
-    .select("login_id, display_name, created_at, last_login_at")
+    .select("login_id, display_name, created_at, last_login_at, status")
     .eq("id", userId)
     .maybeSingle();
 
@@ -94,7 +96,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (!account) {
+  if (!account || !isForumBetaUserActive(account.status)) {
     return NextResponse.json({ error: "Login required." }, { status: 401 });
   }
 
@@ -130,7 +132,7 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  if (!account) {
+  if (!account || !isForumBetaUserActive(account.status)) {
     return NextResponse.json({ error: "Login required." }, { status: 401 });
   }
 

@@ -11,6 +11,9 @@ type ForumBetaAdminUserRow = {
   display_name: string | null;
   created_at: string | null;
   last_login_at: string | null;
+  status?: string | null;
+  disabled_at?: string | null;
+  deleted_at?: string | null;
 };
 
 function getSupabase() {
@@ -40,7 +43,9 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("forum_beta_users")
-    .select("id, login_id, display_name, created_at, last_login_at")
+    .select(
+      "id, login_id, display_name, created_at, last_login_at, status, disabled_at, deleted_at"
+    )
     .order("created_at", { ascending: false })
     .limit(1000);
 
@@ -60,6 +65,9 @@ export async function GET(request: NextRequest) {
     display_name: user.display_name?.trim() || user.login_id,
     created_at: user.created_at,
     last_login_at: user.last_login_at,
+    status: user.status || "active",
+    disabled_at: user.disabled_at,
+    deleted_at: user.deleted_at,
   }));
 
   return NextResponse.json({ ok: true, users });

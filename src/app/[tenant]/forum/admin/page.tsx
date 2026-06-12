@@ -1,11 +1,10 @@
-import Link from "next/link";
-import type { CSSProperties } from "react";
+"use client";
 
-type PageProps = {
-  params: Promise<{
-    tenant: string;
-  }>;
-};
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useEffect, useState, type CSSProperties } from "react";
+
+const adminKeyStorageKey = "forum_admin_key";
 
 const pageStyle: CSSProperties = {
   maxWidth: 920,
@@ -46,8 +45,78 @@ const menuDescriptionStyle: CSSProperties = {
   lineHeight: 1.7,
 };
 
-export default async function ForumAdminPage({ params }: PageProps) {
-  const { tenant } = await params;
+const inputStyle: CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "10px 12px",
+  border: "1px solid #cbd5e1",
+  borderRadius: 8,
+  background: "#ffffff",
+  color: "#111827",
+};
+
+const buttonStyle: CSSProperties = {
+  border: "1px solid #111827",
+  borderRadius: 8,
+  background: "#111827",
+  color: "#ffffff",
+  cursor: "pointer",
+  fontWeight: 800,
+  padding: "10px 14px",
+};
+
+export default function ForumAdminPage() {
+  const params = useParams();
+  const tenantParam = params?.tenant;
+  const tenant = Array.isArray(tenantParam)
+    ? tenantParam[0] ?? "dev"
+    : tenantParam ?? "dev";
+  const [adminKey, setAdminKey] = useState("");
+  const [isVerified, setIsVerified] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem(adminKeyStorageKey);
+
+    if (saved) {
+      setAdminKey(saved);
+    }
+  }, []);
+
+  async function verifyAdminKey() {
+    const requestAdminKey = adminKey.trim();
+
+    if (!requestAdminKey) {
+      setError("管理者キーを入力してください。");
+      return;
+    }
+
+    setIsChecking(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/forum/admin/users", {
+        headers: { "x-admin-key": requestAdminKey },
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        setIsVerified(false);
+        sessionStorage.removeItem(adminKeyStorageKey);
+        setError("管理者キーが正しくありません。");
+        return;
+      }
+
+      sessionStorage.setItem(adminKeyStorageKey, requestAdminKey);
+      setIsVerified(true);
+    } catch {
+      setIsVerified(false);
+      setError("管理者キーを確認できませんでした。");
+    } finally {
+      setIsChecking(false);
+    }
+  }
 
   return (
     <main style={pageStyle}>
@@ -57,55 +126,99 @@ export default async function ForumAdminPage({ params }: PageProps) {
 
       <section style={noticeStyle}>
         <div>このページは管理者向けです。</div>
-        <div>削除操作は元に戻せない場合があります。</div>
+        <div>管理メニューを表示するには ADMIN_KEY が必要です。</div>
         <div>AI論理スコア再評価ではOpenAI API費用が発生します。</div>
       </section>
 
-      <div style={menuGridStyle}>
-        <Link
-          href={`/${tenant}/forum/admin/delete-threads`}
-          style={menuCardStyle}
-        >
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
-            会員向け：非表示/復元
-          </h2>
-          <p style={menuDescriptionStyle}>
-            管理者キーなしでスレッドの非表示・復元を行えます。完全削除のみ管理者キーが必要です。
-          </p>
-        </Link>
+      {!isVerified && (
+        <section style={{ ...menuCardStyle, marginBottom: 18 }}>
+          <label
+            htmlFor="admin-key"
+            style={{ display: "block", marginBottom: 8, fontWeight: 800 }}
+          >
+            管理者キー
+          </label>
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
+            <input
+              id="admin-key"
+              type="password"
+              value={adminKey}
+              onChange={(event) => setAdminKey(event.target.value)}
+              placeholder="ADMIN_KEY"
+              style={{ ...inputStyle, flex: "1 1 260px" }}
+            />
+            <button
+              type="button"
+              onClick={() => void verifyAdminKey()}
+              disabled={isChecking}
+              style={{ ...buttonStyle, opacity: isChecking ? 0.65 : 1 }}
+            >
+              {isChecking ? "確認中..." : "管理メニューを表示"}
+            </button>
+          </div>
+          {error && (
+            <p style={{ color: "#991b1b", margin: "10px 0 0" }}>
+              {error}
+            </p>
+          )}
+        </section>
+      )}
 
-        <Link
-          href={`/${tenant}/forum/admin/re-evaluate-logic-score`}
-          style={menuCardStyle}
-        >
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
-            AI論理スコア再評価
-          </h2>
-          <p style={menuDescriptionStyle}>
-            投稿のAI論理スコアを管理者操作で1件ずつ再評価します。
-          </p>
-        </Link>
+      {isVerified && (
+        <div style={menuGridStyle}>
+          <Link
+            href={`/${tenant}/forum/admin/delete-threads`}
+            style={menuCardStyle}
+          >
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
+              会員向け：非表示/復元
+            </h2>
+            <p style={menuDescriptionStyle}>
+              管理者キーなしでスレッドの非表示・復元を行えます。完全削除のみ管理者キーが必要です。
+            </p>
+          </Link>
 
-        <Link href={`/${tenant}/forum/admin/users`} style={menuCardStyle}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
-            登録ユーザー管理
-          </h2>
-          <p style={menuDescriptionStyle}>
-            ベータ登録ユーザーのID、ハンドルネーム、最終ログインを確認し、必要に応じてパスワードを再設定します。
-          </p>
-        </Link>
-        <Link
-          href={`/${tenant}/forum/admin/rebuild-discussion-map`}
-          style={menuCardStyle}
-        >
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
-            議論マップ再編案
-          </h2>
-          <p style={menuDescriptionStyle}>
-            公開中のスレッドと投稿をもとに、AIが議論ツリーの再編案を生成します。今回はプレビューのみです。
-          </p>
-        </Link>
-      </div>
+          <Link
+            href={`/${tenant}/forum/admin/re-evaluate-logic-score`}
+            style={menuCardStyle}
+          >
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
+              AI論理スコア再評価
+            </h2>
+            <p style={menuDescriptionStyle}>
+              投稿のAI論理スコアを管理者操作で1件ずつ再評価します。
+            </p>
+          </Link>
+
+          <Link href={`/${tenant}/forum/admin/users`} style={menuCardStyle}>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
+              登録ユーザー管理
+            </h2>
+            <p style={menuDescriptionStyle}>
+              ベータ登録ユーザーのID、ハンドルネーム、最終ログインを確認し、無効化・復活・パスワード再設定を行います。
+            </p>
+          </Link>
+
+          <Link
+            href={`/${tenant}/forum/admin/rebuild-discussion-map`}
+            style={menuCardStyle}
+          >
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
+              議論マップ再編案
+            </h2>
+            <p style={menuDescriptionStyle}>
+              公開中のスレッドと投稿をもとに、AIが議論ツリーの再編案を生成します。今回はプレビューのみです。
+            </p>
+          </Link>
+        </div>
+      )}
     </main>
   );
 }

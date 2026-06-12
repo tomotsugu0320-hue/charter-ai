@@ -32,14 +32,19 @@ create table if not exists forum_beta_users (
   login_id_normalized text not null unique,
   password_hash text not null,
   display_name text,
+  status text not null default 'active',
   created_at timestamptz not null default now(),
-  last_login_at timestamptz
+  last_login_at timestamptz,
+  disabled_at timestamptz,
+  deleted_at timestamptz
 );
 ```
 
 `login_id_normalized` は `trim + lowercase` した値を保存する。
 
 `display_name` は任意のハンドルネームを保存する。未入力の場合は `login_id` を表示名の代替として保存する。
+
+`status` は `active` / `disabled` / `deleted` を使う。`disabled` と `deleted` はログイン不可とする。
 
 ## 4. パスワード保存
 
@@ -87,6 +92,8 @@ src/lib/forum-auth.ts
 
 - `normalizeForumBetaLoginId()`
 - `normalizeForumBetaDisplayName()`
+- `normalizeForumBetaUserStatus()`
+- `isForumBetaUserActive()`
 - `validateForumBetaLoginInput()`
 - `validateForumBetaPasswordInput()`
 - `validateForumBetaPasswordConfirmation()`
@@ -116,10 +123,11 @@ src/app/api/forum/login/route.ts
 4. `forum_beta_users` から `login_id_normalized` を検索する
 5. ユーザーが存在しない場合は 401 を返す
 6. ユーザーが存在する場合だけ `password_hash` を verify する
-7. パスワード不一致なら 401 を返す
-8. 成功時に `createForumBetaSessionToken(user.id)` で Cookie を発行する
-9. `last_login_at` を更新する
-10. `{ ok: true }` を返す
+7. `status` が `active` でない場合は 401 を返す
+8. パスワード不一致なら 401 を返す
+9. 成功時に `createForumBetaSessionToken(user.id)` で Cookie を発行する
+10. `last_login_at` を更新する
+11. `{ ok: true }` を返す
 
 ログインAPIでは `forum_beta_users` への insert を行わない。
 
@@ -197,6 +205,7 @@ src/app/[tenant]/forum/account/page.tsx
 - ログインID、ハンドルネーム、最終ログイン日時を表示する
 - ハンドルネーム変更フォームを表示する
 - パスワード変更フォームを表示する
+- 退会セクションを表示する
 - ログアウトボタンとForumへ戻るリンクを表示する
 - 管理者用の全ユーザー管理は行わない
 
@@ -247,7 +256,30 @@ src/app/api/forum/change-password/route.ts
 9. `currentPassword` / `newPasswordConfirm` は保存しない
 10. 成功時 `{ ok: true }` を返す
 
-## 14. ログアウトAPI
+## 14. 本人退会API
+
+実装場所:
+
+```txt
+src/app/api/forum/account/delete/route.ts
+```
+
+処理:
+
+1. `forum_beta_session` Cookie からログイン中ユーザーIDを取得する
+2. 未ログインなら 401 を返す
+3. request body の `currentPassword` / `confirmText` を読む
+4. `confirmText` が `退会する` でなければ 400 を返す
+5. `currentPassword` を現在の `password_hash` と照合する
+6. `currentPassword` が違う場合は 401 を返す
+7. OKなら `status` を `deleted` にし、`deleted_at` / `disabled_at` を現在時刻にする
+8. `display_name` は `退会ユーザー` にする
+9. 投稿は削除せず、原則として残して表示する
+10. `forum_beta_session` Cookie を削除する
+
+本人退会は完全削除ではなく、再ログイン不可にする安全な無効化として扱う。
+
+## 15. ログアウトAPI
 
 実装場所:
 
@@ -257,7 +289,7 @@ src/app/api/forum/logout/route.ts
 
 `forum_beta_session` Cookie を削除し、`{ ok: true }` を返す。
 
-## 15. ログイン状態確認API
+## 16. ログイン状態確認API
 
 実装場所:
 
@@ -267,9 +299,9 @@ src/app/api/forum/login/status/route.ts
 
 `forum_beta_session` Cookie を検証し、ログイン状態を返す。
 
-ログイン済みで `forum_beta_users` を参照できる場合は、`login_id` と `display_name` も返す。`password_hash` は返さない。
+ログイン済みで `forum_beta_users` を参照でき、`status` が `active` の場合は、`login_id` と `display_name` も返す。`password_hash` は返さない。
 
-## 16. ログイン必須の範囲
+## 17. ログイン必須の範囲
 
 投稿・作成・AI整理系APIは、引き続き `isForumBetaLoggedIn()` でログイン確認を行う。
 
@@ -284,11 +316,11 @@ src/app/api/forum/login/status/route.ts
 
 未ログイン時は 401 を返し、本処理に入らない。
 
-## 17. 未ログインでも可能な範囲
+## 18. 未ログインでも可能な範囲
 
 Forumトップ、スレッド詳細、使い方ページなどの閲覧は未ログインでも可能である。
 
-## 18. author_key との関係
+## 19. author_key との関係
 
 `forum_beta_session` はログイン状態を確認するCookieである。
 
@@ -296,13 +328,15 @@ Forumトップ、スレッド詳細、使い方ページなどの閲覧は未ロ
 
 今回の簡易登録では、既存投稿とユーザーIDの厳密な紐づけまでは行わない。
 
-## 19. ADMIN_KEY との関係
+## 20. ADMIN_KEY との関係
 
 管理系APIや高権限APIでは、ログイン済みであっても `ADMIN_KEY` が必要なものがある。
 
 簡易登録ユーザーに管理者権限は付与しない。
 
-## 20. 管理者用ユーザー管理
+管理画面入口 `/{tenant}/forum/admin` も `ADMIN_KEY` 入力後だけ管理メニューを表示する。`ADMIN_KEY` はDBに保存せず、APIリクエストでは既存管理APIと同じ `x-admin-key` ヘッダーで確認する。
+
+## 21. 管理者用ユーザー管理
 
 実装場所:
 
@@ -310,6 +344,8 @@ Forumトップ、スレッド詳細、使い方ページなどの閲覧は未ロ
 src/app/[tenant]/forum/admin/users/page.tsx
 src/app/api/forum/admin/users/route.ts
 src/app/api/forum/admin/users/[id]/reset-password/route.ts
+src/app/api/forum/admin/users/[id]/disable/route.ts
+src/app/api/forum/admin/users/[id]/delete/route.ts
 ```
 
 管理者用ユーザー管理は `ADMIN_KEY` 必須とする。通常ログイン済みユーザーだけでは利用できない。
@@ -319,8 +355,11 @@ src/app/api/forum/admin/users/[id]/reset-password/route.ts
 - ユーザーID
 - 登録ID
 - ハンドルネーム
+- ステータス
 - 作成日
 - 最終ログイン日時
+- 無効化日時
+- 削除日時
 
 管理者APIは `password_hash` を返さない。現在のパスワードは平文保存していないため、管理者でも閲覧できない。
 
@@ -332,9 +371,22 @@ src/app/api/forum/admin/users/[id]/reset-password/route.ts
 - `hashForumBetaPassword(newPassword)` で `password_hash` を更新する
 - `newPasswordConfirm` は保存しない
 
-削除・停止機能は、`is_disabled` などのDB構造がないため今回は作らない。必要になった場合はDB設計を含めて検討する。
+管理者ができるアカウント操作:
 
-## 21. セキュリティ上の注意
+- `active` から `disabled` への無効化
+- `disabled` から `active` への復活
+- `deleted` への削除状態変更
+
+無効化・削除状態のユーザーは再ログイン不可とする。
+
+投稿の扱い:
+
+- 現時点では `forum_posts` と `forum_beta_users.id` の正式な紐づきがない
+- そのため、ユーザー単位の投稿非表示・復活・完全削除は未対応
+- 管理者削除時の投稿扱いは `投稿を残して表示` のみ対応する
+- `author_key` だけを使った推測削除は行わない
+
+## 22. セキュリティ上の注意
 
 この方式はベータ向けの簡易方式であり、本格的なアカウント管理ではない。
 
@@ -348,6 +400,7 @@ src/app/api/forum/admin/users/[id]/reset-password/route.ts
 - 管理者APIは `ADMIN_KEY` 必須にする
 - 通常ユーザーに全ユーザー一覧を見せない
 - 管理者でも現在のパスワードは表示しない
+- 退会・無効化・削除状態のユーザーはログイン不可にする
 - `login_id` は 3〜32文字
 - パスワードは 6〜128文字
 - ハンドルネームは任意、入力する場合は 20文字以内
@@ -360,11 +413,11 @@ src/app/api/forum/admin/users/[id]/reset-password/route.ts
 - スパム・荒らし対策
 - 試行回数制限
 - アカウント停止
-- ユーザー削除や停止
 - 投稿とユーザーIDの正式な紐づけ
+- ユーザー単位の投稿非表示・復活・完全削除
 - 招待制やメール認証への移行
 
-## 22. 確認項目
+## 23. 確認項目
 
 - 未ログインでも閲覧できる
 - 未ログインで投稿しようとするとログインへ誘導される
@@ -383,10 +436,16 @@ src/app/api/forum/admin/users/[id]/reset-password/route.ts
 - 自分のハンドルネームを変更できる
 - 現在のパスワードが正しい場合だけパスワード変更できる
 - 新しいパスワードと確認が一致しない場合は変更できない
+- 自分のアカウント管理から退会できる
+- 退会後、そのIDではログインできない
 - ログイン後メニューにアカウント管理リンクが表示される
+- 通常ユーザーだけでは管理画面入口に入れない
 - `ADMIN_KEY` ありで管理者用ユーザー管理を利用できる
 - `ADMIN_KEY` なしでは管理者用ユーザー管理APIを利用できない
 - 管理者用ユーザー一覧に `password_hash` が含まれない
 - 管理者は現在のパスワードを閲覧できず、新しいパスワードへ再設定だけできる
+- 管理者はユーザーを無効化・復活できる
+- 管理者はユーザーを削除状態にできる
+- 投稿のユーザー単位非表示・完全削除は、正式なユーザーID紐づきがないため未対応と表示する
 - ログイン後、投稿・外部AI取り込み・AI整理が使える
 
