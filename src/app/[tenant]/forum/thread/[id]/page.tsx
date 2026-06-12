@@ -470,6 +470,60 @@ function isTemplateProvisionalAnswer(value?: string | null) {
   );
 }
 
+const ANSWER_LAYER_LABELS = [
+  "【誰でも分かる説明】",
+  "【もう少し詳しい説明】",
+  "【深層・専門的な補足】",
+] as const;
+
+function extractAnswerLayer(
+  text: string,
+  label: (typeof ANSWER_LAYER_LABELS)[number],
+  nextLabels: readonly string[]
+) {
+  const startIndex = text.indexOf(label);
+  if (startIndex < 0) return "";
+
+  const afterLabel = text.slice(startIndex + label.length);
+  const nextIndex = nextLabels.reduce<number | null>((current, nextLabel) => {
+    const index = afterLabel.indexOf(nextLabel);
+    if (index < 0) return current;
+    return current === null ? index : Math.min(current, index);
+  }, null);
+
+  return (nextIndex === null ? afterLabel : afterLabel.slice(0, nextIndex))
+    .replace(/^[:：\s\n]+/, "")
+    .trim();
+}
+
+function parseLayeredProvisionalAnswer(value: string) {
+  const text = value.replace(/\r\n/g, "\n").trim();
+  const hasLayerHeading = ANSWER_LAYER_LABELS.some((label) =>
+    text.includes(label)
+  );
+
+  if (!hasLayerHeading) {
+    return {
+      hasLayers: false,
+      simple: text,
+      detailed: "",
+      deep: "",
+    };
+  }
+
+  return {
+    hasLayers: true,
+    simple: extractAnswerLayer(text, ANSWER_LAYER_LABELS[0], [
+      ANSWER_LAYER_LABELS[1],
+      ANSWER_LAYER_LABELS[2],
+    ]),
+    detailed: extractAnswerLayer(text, ANSWER_LAYER_LABELS[1], [
+      ANSWER_LAYER_LABELS[2],
+    ]),
+    deep: extractAnswerLayer(text, ANSWER_LAYER_LABELS[2], []),
+  };
+}
+
 function normalizeSourceItems(values?: (string | SourceItem)[] | null): SourceItem[] {
   if (!Array.isArray(values)) return [];
 
@@ -1544,6 +1598,8 @@ const provisionalAnswerText =
   naturalSummaryAnswer ||
   externalAiAnswerFromOriginalPost ||
   "まだAIの暫定回答はありません。AIまとめを確認・更新すると表示されます。";
+const layeredProvisionalAnswer =
+  parseLayeredProvisionalAnswer(provisionalAnswerText);
 
 /*
 const oldPremiseSectionTitle = hasInferred(displayPremiseItems)
@@ -2447,16 +2503,97 @@ function renderDiscussionCard({
     投稿内容とAI整理をもとにした、現時点での答えです。今後の反論や補足で更新される可能性があります。
   </div>
 
-  <p
-    style={{
-      margin: "8px 0 10px",
-      color: "#333",
-      fontSize: currentFont.base,
-      lineHeight: 1.7,
-    }}
-  >
-    {provisionalAnswerText}
-  </p>
+  {layeredProvisionalAnswer.hasLayers ? (
+    <div
+      style={{
+        display: "grid",
+        gap: 12,
+        marginTop: 10,
+        color: "#333",
+        fontSize: currentFont.base,
+        lineHeight: 1.7,
+      }}
+    >
+      {layeredProvisionalAnswer.simple && (
+        <section>
+          <div
+            style={{
+              color: "#9a3412",
+              fontWeight: 900,
+              marginBottom: 4,
+            }}
+          >
+            【誰でも分かる説明】
+          </div>
+          <div style={{ whiteSpace: "pre-line" }}>
+            {layeredProvisionalAnswer.simple}
+          </div>
+        </section>
+      )}
+
+      {layeredProvisionalAnswer.detailed && (
+        <section>
+          <div
+            style={{
+              color: "#9a3412",
+              fontWeight: 900,
+              marginBottom: 4,
+            }}
+          >
+            【もう少し詳しい説明】
+          </div>
+          <div style={{ whiteSpace: "pre-line" }}>
+            {layeredProvisionalAnswer.detailed}
+          </div>
+        </section>
+      )}
+
+      {layeredProvisionalAnswer.deep && (
+        <details
+          style={{
+            borderTop: "1px solid #fed7aa",
+            paddingTop: 10,
+          }}
+        >
+          <summary
+            style={{
+              color: "#9a3412",
+              cursor: "pointer",
+              fontWeight: 900,
+            }}
+          >
+            もっと詳しく見る
+          </summary>
+          <div style={{ marginTop: 10 }}>
+            <div
+              style={{
+                color: "#9a3412",
+                fontWeight: 900,
+                marginBottom: 4,
+              }}
+            >
+              【深層・専門的な補足】
+            </div>
+            <div style={{ whiteSpace: "pre-line" }}>
+              {layeredProvisionalAnswer.deep}
+            </div>
+          </div>
+        </details>
+      )}
+    </div>
+  ) : (
+    <p
+      style={{
+        margin: "8px 0 10px",
+        color: "#333",
+        fontSize: currentFont.base,
+        lineHeight: 1.7,
+        whiteSpace: "pre-line",
+      }}
+    >
+      {provisionalAnswerText}
+    </p>
+  )}
 
 </div>
 

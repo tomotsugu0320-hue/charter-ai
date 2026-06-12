@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, scrypt, timingSafeEqual } from "crypto";
+import { createClient } from "@supabase/supabase-js";
 import { promisify } from "util";
 
 export const FORUM_BETA_SESSION_COOKIE = "forum_beta_session";
@@ -18,6 +19,24 @@ type ForumBetaSessionPayload = {
 };
 
 export type ForumBetaUserStatus = "active" | "disabled" | "deleted";
+
+export type ActiveForumBetaSessionUser = {
+  id: string;
+  login_id: string | null;
+  display_name: string | null;
+  status: ForumBetaUserStatus;
+};
+
+export type ActiveForumBetaSessionResult =
+  | {
+      ok: true;
+      user: ActiveForumBetaSessionUser;
+    }
+  | {
+      ok: false;
+      status: 401 | 403 | 500;
+      error: string;
+    };
 
 function getSessionSecret() {
   return process.env.FORUM_BETA_SESSION_SECRET;
@@ -61,7 +80,7 @@ export function normalizeForumBetaUserStatus(
 }
 
 export function isForumBetaUserActive(status: string | null | undefined) {
-  return normalizeForumBetaUserStatus(status) === "active";
+  return status === "active";
 }
 
 export function validateForumBetaPasswordInput(password: string) {
@@ -266,6 +285,73 @@ export function getForumBetaSessionUser(
   const userId = payload?.userId?.trim();
 
   return userId || null;
+}
+
+function getForumBetaUsersClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) return null;
+
+  return createClient(url, key);
+}
+
+export async function getActiveForumBetaSessionUser(
+  requestOrHeaders: Request | Headers | null | undefined
+): Promise<ActiveForumBetaSessionResult> {
+  const userId = getForumBetaSessionUser(requestOrHeaders);
+
+  if (!userId) {
+    return {
+      ok: false,
+      status: 401,
+      error: "Login required.",
+    };
+  }
+
+  const supabase = getForumBetaUsersClient();
+
+  if (!supabase) {
+    return {
+      ok: false,
+      status: 500,
+      error: "Supabase env is missing.",
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("forum_beta_users")
+    .select("id, login_id, display_name, status")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    return {
+      ok: false,
+      status: 500,
+      error: error.message,
+    };
+  }
+
+  if (!data || !isForumBetaUserActive(data.status)) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Forum account is not active.",
+    };
+  }
+
+  return {
+    ok: true,
+    user: {
+      id: data.id,
+      login_id: data.login_id ?? null,
+      display_name: data.display_name ?? null,
+      status: "active",
+    },
+  };
 }
 
 export function getForumBetaSessionCookieOptions() {

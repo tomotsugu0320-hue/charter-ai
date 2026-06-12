@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { isForumBetaLoggedIn } from "@/lib/forum-auth";
+import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,10 +11,11 @@ const supabase = createClient(
 
 export async function POST(req: Request) {
   try {
-    if (!isForumBetaLoggedIn(req)) {
+    const activeUser = await getActiveForumBetaSessionUser(req);
+    if (!activeUser.ok) {
       return NextResponse.json(
-        { error: "Login required." },
-        { status: 401 }
+        { error: activeUser.error },
+        { status: activeUser.status }
       );
     }
 

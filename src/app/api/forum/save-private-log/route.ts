@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { isForumBetaLoggedIn } from "@/lib/forum-auth";
+import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -43,10 +43,11 @@ function buildAuthorKeyCookie(authorKey: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!isForumBetaLoggedIn(req)) {
+    const activeUser = await getActiveForumBetaSessionUser(req);
+    if (!activeUser.ok) {
       return NextResponse.json(
-        { ok: false, error: "Login required." },
-        { status: 401 }
+        { ok: false, error: activeUser.error },
+        { status: activeUser.status }
       );
     }
 

@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { isForumBetaLoggedIn } from "@/lib/forum-auth";
+import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
 
 type ForumPost = {
   id: string;
@@ -278,10 +278,10 @@ async function generateNormalSummaryWithAI(posts: ForumPost[]) {
   2. 主な賛成・意見
   3. 主な反対・反論
   4. 現時点の議論状況
-- 200〜350文字程度
+- 3層全体で400〜900文字程度
 - 誇張しない
 - 投稿にないことは断定しない
-- 出力は本文だけ。見出し不要
+- 出力は本文だけ。前置きやJSONは不要。ただし「結：現時点の答え」用の3層見出しは必ず使う
 
 経済政策、特に賃金・労働生産性・価格転嫁・物価・雇用・人手不足に関する投稿では、一般的な両論併記で終わらず、必ず以下を確認してください。
 - この議論はインフレ局面か、デフレ局面か
@@ -307,6 +307,29 @@ async function generateNormalSummaryWithAI(posts: ForumPost[]) {
 - 人手不足や失業率を無視して賃金論を語ること
 - 権威者の発言だから正しいと扱うこと
 - ミクロ企業会計で正しい主張を、マクロ経済政策でも常に正しいものとして扱うこと
+
+「結：現時点の答え」として使える本文は、必ず同じ1回のAI生成結果の中に、次の3層見出しで書いてください。
+起・承・転はここでは作り替えず、結に当たる答えだけを3層化します。
+3層化のために別回答や追加生成が必要な形にはしないでください。
+
+【誰でも分かる説明】
+- 専門用語を使わず、中学生にも分かる言葉で短く結論を示す。
+- 具体例やたとえ話を使い、「結局どういうこと？」に先に答える。
+- 目安は80〜160字程度に抑える。
+
+【もう少し詳しい説明】
+- 需要、供給、賃金、物価、雇用、消費の関係で説明する。
+- 専門用語を使う場合は、直後に一言説明を添える。
+- 経済・政策テーマでは、物価高の原因が需要超過型か、供給制約・輸入物価型かを分ける。
+- 実質賃金、雇用、個人消費を確認し、利上げ・増税・減税の判断を景気局面ごとに分ける。
+- 目安は180〜300字程度に抑える。
+
+【深層・専門的な補足】
+- 理論名、モデル名、反論、専門的な補足を入れてよい。
+- AD-ASモデル、フィリップス曲線、リカードの等価定理、乗数効果などを使う場合は、簡単な説明を添える。
+- 反論では、財源問題、将来増税予想、インフレ再燃リスクなども必要に応じて扱う。
+- 専門用語だけを並べず、一般読者向けの本文を難しくしない。
+- 初期実装では長くしすぎず、目安は300〜500字程度に抑える。
 
 投稿:
 ${inputText}
@@ -530,10 +553,24 @@ function isImmatureSummaryText(text: string) {
   ].some((phrase) => normalized.includes(phrase.replace(/\s+/g, "")));
 }
 
+function hasLayeredProvisionalAnswerText(text: string) {
+  return (
+    text.includes("【誰でも分かる説明】") &&
+    text.includes("【もう少し詳しい説明】") &&
+    text.includes("【深層・専門的な補足】")
+  );
+}
+
 function buildProvisionalAnswer(
   summary: ReturnType<typeof buildSimpleSummary>,
   conflictPairs: ConflictPair[]
 ) {
+  const summaryText = summary.summary_text?.trim() ?? "";
+
+  if (hasLayeredProvisionalAnswerText(summaryText)) {
+    return summaryText;
+  }
+
   const discussionCount =
     summary.counts.opinion +
     summary.counts.rebuttal +
@@ -544,7 +581,6 @@ function buildProvisionalAnswer(
     return "現時点では投稿が少ないため、AIの初期整理を叩き台として確認している段階です。";
   }
 
-  const summaryText = summary.summary_text?.trim() ?? "";
   const wholeSummary = isImmatureSummaryText(summaryText)
     ? ""
     : shortText(summaryText, 140);
@@ -748,10 +784,11 @@ async function saveThreadSummary(
 
 export async function GET(req: NextRequest) {
   try {
-    if (!isForumBetaLoggedIn(req)) {
+    const activeUser = await getActiveForumBetaSessionUser(req);
+    if (!activeUser.ok) {
       return NextResponse.json(
-        { ok: false, error: "Login required." },
-        { status: 401 }
+        { ok: false, error: activeUser.error },
+        { status: activeUser.status }
       );
     }
 

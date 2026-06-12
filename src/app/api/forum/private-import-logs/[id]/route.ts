@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { isForumBetaLoggedIn } from "@/lib/forum-auth";
+import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
 
 type RouteContext = {
   params: Promise<{
@@ -38,10 +38,11 @@ async function readRequestBody(req: NextRequest) {
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
   try {
-    if (!isForumBetaLoggedIn(req)) {
+    const activeUser = await getActiveForumBetaSessionUser(req);
+    if (!activeUser.ok) {
       return NextResponse.json(
-        { success: false, error: "Login required." },
-        { status: 401 }
+        { success: false, error: activeUser.error },
+        { status: activeUser.status }
       );
     }
 

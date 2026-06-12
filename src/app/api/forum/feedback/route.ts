@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { isForumBetaLoggedIn } from "@/lib/forum-auth";
+import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
 
 const ALLOWED_FEEDBACK_TYPES = [
   "term_unknown",
@@ -180,10 +180,11 @@ return explanation;
 }
 
 export async function POST(req: NextRequest) {
-  if (!isForumBetaLoggedIn(req)) {
+  const activeUser = await getActiveForumBetaSessionUser(req);
+  if (!activeUser.ok) {
     return NextResponse.json(
-      { ok: false, error: "Login required." },
-      { status: 401 }
+      { ok: false, error: activeUser.error },
+      { status: activeUser.status }
     );
   }
 

@@ -64,6 +64,25 @@ export default function ForumLoginPage() {
         padding: "32px 16px",
       }}
     >
+      <div
+        style={{
+          maxWidth: 520,
+          margin: "0 auto 12px",
+        }}
+      >
+        <Link
+          href={`/${tenant}/forum`}
+          style={{
+            color: "#0f172a",
+            fontSize: 14,
+            fontWeight: 800,
+            textDecoration: "underline",
+            textUnderlineOffset: 3,
+          }}
+        >
+          Forumトップへ戻る
+        </Link>
+      </div>
       <section
         style={{
           maxWidth: 520,
