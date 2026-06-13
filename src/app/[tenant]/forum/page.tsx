@@ -3,7 +3,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import ExternalAiImportModal from "@/components/forum/ExternalAiImportModal";
@@ -62,7 +62,9 @@ const RANKING_TABS: { value: RankingMode; label: string }[] = [
 type DiscussionMapNode = {
   id: string;
   label: string;
+  baseLabel?: string;
   nodeId?: string;
+  sourceThreadIds?: string[];
   children?: DiscussionMapNode[];
 };
 
@@ -458,13 +460,14 @@ function renderDiscussionMap(
   root: DiscussionMapNode,
   branches: DiscussionMapNode[],
   tenant: string,
-  selectedNodeId: string
+  selectedNodeId: string,
+  maxDepth = 4
 ) {
   const lines = [
     <div key={root.id}>{renderDiscussionMapNode(root, tenant, selectedNodeId)}</div>,
   ];
 
-  const addNodes = (nodes: DiscussionMapNode[], prefix = "") => {
+  const addNodes = (nodes: DiscussionMapNode[], prefix = "", depth = 1) => {
     nodes.forEach((node, index) => {
       const isLastNode = index === nodes.length - 1;
       const branchPrefix = isLastNode ? "└" : "├";
@@ -477,8 +480,8 @@ function renderDiscussionMap(
         </div>
       );
 
-      if (node.children?.length) {
-        addNodes(node.children, childPrefix);
+      if (node.children?.length && depth < maxDepth) {
+        addNodes(node.children, childPrefix, depth + 1);
       }
     });
   };
@@ -516,11 +519,16 @@ function normalizeDiscussionMapForDisplay(value: unknown): {
     const sourceThreadCount = Array.isArray(item.source_thread_ids)
       ? item.source_thread_ids.filter((threadId) => typeof threadId === "string" && threadId.trim()).length
       : 0;
+    const sourceThreadIds = Array.isArray(item.source_thread_ids)
+      ? item.source_thread_ids.filter((threadId) => typeof threadId === "string" && threadId.trim())
+      : [];
 
     nodeMap.set(id, {
       id,
+      baseLabel: label,
       label: sourceThreadCount > 0 ? `${label}（参照${sourceThreadCount}件）` : label,
       nodeId: id,
+      sourceThreadIds,
       children: [],
     });
     parentByNodeId.set(id, parentId);
@@ -570,6 +578,41 @@ function normalizeDiscussionMapResponse(value: unknown) {
   if (!isRecord(value) || value.fallbackRequired === true) return null;
 
   return normalizeDiscussionMapForDisplay(value.map);
+}
+
+function findDiscussionMapNodeInfo(
+  root: DiscussionMapNode,
+  branches: DiscussionMapNode[],
+  nodeId: string
+): { label: string; path: string[]; sourceThreadIds: string[] } | null {
+  if (!nodeId) return null;
+
+  const visit = (
+    nodes: DiscussionMapNode[],
+    path: string[]
+  ): { label: string; path: string[]; sourceThreadIds: string[] } | null => {
+    for (const item of nodes) {
+      const label = item.baseLabel ?? item.label;
+      const nextPath = [...path, label];
+
+      if (item.id === nodeId || item.nodeId === nodeId) {
+        return {
+          label,
+          path: nextPath,
+          sourceThreadIds: item.sourceThreadIds ?? [],
+        };
+      }
+
+      if (item.children?.length) {
+        const found = visit(item.children, nextPath);
+        if (found) return found;
+      }
+    }
+
+    return null;
+  };
+
+  return visit(branches, [root.baseLabel ?? root.label]);
 }
 
 function matchesThread(thread: ThreadRow, query: string, category: string) {
@@ -786,11 +829,9 @@ export default function ForumPage() {
   const node = searchParams.get("node") || "";
   const shouldOpenExternalAiImport =
     searchParams.get("externalAiImport") === "1";
-  const selectedNodeInfo = NODE_INFO[node];
-  const selectedNodeLabel = selectedNodeInfo?.label;
-  const selectedNodePathText =
-    selectedNodeInfo?.path?.length ? selectedNodeInfo.path.join(" ＞ ") : selectedNodeLabel;
-  const initialSearchQuery = keyword || selectedNodeLabel || "";
+  const fallbackSelectedNodeInfo = NODE_INFO[node];
+  const fallbackSelectedNodeLabel = fallbackSelectedNodeInfo?.label;
+  const initialSearchQuery = keyword || fallbackSelectedNodeLabel || "";
 
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -833,8 +874,51 @@ export default function ForumPage() {
     root: discussionMapRoot,
     branches: discussionMapBranches,
   };
+  const selectedDiscussionMapNode = useMemo(
+    () =>
+      findDiscussionMapNodeInfo(
+        discussionMapForDisplay.root,
+        discussionMapForDisplay.branches,
+        node
+      ),
+    [discussionMapForDisplay.branches, discussionMapForDisplay.root, node]
+  );
+  const selectedNodeLabel =
+    selectedDiscussionMapNode?.label ?? fallbackSelectedNodeLabel;
+  const selectedNodePathText =
+    selectedDiscussionMapNode?.path.join(" ＞ ") ??
+    (fallbackSelectedNodeInfo?.path?.length
+      ? fallbackSelectedNodeInfo.path.join(" ＞ ")
+      : selectedNodeLabel);
+  const selectedNodeThreadIdSet = useMemo(
+    () => new Set(selectedDiscussionMapNode?.sourceThreadIds ?? []),
+    [selectedDiscussionMapNode]
+  );
+  const matchesCurrentThreadFilters = useCallback(
+    (thread: ThreadRow) => {
+      const matchesCategory =
+        categoryFilter === ALL_CATEGORIES || thread.category === categoryFilter;
 
-  const hasFilter = searchQuery.trim() !== "" || categoryFilter !== ALL_CATEGORIES;
+      if (!matchesCategory) return false;
+
+      if (selectedNodeThreadIdSet.size > 0) {
+        if (!selectedNodeThreadIdSet.has(thread.id)) return false;
+
+        const query = searchQuery.trim();
+        if (!query || query === selectedNodeLabel) return true;
+
+        return matchesThread(thread, searchQuery, ALL_CATEGORIES);
+      }
+
+      return matchesThread(thread, searchQuery, categoryFilter);
+    },
+    [categoryFilter, searchQuery, selectedNodeLabel, selectedNodeThreadIdSet]
+  );
+
+  const hasFilter =
+    searchQuery.trim() !== "" ||
+    categoryFilter !== ALL_CATEGORIES ||
+    selectedNodeThreadIdSet.size > 0;
   const hasSearchResultContext = searchQuery.trim() !== "" || Boolean(selectedNodeLabel);
 
   const allThreads = useMemo(() => {
@@ -849,10 +933,8 @@ export default function ForumPage() {
 
   const searchResultThreads = useMemo(
     () =>
-      allThreads.filter((thread) =>
-        matchesThread(thread, searchQuery, categoryFilter)
-      ),
-    [allThreads, categoryFilter, searchQuery]
+      allThreads.filter((thread) => matchesCurrentThreadFilters(thread)),
+    [allThreads, matchesCurrentThreadFilters]
   );
 
   const searchResultTotalPages = Math.max(
@@ -893,26 +975,20 @@ export default function ForumPage() {
 
   const filteredPopularThreads = useMemo(
     () =>
-      popularThreads.filter((thread) =>
-        matchesThread(thread, searchQuery, categoryFilter)
-      ),
-    [categoryFilter, popularThreads, searchQuery]
+      popularThreads.filter((thread) => matchesCurrentThreadFilters(thread)),
+    [matchesCurrentThreadFilters, popularThreads]
   );
 
   const filteredActiveThreads = useMemo(
     () =>
-      activeThreads.filter((thread) =>
-        matchesThread(thread, searchQuery, categoryFilter)
-      ),
-    [activeThreads, categoryFilter, searchQuery]
+      activeThreads.filter((thread) => matchesCurrentThreadFilters(thread)),
+    [activeThreads, matchesCurrentThreadFilters]
   );
 
   const filteredRecentThreads = useMemo(
     () =>
-      recentThreads.filter((thread) =>
-        matchesThread(thread, searchQuery, categoryFilter)
-      ),
-    [categoryFilter, recentThreads, searchQuery]
+      recentThreads.filter((thread) => matchesCurrentThreadFilters(thread)),
+    [matchesCurrentThreadFilters, recentThreads]
   );
 
   const visiblePopularThreads = filteredPopularThreads.slice(0, TOP_CARD_LIMIT);
@@ -1567,6 +1643,70 @@ export default function ForumPage() {
         </p>
       </section>
 
+      <section
+        style={{
+          ...panelStyle,
+          marginBottom: 22,
+          background: "#f8fafc",
+          color: "#0f172a",
+          border: "1px solid #cbd5e1",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+            alignItems: "flex-start",
+            marginBottom: 10,
+          }}
+        >
+          <div>
+            <h2 style={{ margin: 0, fontSize: 22 }}>論点から探す</h2>
+            <p
+              style={{
+                margin: "6px 0 0",
+                color: "#475569",
+                fontSize: currentFontSize - 2,
+                lineHeight: 1.6,
+              }}
+            >
+              掲示板全体の論点ツリーです。気になる論点を選ぶと、その枝に属するスレッドを探せます。
+            </p>
+          </div>
+          {selectedNodeLabel && (
+            <Link href={`/${tenant}/forum`} style={sectionLinkStyle}>
+              選択を解除
+            </Link>
+          )}
+        </div>
+        <div
+          style={{
+            margin: 0,
+            whiteSpace: "pre-wrap",
+            overflowX: "auto",
+            background: "#ffffff",
+            color: "#111827",
+            border: "1px solid #e2e8f0",
+            borderRadius: 8,
+            padding: 12,
+            fontSize: currentFontSize - 1,
+            lineHeight: 1.8,
+            fontFamily:
+              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+          }}
+        >
+          {renderDiscussionMap(
+            discussionMapForDisplay.root,
+            discussionMapForDisplay.branches,
+            tenant,
+            node,
+            4
+          )}
+        </div>
+      </section>
+
       <section style={{ ...panelStyle, marginBottom: 18 }}>
         <div style={{ marginBottom: 14 }}>
           <h2 style={{ margin: 0, fontSize: 22 }}>投稿する・投稿候補を作る</h2>
@@ -1991,6 +2131,7 @@ export default function ForumPage() {
       <section
         style={{
           ...panelStyle,
+          display: "none",
           marginBottom: 22,
           background: "#f8fafc",
           color: "#0f172a",
@@ -2928,3 +3069,4 @@ export default function ForumPage() {
     </main>
   );
 }
+
