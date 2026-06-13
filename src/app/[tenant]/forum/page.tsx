@@ -488,6 +488,90 @@ function renderDiscussionMap(
   return lines;
 }
 
+function normalizeDiscussionMapForDisplay(value: unknown): {
+  root: DiscussionMapNode;
+  branches: DiscussionMapNode[];
+} | null {
+  if (!isRecord(value) || !isRecord(value.root) || !Array.isArray(value.nodes)) {
+    return null;
+  }
+
+  const rootId = toText(value.root.id).trim();
+  const rootLabel = toText(value.root.label).trim();
+
+  if (!rootId || !rootLabel || value.nodes.length === 0) return null;
+
+  const nodeMap = new Map<string, DiscussionMapNode>();
+  const parentByNodeId = new Map<string, string | null>();
+
+  for (const item of value.nodes) {
+    if (!isRecord(item)) return null;
+
+    const id = toText(item.id).trim();
+    const label = toText(item.label).trim();
+    const parentId = toText(item.parent_id).trim() || null;
+
+    if (!id || !label || id === rootId || nodeMap.has(id)) return null;
+
+    const sourceThreadCount = Array.isArray(item.source_thread_ids)
+      ? item.source_thread_ids.filter((threadId) => typeof threadId === "string" && threadId.trim()).length
+      : 0;
+
+    nodeMap.set(id, {
+      id,
+      label: sourceThreadCount > 0 ? `${label}（参照${sourceThreadCount}件）` : label,
+      nodeId: id,
+      children: [],
+    });
+    parentByNodeId.set(id, parentId);
+  }
+
+  for (const [id, parentId] of parentByNodeId) {
+    if (parentId && parentId !== rootId && !nodeMap.has(parentId)) {
+      return null;
+    }
+
+    const seen = new Set<string>([id]);
+    let currentParentId = parentId;
+
+    while (currentParentId && currentParentId !== rootId) {
+      if (seen.has(currentParentId)) return null;
+      seen.add(currentParentId);
+      currentParentId = parentByNodeId.get(currentParentId) ?? null;
+    }
+  }
+
+  const branches: DiscussionMapNode[] = [];
+
+  for (const [id, node] of nodeMap) {
+    const parentId = parentByNodeId.get(id);
+    const parent = parentId && parentId !== rootId ? nodeMap.get(parentId) : null;
+
+    if (parent) {
+      parent.children = [...(parent.children ?? []), node];
+    } else {
+      branches.push(node);
+    }
+  }
+
+  if (branches.length === 0) return null;
+
+  return {
+    root: {
+      id: rootId,
+      label: rootLabel,
+      nodeId: rootId,
+    },
+    branches,
+  };
+}
+
+function normalizeDiscussionMapResponse(value: unknown) {
+  if (!isRecord(value) || value.fallbackRequired === true) return null;
+
+  return normalizeDiscussionMapForDisplay(value.map);
+}
+
 function matchesThread(thread: ThreadRow, query: string, category: string) {
   const q = query.trim().toLowerCase();
   const searchable = [
@@ -719,6 +803,10 @@ export default function ForumPage() {
   const [isForumBetaLoggedIn, setIsForumBetaLoggedIn] = useState<boolean | null>(
     null
   );
+  const [activeDiscussionMap, setActiveDiscussionMap] = useState<{
+    root: DiscussionMapNode;
+    branches: DiscussionMapNode[];
+  } | null>(null);
 
   const [popularThreads, setPopularThreads] = useState<ThreadRow[]>([]);
   const [activeThreads, setActiveThreads] = useState<ThreadRow[]>([]);
@@ -741,6 +829,10 @@ export default function ForumPage() {
   const [analyzeScrollKey, setAnalyzeScrollKey] = useState(0);
   const [relatedThreads, setRelatedThreads] = useState<RelatedThread[]>([]);
   const [generatedIssue, setGeneratedIssue] = useState<GeneratedIssue | null>(null);
+  const discussionMapForDisplay = activeDiscussionMap ?? {
+    root: discussionMapRoot,
+    branches: discussionMapBranches,
+  };
 
   const hasFilter = searchQuery.trim() !== "" || categoryFilter !== ALL_CATEGORIES;
   const hasSearchResultContext = searchQuery.trim() !== "" || Boolean(selectedNodeLabel);
@@ -930,6 +1022,30 @@ export default function ForumPage() {
     }
 
     void loadLoginStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDiscussionMap() {
+      try {
+        const res = await fetch("/api/forum/discussion-map", {
+          cache: "no-store",
+        });
+        const result: unknown = await res.json().catch(() => null);
+        const normalized = res.ok ? normalizeDiscussionMapResponse(result) : null;
+
+        if (!cancelled) setActiveDiscussionMap(normalized);
+      } catch {
+        if (!cancelled) setActiveDiscussionMap(null);
+      }
+    }
+
+    void loadDiscussionMap();
 
     return () => {
       cancelled = true;
@@ -1908,7 +2024,12 @@ export default function ForumPage() {
               'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
           }}
       >
-        {renderDiscussionMap(discussionMapRoot, discussionMapBranches, tenant, node)}
+        {renderDiscussionMap(
+          discussionMapForDisplay.root,
+          discussionMapForDisplay.branches,
+          tenant,
+          node
+        )}
       </div>
     </section>
 

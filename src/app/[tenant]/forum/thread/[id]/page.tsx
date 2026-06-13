@@ -394,6 +394,98 @@ function renderLocationMap(root: LocationMapNode, branches: LocationMapNode[], t
   return lines.map((line, index) => <div key={index}>{line}</div>);
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readMapText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeLocationMapForDisplay(value: unknown): {
+  root: LocationMapNode;
+  branches: LocationMapNode[];
+} | null {
+  if (!isPlainRecord(value) || !isPlainRecord(value.root) || !Array.isArray(value.nodes)) {
+    return null;
+  }
+
+  const rootId = readMapText(value.root.id);
+  const rootLabel = readMapText(value.root.label);
+
+  if (!rootId || !rootLabel || value.nodes.length === 0) return null;
+
+  const nodeMap = new Map<string, LocationMapNode>();
+  const parentByNodeId = new Map<string, string | null>();
+
+  for (const item of value.nodes) {
+    if (!isPlainRecord(item)) return null;
+
+    const id = readMapText(item.id);
+    const label = readMapText(item.label);
+    const parentId = readMapText(item.parent_id) || null;
+
+    if (!id || !label || id === rootId || nodeMap.has(id)) return null;
+
+    const sourceThreadCount = Array.isArray(item.source_thread_ids)
+      ? item.source_thread_ids.filter((threadId) => typeof threadId === "string" && threadId.trim()).length
+      : 0;
+
+    nodeMap.set(id, {
+      id,
+      label: sourceThreadCount > 0 ? `${label}（参照${sourceThreadCount}件）` : label,
+      nodeId: id,
+      children: [],
+    });
+    parentByNodeId.set(id, parentId);
+  }
+
+  for (const [id, parentId] of parentByNodeId) {
+    if (parentId && parentId !== rootId && !nodeMap.has(parentId)) {
+      return null;
+    }
+
+    const seen = new Set<string>([id]);
+    let currentParentId = parentId;
+
+    while (currentParentId && currentParentId !== rootId) {
+      if (seen.has(currentParentId)) return null;
+      seen.add(currentParentId);
+      currentParentId = parentByNodeId.get(currentParentId) ?? null;
+    }
+  }
+
+  const branches: LocationMapNode[] = [];
+
+  for (const [id, node] of nodeMap) {
+    const parentId = parentByNodeId.get(id);
+    const parent = parentId && parentId !== rootId ? nodeMap.get(parentId) : null;
+
+    if (parent) {
+      parent.children = [...(parent.children ?? []), node];
+    } else {
+      branches.push(node);
+    }
+  }
+
+  if (branches.length === 0) return null;
+
+  return {
+    root: {
+      id: rootId,
+      label: rootLabel,
+      nodeId: rootId,
+    },
+    branches,
+  };
+}
+
+function normalizeLocationMapResponse(value: unknown) {
+  if (!isPlainRecord(value) || value.fallbackRequired === true) return null;
+
+  return normalizeLocationMapForDisplay(value.map);
+}
+
 function splitContent(content: string) {
   if (!content) {
     return {
@@ -821,6 +913,10 @@ const [summaryNotice, setSummaryNotice] = useState<string | null>(null);
   const [rebuttalReason, setRebuttalReason] = useState("");
 
   const [summary, setSummary] = useState<ThreadSummary | null>(null);
+  const [activeDiscussionMap, setActiveDiscussionMap] = useState<{
+    root: LocationMapNode;
+    branches: LocationMapNode[];
+  } | null>(null);
 const keywords = useMemo(() => {
 const postText = posts
   .slice(0, 30)
@@ -950,6 +1046,30 @@ const [treeVariant] = useState<"A" | "C">("A");
       setThreadId(resolved.id);
     })();
   }, [params]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDiscussionMap() {
+      try {
+        const res = await fetch("/api/forum/discussion-map", {
+          cache: "no-store",
+        });
+        const result: unknown = await res.json().catch(() => null);
+        const normalized = res.ok ? normalizeLocationMapResponse(result) : null;
+
+        if (!cancelled) setActiveDiscussionMap(normalized);
+      } catch {
+        if (!cancelled) setActiveDiscussionMap(null);
+      }
+    }
+
+    void loadDiscussionMap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1126,6 +1246,10 @@ async function handleLogout() {
   const threadTitleFontSize = currentFont.title * 0.9;
   const currentUrl =
     typeof window !== "undefined" ? window.location.href : "";
+  const discussionMapForDisplay = activeDiscussionMap ?? {
+    root: wholeDiscussionMapRoot,
+    branches: wholeDiscussionMapBranches,
+  };
 
   const visiblePosts = useMemo(() => {
     return posts.filter((post) => {
@@ -3829,7 +3953,7 @@ function renderDiscussionCard({
         'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
     }}
   >
-{renderLocationMap(mapRoot, mapBranches, tenant)}
+{renderLocationMap(discussionMapForDisplay.root, discussionMapForDisplay.branches, tenant)}
   </div>
 </SectionCard>
 </details>
@@ -4425,7 +4549,7 @@ function renderDiscussionCard({
                   'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
               }}
             >
-              {renderLocationMap(wholeDiscussionMapRoot, wholeDiscussionMapBranches, tenant)}
+              {renderLocationMap(discussionMapForDisplay.root, discussionMapForDisplay.branches, tenant)}
             </div>
 
             <div

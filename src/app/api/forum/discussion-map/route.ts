@@ -32,7 +32,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("forum_discussion_map_versions")
-    .select("id, map_json, source_preview_id, created_at, applied_at")
+    .select("map_json")
     .eq("is_active", true)
     .order("applied_at", { ascending: false, nullsFirst: false })
     .limit(1)
@@ -54,7 +54,6 @@ export async function GET() {
       ok: true,
       map: null,
       fallbackRequired: true,
-      version: null,
     });
   }
 
@@ -62,11 +61,5 @@ export async function GET() {
     ok: true,
     map: data.map_json,
     fallbackRequired: false,
-    version: {
-      id: data.id,
-      source_preview_id: data.source_preview_id,
-      created_at: data.created_at,
-      applied_at: data.applied_at,
-    },
   });
 }
