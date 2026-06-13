@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { calculateOpenAiEstimatedCostUsd } from "@/lib/openai-pricing";
 
 type ForumApiUsageStatus = "success" | "error";
 
@@ -105,6 +106,13 @@ export async function recordForumApiUsageLog(input: ForumApiUsageLogInput) {
     (inputTokenEstimate !== null || outputTokenEstimate !== null
       ? (inputTokenEstimate ?? 0) + (outputTokenEstimate ?? 0)
       : null);
+  const estimatedCost =
+    input.estimatedCost ??
+    calculateOpenAiEstimatedCostUsd({
+      model: input.model,
+      inputTokenEstimate,
+      outputTokenEstimate,
+    });
 
   try {
     const { error } = await supabase.from("forum_api_usage_logs").insert({
@@ -118,7 +126,7 @@ export async function recordForumApiUsageLog(input: ForumApiUsageLogInput) {
       input_token_estimate: inputTokenEstimate,
       output_token_estimate: outputTokenEstimate,
       total_token_estimate: totalTokenEstimate,
-      estimated_cost: input.estimatedCost ?? null,
+      estimated_cost: estimatedCost,
       status: input.status,
       error_message: truncateText(input.errorMessage, 500),
     });

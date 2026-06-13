@@ -380,7 +380,7 @@ export default function ForumAdminApiUsagePage() {
               <MetricCard label="今日のAPI実行回数" value={formatNumber(summary.todayCount)} />
               <MetricCard label="7日間のAPI実行回数" value={formatNumber(summary.sevenDayCount)} />
               <MetricCard label="30日間のAPI実行回数" value={formatNumber(summary.thirtyDayCount)} />
-              <MetricCard label="推定コスト合計" value={formatCost(summary.estimatedCostTotal)} />
+              <MetricCard label="推定コスト合計 (USD)" value={formatCost(summary.estimatedCostTotal)} />
               <MetricCard
                 label="推定input token合計"
                 value={formatNumber(summary.inputTokenTotal)}

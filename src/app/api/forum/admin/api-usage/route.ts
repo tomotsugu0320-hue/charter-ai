@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isForumAdminKeyValid } from "@/lib/forum-auth";
+import { calculateOpenAiEstimatedCostUsd } from "@/lib/openai-pricing";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -41,14 +42,34 @@ function sumToken(rows: UsageLogRow[], key: "input_token_estimate" | "output_tok
   return rows.reduce((total, row) => total + (Number(row[key]) || 0), 0);
 }
 
+function toOptionalNumber(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function getDisplayCost(row: UsageLogRow) {
+  if (row.estimated_cost !== null && row.estimated_cost !== undefined) {
+    const value = Number(row.estimated_cost);
+    if (Number.isFinite(value)) {
+      return value;
+    }
+  }
+
+  return calculateOpenAiEstimatedCostUsd({
+    model: row.model,
+    inputTokenEstimate: toOptionalNumber(row.input_token_estimate),
+    outputTokenEstimate: toOptionalNumber(row.output_token_estimate),
+  });
+}
+
 function sumCost(rows: UsageLogRow[]) {
   let hasCost = false;
   const total = rows.reduce((sum, row) => {
-    if (row.estimated_cost === null || row.estimated_cost === undefined) {
-      return sum;
-    }
-    const value = Number(row.estimated_cost);
-    if (!Number.isFinite(value)) {
+    const value = getDisplayCost(row);
+    if (value === null) {
       return sum;
     }
     hasCost = true;
@@ -90,10 +111,8 @@ function groupRows(rows: UsageLogRow[], key: "feature_key" | "model" | "status")
     current.outputTokenTotal += Number(row.output_token_estimate) || 0;
     current.totalTokenTotal += Number(row.total_token_estimate) || 0;
 
-    const cost = row.estimated_cost === null || row.estimated_cost === undefined
-      ? Number.NaN
-      : Number(row.estimated_cost);
-    if (Number.isFinite(cost)) {
+    const cost = getDisplayCost(row);
+    if (cost !== null) {
       current.costSeen = true;
       current.estimatedCostTotal = (current.estimatedCostTotal ?? 0) + cost;
     }
@@ -170,7 +189,10 @@ export async function GET(request: NextRequest) {
     }
 
     const rows = (logsResult.data ?? []) as UsageLogRow[];
-    const latestLogs = (latestResult.data ?? []) as UsageLogRow[];
+    const latestLogs = ((latestResult.data ?? []) as UsageLogRow[]).map((row) => ({
+      ...row,
+      estimated_cost: getDisplayCost(row),
+    }));
 
     return NextResponse.json({
       ok: true,

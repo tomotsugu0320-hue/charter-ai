@@ -332,6 +332,9 @@ export async function POST(req: Request) {
 - nodesは「大分類＋主要中分類」までに抑えてください。細かい個別論点を第2階層以下に大量追加しないでください。
 - source_thread_idsが1件だけの細かい論点は、原則nodesではなくnew_node_candidatesに入れてください。
 - 例外的に重要論点としてsource_thread_idsが1件だけのnodeを作る場合は、その理由をwarningsに書いてください。
+- 主要カテゴリに入らない公開スレッドは、id "other" / label "その他" のnodeに必ず入れてください。
+- "その他" nodeはparent_idをroot.idにし、分類しきれない公開スレッドのsource_thread_idsを入れてください。
+- 分類しきれない公開スレッドをwarningsやnew_node_candidatesだけに逃がさず、議論マップ上で見える状態にしてください。
 - 類似論点は別々のnodeにせず、merge_candidatesに統合候補として出してください。
 - 既存ノードに近い論点は、同じ意味の別名nodeを作らず、existing_node_matchesで既存ノードへ寄せてください。
 - parent_idはできるだけ大分類nodeに接続してください。japan-economy直下に細かい論点を大量に置かないでください。
