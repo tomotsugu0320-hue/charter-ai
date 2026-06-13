@@ -229,8 +229,13 @@ const DISCUSSION_CARD_TEXT_LIMIT = 120;
 type LocationMapNode = {
   id: string;
   label: string;
+  baseLabel?: string;
   nodeId?: string;
   isCurrent?: boolean;
+  isBranch?: boolean;
+  isMuted?: boolean;
+  relatedKeywords?: string[];
+  sourceThreadIds?: string[];
   children?: LocationMapNode[];
 };
 
@@ -318,12 +323,20 @@ const wholeDiscussionMapBranches: LocationMapNode[] = [
 ];
 
 function renderLocationNode(node: LocationMapNode, tenant: string) {
+  const color = node.isCurrent
+    ? "#166534"
+    : node.isBranch
+    ? "#1d4ed8"
+    : node.isMuted
+    ? "#94a3b8"
+    : "#0d47a1";
+  const fontWeight = node.isCurrent ? 900 : node.isBranch ? 800 : node.isMuted ? 600 : 700;
   const content = node.nodeId ? (
     <Link
       href={`/${tenant}/forum?node=${node.nodeId}`}
       style={{
-        color: node.isCurrent ? "#166534" : "#0d47a1",
-        fontWeight: 700,
+        color,
+        fontWeight,
         textDecoration: "underline",
         textUnderlineOffset: 2,
       }}
@@ -331,8 +344,21 @@ function renderLocationNode(node: LocationMapNode, tenant: string) {
       {node.label}
     </Link>
   ) : (
-    node.label
+    <span style={{ color: node.isMuted ? "#94a3b8" : "inherit", fontWeight }}>
+      {node.label}
+    </span>
   );
+
+  if (node.isBranch && !node.isCurrent) {
+    return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        {content}
+        <span style={{ color: "#1d4ed8", fontSize: 12, fontWeight: 800 }}>
+          この枝
+        </span>
+      </span>
+    );
+  }
 
   if (!node.isCurrent) return content;
 
@@ -427,14 +453,21 @@ function normalizeLocationMapForDisplay(value: unknown): {
 
     if (!id || !label || id === rootId || nodeMap.has(id)) return null;
 
-    const sourceThreadCount = Array.isArray(item.source_thread_ids)
-      ? item.source_thread_ids.filter((threadId) => typeof threadId === "string" && threadId.trim()).length
-      : 0;
+    const sourceThreadIds = Array.isArray(item.source_thread_ids)
+      ? item.source_thread_ids.filter((threadId) => typeof threadId === "string" && threadId.trim())
+      : [];
+    const sourceThreadCount = sourceThreadIds.length;
+    const relatedKeywords = Array.isArray(item.related_keywords)
+      ? item.related_keywords.filter((keyword) => typeof keyword === "string" && keyword.trim())
+      : [];
 
     nodeMap.set(id, {
       id,
+      baseLabel: label,
       label: sourceThreadCount > 0 ? `${label}（参照${sourceThreadCount}件）` : label,
       nodeId: id,
+      relatedKeywords,
+      sourceThreadIds,
       children: [],
     });
     parentByNodeId.set(id, parentId);
@@ -484,6 +517,145 @@ function normalizeLocationMapResponse(value: unknown) {
   if (!isPlainRecord(value) || value.fallbackRequired === true) return null;
 
   return normalizeLocationMapForDisplay(value.map);
+}
+
+type ThreadLocationContext = {
+  path: LocationMapNode[];
+  root: LocationMapNode;
+  branches: LocationMapNode[];
+  relatedLabels: string[];
+};
+
+type LocationMapEntry = {
+  node: LocationMapNode;
+  parent: LocationMapNode | null;
+  path: LocationMapNode[];
+  depth: number;
+  sourceThreadCount: number;
+};
+
+function getLocationLabel(node: LocationMapNode) {
+  return node.baseLabel ?? node.label;
+}
+
+function flattenLocationMap(
+  root: LocationMapNode,
+  branches: LocationMapNode[]
+): LocationMapEntry[] {
+  const entries: LocationMapEntry[] = [];
+
+  const visit = (
+    nodes: LocationMapNode[],
+    parent: LocationMapNode | null,
+    parentPath: LocationMapNode[]
+  ) => {
+    for (const node of nodes) {
+      const path = [...parentPath, node];
+      entries.push({
+        node,
+        parent,
+        path,
+        depth: path.length - 1,
+        sourceThreadCount: node.sourceThreadIds?.length ?? 0,
+      });
+
+      if (node.children?.length) {
+        visit(node.children, node, path);
+      }
+    }
+  };
+
+  visit(branches, null, [root]);
+  return entries;
+}
+
+function cloneNodeForCurrentLocation(
+  node: LocationMapNode,
+  pathIds: Set<string>,
+  currentNodeId: string
+): LocationMapNode {
+  const isInPath = pathIds.has(node.id);
+  const isCurrent = node.id === currentNodeId;
+
+  return {
+    ...node,
+    isCurrent,
+    isBranch: isInPath && !isCurrent,
+    isMuted: !isInPath,
+    children:
+      isInPath && !isCurrent
+        ? (node.children ?? []).map((child) =>
+            cloneNodeForCurrentLocation(child, pathIds, currentNodeId)
+          )
+        : [],
+  };
+}
+
+function buildRelatedLocationLabels(target: LocationMapEntry) {
+  const labels = new Set<string>();
+  const targetLabel = getLocationLabel(target.node);
+
+  for (const keyword of target.node.relatedKeywords ?? []) {
+    if (keyword && keyword !== targetLabel) labels.add(keyword);
+  }
+
+  for (const child of target.node.children ?? []) {
+    const label = getLocationLabel(child);
+    if (label && label !== targetLabel) labels.add(label);
+  }
+
+  for (const sibling of target.parent?.children ?? []) {
+    const label = getLocationLabel(sibling);
+    if (sibling.id !== target.node.id && label) labels.add(label);
+  }
+
+  return Array.from(labels).slice(0, 6);
+}
+
+function buildThreadLocationContext(
+  root: LocationMapNode,
+  branches: LocationMapNode[],
+  threadId: string
+): ThreadLocationContext | null {
+  if (!threadId) return null;
+
+  const entries = flattenLocationMap(root, branches);
+  const matches = entries
+    .filter((entry) => entry.node.sourceThreadIds?.includes(threadId))
+    .sort((a, b) => {
+      if (b.depth !== a.depth) return b.depth - a.depth;
+      return (a.sourceThreadCount || Number.MAX_SAFE_INTEGER) - (b.sourceThreadCount || Number.MAX_SAFE_INTEGER);
+    });
+
+  const otherEntry = entries.find((entry) => {
+    const id = entry.node.id.toLowerCase();
+    return id === "other" || id === "others" || getLocationLabel(entry.node).includes("その他");
+  });
+  const target = matches[0] ?? otherEntry;
+
+  if (!target) return null;
+
+  const pathIds = new Set(target.path.map((node) => node.id));
+  const currentRoot: LocationMapNode = {
+    ...root,
+    isBranch: false,
+    isCurrent: false,
+    isMuted: false,
+  };
+
+  return {
+    path: target.path.map((node, index) => ({
+      ...node,
+      isCurrent: node.id === target.node.id,
+      isBranch: index > 0 && node.id !== target.node.id,
+      isMuted: false,
+    })),
+    root: currentRoot,
+    branches: branches.map((node) =>
+      cloneNodeForCurrentLocation(node, pathIds, target.node.id)
+    ),
+    relatedLabels: buildRelatedLocationLabels(target),
+  };
 }
 
 function splitContent(content: string) {
@@ -1250,6 +1422,26 @@ async function handleLogout() {
     root: wholeDiscussionMapRoot,
     branches: wholeDiscussionMapBranches,
   };
+  const threadLocationContext = useMemo(
+    () =>
+      buildThreadLocationContext(
+        discussionMapForDisplay.root,
+        discussionMapForDisplay.branches,
+        threadId
+      ),
+    [discussionMapForDisplay.branches, discussionMapForDisplay.root, threadId]
+  );
+  const currentLocationPath = threadLocationContext?.path ?? currentPath;
+  const currentLocationMap = threadLocationContext
+    ? {
+        root: threadLocationContext.root,
+        branches: threadLocationContext.branches,
+      }
+    : {
+        root: mapRoot,
+        branches: mapBranches,
+      };
+  const currentRelatedLabels = threadLocationContext?.relatedLabels ?? [];
 
   const visiblePosts = useMemo(() => {
     return posts.filter((post) => {
@@ -3924,8 +4116,45 @@ function renderDiscussionCard({
       lineHeight: 1.7,
     }}
   >
-    {renderCurrentPath(currentPath, tenant)}
+    {renderCurrentPath(currentLocationPath, tenant)}
   </div>
+
+  <div
+    style={{
+      fontSize: currentFont.base,
+      fontWeight: 800,
+      color: "#111",
+      marginBottom: 6,
+    }}
+  >
+    この議論に近い論点：
+  </div>
+  {currentRelatedLabels.length > 0 ? (
+    <ul
+      style={{
+        margin: "0 0 14px",
+        paddingLeft: 20,
+        color: "#111",
+        fontSize: currentFont.base,
+        lineHeight: 1.8,
+      }}
+    >
+      {currentRelatedLabels.map((label) => (
+        <li key={label}>{label}</li>
+      ))}
+    </ul>
+  ) : (
+    <p
+      style={{
+        margin: "0 0 14px",
+        color: "#64748b",
+        fontSize: currentFont.base,
+        lineHeight: 1.7,
+      }}
+    >
+      近い論点は、今後の議論マップ再編でさらに整理されます。
+    </p>
+  )}
 
   <div
     style={{
@@ -3953,7 +4182,7 @@ function renderDiscussionCard({
         'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
     }}
   >
-{renderLocationMap(discussionMapForDisplay.root, discussionMapForDisplay.branches, tenant)}
+{renderLocationMap(currentLocationMap.root, currentLocationMap.branches, tenant)}
   </div>
 </SectionCard>
 </details>
