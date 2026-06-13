@@ -10,12 +10,21 @@ type RebuildMapResponse = {
   error_code?: string;
   details?: string;
   message?: string;
+  preview_id?: string;
   preview?: unknown;
   source?: {
     threads?: number;
     posts?: number;
     saved?: boolean;
   };
+};
+
+type ApplyMapResponse = {
+  ok?: boolean;
+  error?: string;
+  details?: string;
+  version_id?: string;
+  preview_id?: string;
 };
 
 type PreviewRoot = {
@@ -265,7 +274,10 @@ export default function RebuildDiscussionMapPage() {
 
   const [adminKey, setAdminKey] = useState("");
   const [loading, setLoading] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const [applyMessage, setApplyMessage] = useState<string | null>(null);
   const [result, setResult] = useState<RebuildMapResponse | null>(null);
   const [expandedSourceNodeIds, setExpandedSourceNodeIds] = useState<
     Record<string, boolean>
@@ -499,6 +511,8 @@ export default function RebuildDiscussionMapPage() {
 
     setLoading(true);
     setError(null);
+    setApplyError(null);
+    setApplyMessage(null);
     setResult(null);
     setExpandedSourceNodeIds({});
 
@@ -534,6 +548,72 @@ export default function RebuildDiscussionMapPage() {
     }
   }
 
+  async function handleApplyPreview() {
+    const previewId = result?.preview_id?.trim();
+
+    if (!requestAdminKey) {
+      setApplyError("ADMIN_KEYを入力してください。");
+      setApplyMessage(null);
+      return;
+    }
+
+    if (!previewId) {
+      setApplyError("保存済みpreview_idがないため、適用できません。");
+      setApplyMessage(null);
+      return;
+    }
+
+    setApplying(true);
+    setApplyError(null);
+    setApplyMessage(null);
+
+    try {
+      const res = await fetch("/api/forum/admin/discussion-map-apply", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": requestAdminKey,
+        },
+        body: JSON.stringify({ preview_id: previewId }),
+      });
+      const responseText = await res.text();
+      let json: ApplyMapResponse = {};
+
+      if (responseText.trim()) {
+        try {
+          json = JSON.parse(responseText) as ApplyMapResponse;
+        } catch {
+          json = { error: compactErrorText(responseText) };
+        }
+      }
+
+      if (!res.ok || json.ok !== true) {
+        const message = json.error || json.details || "適用に失敗しました。";
+        setApplyError(`HTTP ${res.status} / ${message}`);
+        return;
+      }
+
+      setApplyMessage(
+        `適用しました。version_id: ${json.version_id ?? "-"}`
+      );
+      setResult((current) =>
+        current
+          ? {
+              ...current,
+              source: {
+                ...(current.source ?? {}),
+                saved: true,
+              },
+            }
+          : current
+      );
+    } catch {
+      setApplyError("通信エラーが発生しました。もう一度お試しください。");
+    } finally {
+      setApplying(false);
+    }
+  }
+
   return (
     <main style={pageStyle}>
       <Link
@@ -554,7 +634,8 @@ export default function RebuildDiscussionMapPage() {
       </h1>
       <p style={{ margin: "0 0 18px", color: "#475569", lineHeight: 1.7 }}>
         現在の公開中スレッドと投稿をもとに、AIが議論ツリーの再編案を生成します。
-        今回はプレビューのみで、本番マップには反映されません。
+        生成結果はプレビューとしてDBに保存され、管理者が確認後に本番versionとして適用できます。
+        適用ボタンではOpenAI APIを呼ばず、保存済みプレビューをDB上のactive mapとして切り替えるだけです。
       </p>
 
       <section style={{ ...cardStyle, marginBottom: 18 }}>
@@ -651,15 +732,87 @@ export default function RebuildDiscussionMapPage() {
               style={{
                 border: "1px solid #fed7aa",
                 borderRadius: 999,
-                background: "#fff7ed",
-                color: "#9a3412",
+                background: result.source?.saved ? "#f0fdf4" : "#fff7ed",
+                color: result.source?.saved ? "#166534" : "#9a3412",
                 fontWeight: 900,
                 padding: "4px 10px",
               }}
             >
-              preview only
+              {result.source?.saved ? "preview saved" : "preview only"}
             </span>
+            {result.preview_id && (
+              <span
+                style={{
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 999,
+                  background: "#f8fafc",
+                  color: "#334155",
+                  fontWeight: 900,
+                  overflowWrap: "anywhere",
+                  padding: "4px 10px",
+                }}
+              >
+                preview_id: {result.preview_id}
+              </span>
+            )}
           </div>
+
+          <section
+            style={{
+              border: "1px solid #bbf7d0",
+              borderRadius: 8,
+              background: "#f0fdf4",
+              color: "#14532d",
+              display: "grid",
+              gap: 10,
+              marginBottom: 16,
+              padding: 14,
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 900 }}>
+              本番versionへの適用
+            </h3>
+            <p style={{ margin: 0, lineHeight: 1.7 }}>
+              内容を確認して問題なければ、この保存済みプレビューを本番議論マップのactive versionとして保存・適用できます。
+              この操作ではOpenAI APIは呼びません。
+            </p>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 10,
+                alignItems: "center",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => void handleApplyPreview()}
+                disabled={applying || !result.preview_id}
+                style={{
+                  ...buttonStyle,
+                  opacity: applying || !result.preview_id ? 0.65 : 1,
+                  cursor: applying || !result.preview_id ? "not-allowed" : "pointer",
+                }}
+              >
+                {applying ? "適用中..." : "本番versionとして保存・適用"}
+              </button>
+              {!result.preview_id && (
+                <span style={{ color: "#64748b", fontSize: 13, fontWeight: 800 }}>
+                  preview_idがないため適用できません。
+                </span>
+              )}
+            </div>
+            {applyMessage && (
+              <p style={{ color: "#166534", fontWeight: 900, margin: 0 }}>
+                {applyMessage}
+              </p>
+            )}
+            {applyError && (
+              <p style={{ color: "#991b1b", fontWeight: 900, margin: 0 }}>
+                {applyError}
+              </p>
+            )}
+          </section>
 
           <section
             style={{

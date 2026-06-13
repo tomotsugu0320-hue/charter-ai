@@ -12,6 +12,7 @@ const MAX_TITLE_LENGTH = 160;
 const MAX_THREAD_TEXT_LENGTH = 800;
 const MAX_POST_CONTENT_LENGTH = 500;
 const MAX_POSTS_PER_THREAD = 5;
+const PROMPT_VERSION = "rebuild_discussion_map_v1";
 
 const EXISTING_NODES = [
   { id: "consumption-tax", label: "消費税" },
@@ -54,11 +55,15 @@ type PreviewJson = {
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !key) return null;
 
-  return createClient(url, key);
+  return createClient(url, key, {
+    auth: {
+      persistSession: false,
+    },
+  });
 }
 
 function compactText(value: unknown, maxLength: number) {
@@ -125,6 +130,35 @@ function normalizePreviewJson(value: PreviewJson) {
       : [],
     warnings: Array.isArray(value.warnings) ? value.warnings : [],
   };
+}
+
+async function saveDiscussionMapPreview(
+  supabase: ReturnType<typeof getSupabase>,
+  preview: ReturnType<typeof normalizePreviewJson>,
+  sourceThreadCount: number,
+  sourcePostCount: number
+) {
+  if (!supabase) {
+    throw new Error("Supabase env is missing");
+  }
+
+  const { data, error } = await supabase
+    .from("forum_discussion_map_previews")
+    .insert({
+      preview_json: preview,
+      source_thread_count: sourceThreadCount,
+      source_post_count: sourcePostCount,
+      prompt_version: PROMPT_VERSION,
+      status: "draft",
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data?.id as string | undefined;
 }
 
 function errorResponse(
@@ -207,24 +241,39 @@ export async function POST(req: Request) {
     }
 
     if (visibleThreads.length === 0) {
+      const preview = normalizePreviewJson({
+        root: {
+          id: "japan-economy",
+          label: "日本経済",
+          summary: "公開中のスレッドがまだないため、再編案は生成していません。",
+        },
+        nodes: [],
+        existing_node_matches: [],
+        new_node_candidates: [],
+        merge_candidates: [],
+        warnings: ["公開中のスレッドがありません。"],
+      });
+      let previewId: string | undefined;
+
+      try {
+        previewId = await saveDiscussionMapPreview(supabase, preview, 0, 0);
+      } catch (error) {
+        return errorResponse(
+          "discussion_map_preview_save_failed",
+          "Failed to save discussion map preview",
+          500,
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+
       return NextResponse.json({
         success: true,
-        preview: normalizePreviewJson({
-          root: {
-            id: "japan-economy",
-            label: "日本経済",
-            summary: "公開中のスレッドがまだないため、再編案は生成していません。",
-          },
-          nodes: [],
-          existing_node_matches: [],
-          new_node_candidates: [],
-          merge_candidates: [],
-          warnings: ["公開中のスレッドがありません。"],
-        }),
+        preview_id: previewId,
+        preview,
         source: {
           threads: 0,
           posts: 0,
-          saved: false,
+          saved: true,
         },
       });
     }
@@ -454,7 +503,7 @@ export async function POST(req: Request) {
         featureKey: "rebuild_discussion_map",
         routePath: "/api/forum/admin-rebuild-discussion-map",
         model: "gpt-4.1-mini",
-        promptVersion: "rebuild_discussion_map_v1",
+        promptVersion: PROMPT_VERSION,
         targetType: "admin_job",
         targetId: null,
         userId: null,
@@ -468,7 +517,7 @@ export async function POST(req: Request) {
         featureKey: "rebuild_discussion_map",
         routePath: "/api/forum/admin-rebuild-discussion-map",
         model: "gpt-4.1-mini",
-        promptVersion: "rebuild_discussion_map_v1",
+        promptVersion: PROMPT_VERSION,
         targetType: "admin_job",
         targetId: null,
         userId: null,
@@ -499,13 +548,33 @@ export async function POST(req: Request) {
       );
     }
 
+    const preview = normalizePreviewJson(parsed);
+    let previewId: string | undefined;
+
+    try {
+      previewId = await saveDiscussionMapPreview(
+        supabase,
+        preview,
+        visibleThreads.length,
+        posts.length
+      );
+    } catch (error) {
+      return errorResponse(
+        "discussion_map_preview_save_failed",
+        "Failed to save discussion map preview",
+        500,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+
     return NextResponse.json({
       success: true,
-      preview: normalizePreviewJson(parsed),
+      preview_id: previewId,
+      preview,
       source: {
         threads: visibleThreads.length,
         posts: posts.length,
-        saved: false,
+        saved: true,
       },
     });
   } catch (error) {
