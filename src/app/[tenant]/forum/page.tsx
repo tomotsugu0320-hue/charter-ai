@@ -1115,9 +1115,17 @@ export default function ForumPage() {
         const result: unknown = await res.json().catch(() => null);
         const normalized = res.ok ? normalizeDiscussionMapResponse(result) : null;
 
-        if (!cancelled) setActiveDiscussionMap(normalized);
+        if (!cancelled) {
+          if (normalized) {
+            setActiveDiscussionMap(normalized);
+          } else if (isRecord(result) && result.fallbackRequired === true) {
+            setActiveDiscussionMap(null);
+          }
+        }
       } catch {
-        if (!cancelled) setActiveDiscussionMap(null);
+        if (!cancelled) {
+          setActiveDiscussionMap((current) => current);
+        }
       }
     }
 
