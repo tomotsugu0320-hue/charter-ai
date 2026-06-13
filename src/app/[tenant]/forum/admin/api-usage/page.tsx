@@ -74,11 +74,21 @@ function formatDate(value: string | null) {
   return date.toLocaleString("ja-JP");
 }
 
-function shorten(value: string | null | undefined, length = 80) {
+function shorten(value: string | null | undefined, length = 90) {
   if (!value) {
     return "-";
   }
   return value.length > length ? `${value.slice(0, length)}...` : value;
+}
+
+function statusClassName(status: string | null) {
+  if (status === "success") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+  if (status === "error") {
+    return "border-rose-200 bg-rose-50 text-rose-700";
+  }
+  return "border-slate-200 bg-slate-50 text-slate-600";
 }
 
 export default function ForumAdminApiUsagePage() {
@@ -94,7 +104,7 @@ export default function ForumAdminApiUsagePage() {
   async function loadUsage(keyOverride?: string) {
     const key = (keyOverride ?? adminKeyRef.current).trim();
     if (!key) {
-      setMessage("ADMIN_KEYを入力してください");
+      setMessage("ADMIN_KEYを入力してください。");
       setIsVerified(false);
       return;
     }
@@ -111,7 +121,7 @@ export default function ForumAdminApiUsagePage() {
       const data = (await response.json()) as UsageResponse;
 
       if (!response.ok || !data.ok) {
-        throw new Error(data.error || "API使用量を取得できませんでした");
+        throw new Error(data.error || "API使用量を取得できませんでした。");
       }
 
       adminKeyRef.current = key;
@@ -123,99 +133,98 @@ export default function ForumAdminApiUsagePage() {
       setIsVerified(false);
       adminKeyRef.current = "";
       setAdminKey("");
-      setMessage(error instanceof Error ? error.message : "入力内容を確認してください");
+      setMessage(error instanceof Error ? error.message : "入力内容を確認してください。");
     } finally {
       setIsLoading(false);
     }
   }
 
   const summary = usage?.summary;
+  const latestLogs = usage?.latestLogs ?? [];
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <Link href={`/${tenant}/forum/admin`} className="text-cyan-200 hover:text-cyan-100">
+    <main className="min-h-screen bg-slate-100 px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <nav className="flex flex-wrap gap-2 text-sm">
+          <Link
+            href={`/${tenant}/forum/admin`}
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700"
+          >
             管理メニューへ戻る
           </Link>
-          <span className="text-slate-600">/</span>
-          <Link href={`/${tenant}/forum`} className="text-cyan-200 hover:text-cyan-100">
+          <Link
+            href={`/${tenant}/forum`}
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700"
+          >
             Forumトップへ戻る
           </Link>
-        </div>
+        </nav>
 
-        <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-xl">
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
-              Forum Admin
-            </p>
-            <h1 className="text-2xl font-bold text-white">OpenAI API使用量</h1>
-            <p className="text-sm leading-6 text-slate-300">
-              Forum内のAI処理で記録されたAPI使用ログを確認します。ページ表示だけではOpenAI APIを呼びません。
-            </p>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-2">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-600">
+                Forum Admin
+              </p>
+              <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+                OpenAI API使用量
+              </h1>
+              <p className="max-w-3xl text-sm leading-7 text-slate-600">
+                Forum内のAI処理で記録されたAPI使用ログを確認します。このページ表示だけではOpenAI APIを呼びません。
+              </p>
+            </div>
+            <div className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
+              表示専用
+            </div>
           </div>
 
-          {!isVerified && (
-            <div className="mt-5 max-w-xl space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-              <label className="block text-sm font-semibold text-slate-100" htmlFor="admin-key">
-                ADMIN_KEY
-              </label>
-              <input
-                id="admin-key"
-                type="password"
-                value={adminKey}
-                onChange={(event) => setAdminKey(event.target.value)}
-                autoComplete="new-password"
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-cyan-400"
-                placeholder="管理者キーを入力"
-              />
+          <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end">
+              <div className="flex-1">
+                <label className="mb-2 block text-sm font-bold text-slate-800" htmlFor="admin-key">
+                  ADMIN_KEY
+                </label>
+                <input
+                  id="admin-key"
+                  type="password"
+                  value={adminKey}
+                  onChange={(event) => setAdminKey(event.target.value)}
+                  autoComplete="new-password"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                  placeholder="管理者キーを入力"
+                />
+              </div>
               <button
                 type="button"
                 onClick={() => loadUsage(adminKey)}
                 disabled={isLoading}
-                className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isLoading ? "確認中..." : "使用量を表示"}
+                {isLoading ? "確認中..." : isVerified ? "再読み込み" : "使用量を表示"}
               </button>
-              {message && <p className="text-sm text-amber-200">{message}</p>}
             </div>
-          )}
+            <div className="mt-3 flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-slate-500">
+                入力値は保存しません。ページを再読み込みすると再入力が必要です。
+              </p>
+              {message && <p className="font-semibold text-amber-700">{message}</p>}
+            </div>
+          </div>
         </section>
 
-        {isVerified && summary && (
+        {isVerified && summary ? (
           <>
-            <section className="grid gap-4 md:grid-cols-3">
-              <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-                <p className="text-xs text-slate-400">今日のAPI実行回数</p>
-                <p className="mt-2 text-3xl font-bold text-white">{formatNumber(summary.todayCount)}</p>
-              </div>
-              <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-                <p className="text-xs text-slate-400">7日間のAPI実行回数</p>
-                <p className="mt-2 text-3xl font-bold text-white">{formatNumber(summary.sevenDayCount)}</p>
-              </div>
-              <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-                <p className="text-xs text-slate-400">30日間のAPI実行回数</p>
-                <p className="mt-2 text-3xl font-bold text-white">{formatNumber(summary.thirtyDayCount)}</p>
-              </div>
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricCard label="今日のAPI実行回数" value={formatNumber(summary.todayCount)} />
+              <MetricCard label="7日間のAPI実行回数" value={formatNumber(summary.sevenDayCount)} />
+              <MetricCard label="30日間のAPI実行回数" value={formatNumber(summary.thirtyDayCount)} />
+              <MetricCard label="推定コスト合計" value={formatCost(summary.estimatedCostTotal)} />
             </section>
 
-            <section className="grid gap-4 md:grid-cols-4">
-              <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-                <p className="text-xs text-slate-400">推定input token合計</p>
-                <p className="mt-2 text-xl font-semibold text-white">{formatNumber(summary.inputTokenTotal)}</p>
-              </div>
-              <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-                <p className="text-xs text-slate-400">推定output token合計</p>
-                <p className="mt-2 text-xl font-semibold text-white">{formatNumber(summary.outputTokenTotal)}</p>
-              </div>
-              <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-                <p className="text-xs text-slate-400">推定total token合計</p>
-                <p className="mt-2 text-xl font-semibold text-white">{formatNumber(summary.totalTokenTotal)}</p>
-              </div>
-              <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-                <p className="text-xs text-slate-400">推定コスト合計</p>
-                <p className="mt-2 text-xl font-semibold text-white">{formatCost(summary.estimatedCostTotal)}</p>
-              </div>
+            <section className="grid gap-4 sm:grid-cols-3">
+              <MetricCard label="推定input token合計" value={formatNumber(summary.inputTokenTotal)} tone="blue" />
+              <MetricCard label="推定output token合計" value={formatNumber(summary.outputTokenTotal)} tone="blue" />
+              <MetricCard label="推定total token合計" value={formatNumber(summary.totalTokenTotal)} tone="blue" />
             </section>
 
             <section className="grid gap-4 lg:grid-cols-3">
@@ -224,52 +233,70 @@ export default function ForumAdminApiUsagePage() {
               <UsageGroupList title="success / error" rows={summary.byStatus} />
             </section>
 
-            <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-bold text-white">最新ログ</h2>
+            <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex flex-col gap-3 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-black text-slate-950">最新ログ</h2>
+                  <p className="mt-1 text-sm text-slate-500">直近50件まで表示します。</p>
+                </div>
                 <button
                   type="button"
                   onClick={() => loadUsage()}
                   disabled={isLoading}
-                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-100 hover:border-cyan-400 disabled:opacity-60"
+                  className="w-fit rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   再読み込み
                 </button>
               </div>
-              <div className="mt-4 overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="border-b border-slate-800 text-xs text-slate-400">
+
+              <div className="overflow-x-auto">
+                <table className="min-w-[980px] w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
                     <tr>
-                      <th className="py-2 pr-4">日時</th>
-                      <th className="py-2 pr-4">feature</th>
-                      <th className="py-2 pr-4">model</th>
-                      <th className="py-2 pr-4">status</th>
-                      <th className="py-2 pr-4">target</th>
-                      <th className="py-2 pr-4">tokens</th>
-                      <th className="py-2 pr-4">cost</th>
-                      <th className="py-2">error</th>
+                      <th className="px-4 py-3">日時</th>
+                      <th className="px-4 py-3">feature</th>
+                      <th className="px-4 py-3">model</th>
+                      <th className="px-4 py-3">status</th>
+                      <th className="px-4 py-3">target</th>
+                      <th className="px-4 py-3 text-right">tokens</th>
+                      <th className="px-4 py-3 text-right">cost</th>
+                      <th className="px-4 py-3">error</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {(usage.latestLogs ?? []).map((log) => (
-                      <tr key={log.id} className="align-top text-slate-200">
-                        <td className="py-2 pr-4 whitespace-nowrap">{formatDate(log.created_at)}</td>
-                        <td className="py-2 pr-4">{log.feature_key || "unknown"}</td>
-                        <td className="py-2 pr-4">{log.model || "-"}</td>
-                        <td className="py-2 pr-4">{log.status || "-"}</td>
-                        <td className="py-2 pr-4">
+                  <tbody className="divide-y divide-slate-100">
+                    {latestLogs.map((log) => (
+                      <tr key={log.id} className="align-top hover:bg-slate-50/80">
+                        <td className="whitespace-nowrap px-4 py-3 text-slate-700">
+                          {formatDate(log.created_at)}
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-slate-900">
+                          {log.feature_key || "unknown"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">{log.model || "-"}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${statusClassName(log.status)}`}>
+                            {log.status || "-"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
                           {log.target_type || "-"}
                           {log.target_id ? ` / ${log.target_id}` : ""}
                         </td>
-                        <td className="py-2 pr-4">{formatNumber(log.total_token_estimate)}</td>
-                        <td className="py-2 pr-4">{formatCost(log.estimated_cost)}</td>
-                        <td className="py-2 text-slate-400">{shorten(log.error_message)}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-slate-900">
+                          {formatNumber(log.total_token_estimate)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-slate-700">
+                          {formatCost(log.estimated_cost)}
+                        </td>
+                        <td className="max-w-[260px] px-4 py-3 text-slate-500">
+                          {shorten(log.error_message)}
+                        </td>
                       </tr>
                     ))}
-                    {(!usage.latestLogs || usage.latestLogs.length === 0) && (
+                    {latestLogs.length === 0 && (
                       <tr>
-                        <td className="py-4 text-slate-400" colSpan={8}>
-                          まだAPI使用ログはありません。
+                        <td className="px-4 py-10 text-center text-slate-500" colSpan={8}>
+                          まだ記録がありません。
                         </td>
                       </tr>
                     )}
@@ -278,34 +305,73 @@ export default function ForumAdminApiUsagePage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 text-sm leading-6 text-slate-300">
-              <h2 className="text-base font-bold text-white">将来の一括再整理メモ</h2>
+            <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-7 text-amber-950 shadow-sm">
+              <h2 className="text-base font-black text-amber-950">将来の一括再整理メモ</h2>
               <p className="mt-2">
                 今回は一括再整理機能は実装していません。将来追加する場合は、条件設定、対象件数プレビュー、
                 推定API回数・token・費用表示、管理者確認、少量ずつ実行の順に進めます。
-                既に3層化済み、古いprompt_versionのみ、非表示・削除済み除外などの条件を先に絞り込みます。
+                既に3層化済み、古いprompt_versionのみ、非表示・削除済み除外などの条件で先に絞り込みます。
               </p>
             </section>
           </>
+        ) : (
+          <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500 shadow-sm">
+            ADMIN_KEYを入力すると、API使用量の集計と最新ログが表示されます。
+          </section>
         )}
       </div>
     </main>
   );
 }
 
+function MetricCard({
+  label,
+  value,
+  tone = "slate",
+}: {
+  label: string;
+  value: string;
+  tone?: "slate" | "blue";
+}) {
+  const accentClassName =
+    tone === "blue" ? "bg-blue-500" : "bg-slate-900";
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className={`mb-4 h-1.5 w-10 rounded-full ${accentClassName}`} />
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-2 break-words text-3xl font-black tracking-tight text-slate-950">
+        {value}
+      </p>
+    </div>
+  );
+}
+
 function UsageGroupList({ title, rows }: { title: string; rows: UsageGroup[] }) {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5">
-      <h2 className="text-base font-bold text-white">{title}</h2>
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-black text-slate-950">{title}</h2>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">
+          {formatNumber(rows.length)}種
+        </span>
+      </div>
+
       <div className="mt-4 space-y-3">
-        {rows.length === 0 && <p className="text-sm text-slate-400">データがありません。</p>}
+        {rows.length === 0 && (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+            まだ記録がありません。
+          </div>
+        )}
         {rows.slice(0, 12).map((row) => (
-          <div key={row.key} className="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+          <div key={row.key} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div className="flex items-start justify-between gap-3">
-              <p className="break-all text-sm font-semibold text-slate-100">{row.key}</p>
-              <p className="whitespace-nowrap text-sm text-cyan-200">{formatNumber(row.count)}件</p>
+              <p className="break-all text-sm font-bold text-slate-900">{row.key}</p>
+              <p className="whitespace-nowrap text-sm font-black text-blue-700">
+                {formatNumber(row.count)}件
+              </p>
             </div>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-xs text-slate-500">
               tokens {formatNumber(row.totalTokenTotal)} / cost {formatCost(row.estimatedCostTotal)}
             </p>
           </div>
