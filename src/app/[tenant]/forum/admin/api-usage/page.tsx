@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 
 type UsageGroup = {
   key: string;
@@ -48,6 +48,118 @@ type UsageResponse = {
   latestLogs?: UsageLog[];
 };
 
+const pageStyle: CSSProperties = {
+  minHeight: "100vh",
+  background: "#f3f4f6",
+  color: "#111827",
+  padding: "24px 16px 40px",
+};
+
+const containerStyle: CSSProperties = {
+  maxWidth: 1180,
+  margin: "0 auto",
+  display: "grid",
+  gap: 18,
+};
+
+const linkBarStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 10,
+};
+
+const linkPillStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  border: "1px solid #dbe3ef",
+  borderRadius: 999,
+  background: "#ffffff",
+  color: "#2563eb",
+  fontSize: 14,
+  fontWeight: 800,
+  padding: "8px 13px",
+  textDecoration: "none",
+};
+
+const cardStyle: CSSProperties = {
+  border: "1px solid #dbe3ef",
+  borderRadius: 12,
+  background: "#ffffff",
+  boxShadow: "0 8px 22px rgba(15, 23, 42, 0.06)",
+};
+
+const heroCardStyle: CSSProperties = {
+  ...cardStyle,
+  padding: 22,
+};
+
+const mutedTextStyle: CSSProperties = {
+  color: "#475569",
+  lineHeight: 1.7,
+};
+
+const adminKeyCardStyle: CSSProperties = {
+  border: "1px solid #e2e8f0",
+  borderRadius: 10,
+  background: "#f8fafc",
+  marginTop: 18,
+  padding: 16,
+};
+
+const inputStyle: CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  border: "1px solid #cbd5e1",
+  borderRadius: 8,
+  background: "#ffffff",
+  color: "#111827",
+  fontSize: 14,
+  padding: "11px 12px",
+  outline: "none",
+};
+
+const buttonStyle: CSSProperties = {
+  border: "1px solid #111827",
+  borderRadius: 8,
+  background: "#111827",
+  color: "#ffffff",
+  cursor: "pointer",
+  fontSize: 14,
+  fontWeight: 900,
+  padding: "11px 16px",
+  whiteSpace: "nowrap",
+};
+
+const metricGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 190px), 1fr))",
+  gap: 12,
+};
+
+const groupGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+  gap: 12,
+};
+
+const tableHeaderCellStyle: CSSProperties = {
+  color: "#64748b",
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: "0.04em",
+  padding: "12px 14px",
+  textTransform: "uppercase",
+  whiteSpace: "nowrap",
+};
+
+const tableCellStyle: CSSProperties = {
+  borderTop: "1px solid #e2e8f0",
+  color: "#334155",
+  fontSize: 14,
+  padding: "12px 14px",
+  verticalAlign: "top",
+};
+
 function formatNumber(value: number | null | undefined) {
   return Number(value ?? 0).toLocaleString("ja-JP");
 }
@@ -81,14 +193,26 @@ function shorten(value: string | null | undefined, length = 90) {
   return value.length > length ? `${value.slice(0, length)}...` : value;
 }
 
-function statusClassName(status: string | null) {
+function statusBadgeStyle(status: string | null): CSSProperties {
   if (status === "success") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    return {
+      border: "1px solid #bbf7d0",
+      background: "#f0fdf4",
+      color: "#166534",
+    };
   }
   if (status === "error") {
-    return "border-rose-200 bg-rose-50 text-rose-700";
+    return {
+      border: "1px solid #fecdd3",
+      background: "#fff1f2",
+      color: "#be123c",
+    };
   }
-  return "border-slate-200 bg-slate-50 text-slate-600";
+  return {
+    border: "1px solid #e2e8f0",
+    background: "#f8fafc",
+    color: "#475569",
+  };
 }
 
 export default function ForumAdminApiUsagePage() {
@@ -143,159 +267,238 @@ export default function ForumAdminApiUsagePage() {
   const latestLogs = usage?.latestLogs ?? [];
 
   return (
-    <main className="min-h-screen bg-slate-100 px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <nav className="flex flex-wrap gap-2 text-sm">
-          <Link
-            href={`/${tenant}/forum/admin`}
-            className="rounded-full border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700"
-          >
+    <main style={pageStyle}>
+      <div style={containerStyle}>
+        <nav style={linkBarStyle}>
+          <Link href={`/${tenant}/forum/admin`} style={linkPillStyle}>
             管理メニューへ戻る
           </Link>
-          <Link
-            href={`/${tenant}/forum`}
-            className="rounded-full border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700"
-          >
+          <Link href={`/${tenant}/forum`} style={linkPillStyle}>
             Forumトップへ戻る
           </Link>
         </nav>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-2">
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-600">
+        <section style={heroCardStyle}>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 14,
+              justifyContent: "space-between",
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  color: "#2563eb",
+                  fontSize: 12,
+                  fontWeight: 900,
+                  letterSpacing: "0.18em",
+                  marginBottom: 8,
+                  textTransform: "uppercase",
+                }}
+              >
                 Forum Admin
-              </p>
-              <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+              </div>
+              <h1 style={{ margin: 0, fontSize: 30, fontWeight: 950 }}>
                 OpenAI API使用量
               </h1>
-              <p className="max-w-3xl text-sm leading-7 text-slate-600">
+              <p style={{ ...mutedTextStyle, margin: "10px 0 0", maxWidth: 760 }}>
                 Forum内のAI処理で記録されたAPI使用ログを確認します。このページ表示だけではOpenAI APIを呼びません。
               </p>
             </div>
-            <div className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
+            <div
+              style={{
+                alignSelf: "flex-start",
+                border: "1px solid #bbf7d0",
+                borderRadius: 999,
+                background: "#f0fdf4",
+                color: "#166534",
+                fontSize: 12,
+                fontWeight: 900,
+                padding: "7px 11px",
+              }}
+            >
               表示専用
             </div>
           </div>
 
-          <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-end">
-              <div className="flex-1">
-                <label className="mb-2 block text-sm font-bold text-slate-800" htmlFor="admin-key">
-                  ADMIN_KEY
-                </label>
-                <input
-                  id="admin-key"
-                  type="password"
-                  value={adminKey}
-                  onChange={(event) => setAdminKey(event.target.value)}
-                  autoComplete="new-password"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                  placeholder="管理者キーを入力"
-                />
-              </div>
+          <div style={adminKeyCardStyle}>
+            <label
+              htmlFor="admin-key"
+              style={{ display: "block", fontSize: 14, fontWeight: 900, marginBottom: 8 }}
+            >
+              ADMIN_KEY
+            </label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+              <input
+                id="admin-key"
+                type="password"
+                value={adminKey}
+                onChange={(event) => setAdminKey(event.target.value)}
+                autoComplete="new-password"
+                placeholder="管理者キーを入力"
+                style={{ ...inputStyle, flex: "1 1 260px" }}
+              />
               <button
                 type="button"
                 onClick={() => loadUsage(adminKey)}
                 disabled={isLoading}
-                className="rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                style={{
+                  ...buttonStyle,
+                  opacity: isLoading ? 0.65 : 1,
+                  cursor: isLoading ? "wait" : "pointer",
+                }}
               >
                 {isLoading ? "確認中..." : isVerified ? "再読み込み" : "使用量を表示"}
               </button>
             </div>
-            <div className="mt-3 flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-slate-500">
-                入力値は保存しません。ページを再読み込みすると再入力が必要です。
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 10,
+                justifyContent: "space-between",
+                marginTop: 10,
+              }}
+            >
+              <p style={{ ...mutedTextStyle, fontSize: 13, margin: 0 }}>
+                入力値はCookie/localStorage/sessionStorage/URL queryには保存しません。
               </p>
-              {message && <p className="font-semibold text-amber-700">{message}</p>}
+              {message && (
+                <p style={{ color: "#b45309", fontSize: 13, fontWeight: 800, margin: 0 }}>
+                  {message}
+                </p>
+              )}
             </div>
           </div>
         </section>
 
         {isVerified && summary ? (
           <>
-            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <section style={metricGridStyle}>
               <MetricCard label="今日のAPI実行回数" value={formatNumber(summary.todayCount)} />
               <MetricCard label="7日間のAPI実行回数" value={formatNumber(summary.sevenDayCount)} />
               <MetricCard label="30日間のAPI実行回数" value={formatNumber(summary.thirtyDayCount)} />
               <MetricCard label="推定コスト合計" value={formatCost(summary.estimatedCostTotal)} />
+              <MetricCard
+                label="推定input token合計"
+                value={formatNumber(summary.inputTokenTotal)}
+                tone="blue"
+              />
+              <MetricCard
+                label="推定output token合計"
+                value={formatNumber(summary.outputTokenTotal)}
+                tone="blue"
+              />
+              <MetricCard
+                label="推定total token合計"
+                value={formatNumber(summary.totalTokenTotal)}
+                tone="blue"
+              />
             </section>
 
-            <section className="grid gap-4 sm:grid-cols-3">
-              <MetricCard label="推定input token合計" value={formatNumber(summary.inputTokenTotal)} tone="blue" />
-              <MetricCard label="推定output token合計" value={formatNumber(summary.outputTokenTotal)} tone="blue" />
-              <MetricCard label="推定total token合計" value={formatNumber(summary.totalTokenTotal)} tone="blue" />
-            </section>
-
-            <section className="grid gap-4 lg:grid-cols-3">
+            <section style={groupGridStyle}>
               <UsageGroupList title="feature_key別" rows={summary.byFeatureKey} />
               <UsageGroupList title="model別" rows={summary.byModel} />
               <UsageGroupList title="success / error" rows={summary.byStatus} />
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex flex-col gap-3 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <section style={cardStyle}>
+              <div
+                style={{
+                  alignItems: "center",
+                  borderBottom: "1px solid #e2e8f0",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 12,
+                  justifyContent: "space-between",
+                  padding: 18,
+                }}
+              >
                 <div>
-                  <h2 className="text-lg font-black text-slate-950">最新ログ</h2>
-                  <p className="mt-1 text-sm text-slate-500">直近50件まで表示します。</p>
+                  <h2 style={{ margin: 0, fontSize: 20, fontWeight: 950 }}>最新ログ</h2>
+                  <p style={{ ...mutedTextStyle, fontSize: 13, margin: "4px 0 0" }}>
+                    直近50件まで表示します。
+                  </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => loadUsage()}
                   disabled={isLoading}
-                  className="w-fit rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{
+                    ...buttonStyle,
+                    background: "#ffffff",
+                    color: "#111827",
+                    opacity: isLoading ? 0.65 : 1,
+                  }}
                 >
                   再読み込み
                 </button>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="min-w-[980px] w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
+              <div style={{ overflowX: "auto" }}>
+                <table
+                  style={{
+                    borderCollapse: "collapse",
+                    minWidth: 980,
+                    width: "100%",
+                  }}
+                >
+                  <thead style={{ background: "#f8fafc" }}>
                     <tr>
-                      <th className="px-4 py-3">日時</th>
-                      <th className="px-4 py-3">feature</th>
-                      <th className="px-4 py-3">model</th>
-                      <th className="px-4 py-3">status</th>
-                      <th className="px-4 py-3">target</th>
-                      <th className="px-4 py-3 text-right">tokens</th>
-                      <th className="px-4 py-3 text-right">cost</th>
-                      <th className="px-4 py-3">error</th>
+                      <th style={tableHeaderCellStyle}>日時</th>
+                      <th style={tableHeaderCellStyle}>feature</th>
+                      <th style={tableHeaderCellStyle}>model</th>
+                      <th style={tableHeaderCellStyle}>status</th>
+                      <th style={tableHeaderCellStyle}>target</th>
+                      <th style={{ ...tableHeaderCellStyle, textAlign: "right" }}>tokens</th>
+                      <th style={{ ...tableHeaderCellStyle, textAlign: "right" }}>cost</th>
+                      <th style={tableHeaderCellStyle}>error</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody>
                     {latestLogs.map((log) => (
-                      <tr key={log.id} className="align-top hover:bg-slate-50/80">
-                        <td className="whitespace-nowrap px-4 py-3 text-slate-700">
+                      <tr key={log.id}>
+                        <td style={{ ...tableCellStyle, whiteSpace: "nowrap" }}>
                           {formatDate(log.created_at)}
                         </td>
-                        <td className="px-4 py-3 font-semibold text-slate-900">
+                        <td style={{ ...tableCellStyle, color: "#0f172a", fontWeight: 800 }}>
                           {log.feature_key || "unknown"}
                         </td>
-                        <td className="px-4 py-3 text-slate-700">{log.model || "-"}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${statusClassName(log.status)}`}>
+                        <td style={tableCellStyle}>{log.model || "-"}</td>
+                        <td style={tableCellStyle}>
+                          <span
+                            style={{
+                              ...statusBadgeStyle(log.status),
+                              borderRadius: 999,
+                              display: "inline-flex",
+                              fontSize: 12,
+                              fontWeight: 900,
+                              padding: "4px 9px",
+                            }}
+                          >
                             {log.status || "-"}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-slate-700">
+                        <td style={tableCellStyle}>
                           {log.target_type || "-"}
                           {log.target_id ? ` / ${log.target_id}` : ""}
                         </td>
-                        <td className="px-4 py-3 text-right font-semibold text-slate-900">
+                        <td style={{ ...tableCellStyle, color: "#0f172a", fontWeight: 800, textAlign: "right" }}>
                           {formatNumber(log.total_token_estimate)}
                         </td>
-                        <td className="px-4 py-3 text-right text-slate-700">
+                        <td style={{ ...tableCellStyle, textAlign: "right" }}>
                           {formatCost(log.estimated_cost)}
                         </td>
-                        <td className="max-w-[260px] px-4 py-3 text-slate-500">
+                        <td style={{ ...tableCellStyle, maxWidth: 280 }}>
                           {shorten(log.error_message)}
                         </td>
                       </tr>
                     ))}
                     {latestLogs.length === 0 && (
                       <tr>
-                        <td className="px-4 py-10 text-center text-slate-500" colSpan={8}>
+                        <td colSpan={8} style={{ ...tableCellStyle, padding: 28, textAlign: "center" }}>
                           まだ記録がありません。
                         </td>
                       </tr>
@@ -305,9 +508,20 @@ export default function ForumAdminApiUsagePage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-7 text-amber-950 shadow-sm">
-              <h2 className="text-base font-black text-amber-950">将来の一括再整理メモ</h2>
-              <p className="mt-2">
+            <section
+              style={{
+                border: "1px solid #fed7aa",
+                borderRadius: 12,
+                background: "#fff7ed",
+                color: "#9a3412",
+                lineHeight: 1.8,
+                padding: 18,
+              }}
+            >
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 950 }}>
+                将来の一括再整理メモ
+              </h2>
+              <p style={{ margin: "8px 0 0" }}>
                 今回は一括再整理機能は実装していません。将来追加する場合は、条件設定、対象件数プレビュー、
                 推定API回数・token・費用表示、管理者確認、少量ずつ実行の順に進めます。
                 既に3層化済み、古いprompt_versionのみ、非表示・削除済み除外などの条件で先に絞り込みます。
@@ -315,7 +529,15 @@ export default function ForumAdminApiUsagePage() {
             </section>
           </>
         ) : (
-          <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500 shadow-sm">
+          <section
+            style={{
+              ...cardStyle,
+              borderStyle: "dashed",
+              color: "#64748b",
+              padding: 28,
+              textAlign: "center",
+            }}
+          >
             ADMIN_KEYを入力すると、API使用量の集計と最新ログが表示されます。
           </section>
         )}
@@ -333,14 +555,38 @@ function MetricCard({
   value: string;
   tone?: "slate" | "blue";
 }) {
-  const accentClassName =
-    tone === "blue" ? "bg-blue-500" : "bg-slate-900";
-
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className={`mb-4 h-1.5 w-10 rounded-full ${accentClassName}`} />
-      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-2 break-words text-3xl font-black tracking-tight text-slate-950">
+    <div style={{ ...cardStyle, padding: 18 }}>
+      <div
+        style={{
+          background: tone === "blue" ? "#2563eb" : "#111827",
+          borderRadius: 999,
+          height: 5,
+          marginBottom: 14,
+          width: 42,
+        }}
+      />
+      <p
+        style={{
+          color: "#64748b",
+          fontSize: 12,
+          fontWeight: 900,
+          letterSpacing: "0.04em",
+          margin: 0,
+        }}
+      >
+        {label}
+      </p>
+      <p
+        style={{
+          color: "#0f172a",
+          fontSize: 30,
+          fontWeight: 950,
+          lineHeight: 1.1,
+          margin: "8px 0 0",
+          overflowWrap: "anywhere",
+        }}
+      >
         {value}
       </p>
     </div>
@@ -349,29 +595,57 @@ function MetricCard({
 
 function UsageGroupList({ title, rows }: { title: string; rows: UsageGroup[] }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-black text-slate-950">{title}</h2>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">
+    <div style={{ ...cardStyle, padding: 18 }}>
+      <div style={{ alignItems: "center", display: "flex", justifyContent: "space-between", gap: 12 }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 950 }}>{title}</h2>
+        <span
+          style={{
+            borderRadius: 999,
+            background: "#f1f5f9",
+            color: "#475569",
+            fontSize: 12,
+            fontWeight: 900,
+            padding: "4px 9px",
+          }}
+        >
           {formatNumber(rows.length)}種
         </span>
       </div>
 
-      <div className="mt-4 space-y-3">
+      <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
         {rows.length === 0 && (
-          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+          <div
+            style={{
+              border: "1px dashed #cbd5e1",
+              borderRadius: 10,
+              background: "#f8fafc",
+              color: "#64748b",
+              fontSize: 14,
+              padding: 14,
+            }}
+          >
             まだ記録がありません。
           </div>
         )}
         {rows.slice(0, 12).map((row) => (
-          <div key={row.key} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <div className="flex items-start justify-between gap-3">
-              <p className="break-all text-sm font-bold text-slate-900">{row.key}</p>
-              <p className="whitespace-nowrap text-sm font-black text-blue-700">
+          <div
+            key={row.key}
+            style={{
+              border: "1px solid #e2e8f0",
+              borderRadius: 10,
+              background: "#f8fafc",
+              padding: 12,
+            }}
+          >
+            <div style={{ display: "flex", gap: 10, justifyContent: "space-between" }}>
+              <p style={{ color: "#0f172a", fontSize: 14, fontWeight: 900, margin: 0, overflowWrap: "anywhere" }}>
+                {row.key}
+              </p>
+              <p style={{ color: "#2563eb", fontSize: 14, fontWeight: 950, margin: 0, whiteSpace: "nowrap" }}>
                 {formatNumber(row.count)}件
               </p>
             </div>
-            <p className="mt-1 text-xs text-slate-500">
+            <p style={{ color: "#64748b", fontSize: 12, margin: "6px 0 0" }}>
               tokens {formatNumber(row.totalTokenTotal)} / cost {formatCost(row.estimatedCostTotal)}
             </p>
           </div>
