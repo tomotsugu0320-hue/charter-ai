@@ -209,6 +209,15 @@ export default function ForumAdminPage() {
             </p>
           </Link>
 
+          <Link href={`/${tenant}/forum/admin/api-usage`} style={menuCardStyle}>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
+              OpenAI API使用量
+            </h2>
+            <p style={menuDescriptionStyle}>
+              Forum内のAI処理の実行回数、推定token、成功/失敗ログを確認します。
+            </p>
+          </Link>
+
           <Link
             href={`/${tenant}/forum/admin/rebuild-discussion-map`}
             style={menuCardStyle}

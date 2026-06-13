@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
+import { getErrorMessage, recordForumApiUsageLog } from "@/lib/forum-api-usage";
 
 type DbStructure = {
   premises: string[];
@@ -519,9 +520,11 @@ claim: typeof text === "string" ? text : "",
 
 
     // ③ AI fallback
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
+    let completion: any;
+    try {
+      completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
         {
           role: "system",
 
@@ -552,8 +555,36 @@ content: generateIssueSystemPrompt,
           role: "user",
           content: text,
         },
-      ],
-    });
+        ],
+      });
+      await recordForumApiUsageLog({
+        featureKey: "generate_issue",
+        routePath: "/api/forum/generate-issue",
+        model: "gpt-4o-mini",
+        promptVersion: "generate_issue_v1",
+        targetType: "unknown",
+        targetId: null,
+        userId: activeUser.user.id,
+        inputText: `${generateIssueSystemPrompt}\n${text}`,
+        outputText: completion.choices[0]?.message?.content ?? "",
+        usage: completion.usage,
+        status: "success",
+      });
+    } catch (error) {
+      await recordForumApiUsageLog({
+        featureKey: "generate_issue",
+        routePath: "/api/forum/generate-issue",
+        model: "gpt-4o-mini",
+        promptVersion: "generate_issue_v1",
+        targetType: "unknown",
+        targetId: null,
+        userId: activeUser.user.id,
+        inputText: `${generateIssueSystemPrompt}\n${text}`,
+        status: "error",
+        errorMessage: getErrorMessage(error),
+      });
+      throw error;
+    }
 
 
 const raw = completion.choices[0].message.content || "{}";

@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
+import { getErrorMessage, recordForumApiUsageLog } from "@/lib/forum-api-usage";
 
 const ALLOWED_FEEDBACK_TYPES = [
   "term_unknown",
@@ -111,7 +112,8 @@ ${content}
 
 async function generateExplanation(
   feedbackType: AllowedFeedbackType,
-  content: string
+  content: string,
+  usageContext: { userId?: string | null; postId?: string | null } = {}
 ): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
 
@@ -133,25 +135,41 @@ async function generateExplanation(
 
   const prompt = buildInstruction(feedbackType, content);
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      input: prompt,
-    }),
-  });
+  const model = "gpt-4o-mini";
+  let result: any;
+  try {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        input: prompt,
+      }),
+    });
 
+    result = await response.json();
 
-
-const result = await response.json();
-
-if (!response.ok) {
-  throw new Error(result?.error?.message || "OpenAI explanation generation failed");
-}
+    if (!response.ok) {
+      throw new Error(result?.error?.message || "OpenAI explanation generation failed");
+    }
+  } catch (error) {
+    await recordForumApiUsageLog({
+      featureKey: "feedback_explanation",
+      routePath: "/api/forum/feedback",
+      model,
+      promptVersion: "feedback_explanation_v1",
+      targetType: "post",
+      targetId: usageContext.postId ?? null,
+      userId: usageContext.userId ?? null,
+      inputText: prompt,
+      status: "error",
+      errorMessage: getErrorMessage(error),
+    });
+    throw error;
+  }
 
 let explanation = "";
 
@@ -175,6 +193,20 @@ if (!explanation && result?.error?.message) {
 if (!explanation) {
   explanation = "説明の生成に失敗しました。もう一度試してください。";
 }
+
+await recordForumApiUsageLog({
+  featureKey: "feedback_explanation",
+  routePath: "/api/forum/feedback",
+  model,
+  promptVersion: "feedback_explanation_v1",
+  targetType: "post",
+  targetId: usageContext.postId ?? null,
+  userId: usageContext.userId ?? null,
+  inputText: prompt,
+  outputText: explanation,
+  usage: result?.usage,
+  status: "success",
+});
 
 return explanation;
 }
@@ -285,7 +317,10 @@ if (explanationColumn) {
     }
 
 
-const explanation = await generateExplanation(feedbackType, content);
+const explanation = await generateExplanation(feedbackType, content, {
+  userId: activeUser.user.id,
+  postId,
+});
 
 if (explanationColumn) {
   const { error: updateError } = await supabase

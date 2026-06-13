@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { checkPrivacyRisk } from "@/lib/privacy";
 import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
+import { getErrorMessage, recordForumApiUsageLog } from "@/lib/forum-api-usage";
 
 type ForumPost = {
   id: string;
@@ -378,6 +379,20 @@ ${content}
 
     const parsed = JSON.parse(outputText);
 
+    await recordForumApiUsageLog({
+      featureKey: "add_post_logic_score",
+      routePath: "/api/forum/add-post",
+      model: "gpt-4.1-mini",
+      promptVersion: "add_post_logic_score_v1",
+      targetType: "post",
+      targetId: null,
+      userId: null,
+      inputText: content,
+      outputText,
+      usage: json?.usage,
+      status: "success",
+    });
+
 const baseScore = Math.max(0, Math.min(100, Number(parsed.score ?? 50)));
 
 let weight = 0;
@@ -409,6 +424,18 @@ return {
 
 
   } catch (e) {
+    await recordForumApiUsageLog({
+      featureKey: "add_post_logic_score",
+      routePath: "/api/forum/add-post",
+      model: "gpt-4.1-mini",
+      promptVersion: "add_post_logic_score_v1",
+      targetType: "post",
+      targetId: null,
+      userId: null,
+      inputText: content,
+      status: "error",
+      errorMessage: getErrorMessage(e),
+    });
     console.error("[evaluateLogicScore fallback]", e);
     return calcLogicScoreFallback(content, postRole);
   }

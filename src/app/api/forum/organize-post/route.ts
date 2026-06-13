@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
+import { getErrorMessage, recordForumApiUsageLog } from "@/lib/forum-api-usage";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -118,10 +119,40 @@ export async function POST(req: NextRequest) {
 ${text}
 `;
 
-    const response = await client.responses.create({
-      model: "gpt-4.1-mini",
-      input: prompt,
-    });
+    let response: any;
+    try {
+      response = await client.responses.create({
+        model: "gpt-4.1-mini",
+        input: prompt,
+      });
+      await recordForumApiUsageLog({
+        featureKey: "organize_post",
+        routePath: "/api/forum/organize-post",
+        model: "gpt-4.1-mini",
+        promptVersion: "organize_post_v1",
+        targetType: "unknown",
+        targetId: null,
+        userId: activeUser.user.id,
+        inputText: prompt,
+        outputText: response.output_text ?? "",
+        usage: response.usage,
+        status: "success",
+      });
+    } catch (error) {
+      await recordForumApiUsageLog({
+        featureKey: "organize_post",
+        routePath: "/api/forum/organize-post",
+        model: "gpt-4.1-mini",
+        promptVersion: "organize_post_v1",
+        targetType: "unknown",
+        targetId: null,
+        userId: activeUser.user.id,
+        inputText: prompt,
+        status: "error",
+        errorMessage: getErrorMessage(error),
+      });
+      throw error;
+    }
 
     const rawText =
       response.output_text?.trim() ||

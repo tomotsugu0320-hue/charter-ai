@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { recordForumApiUsageLog } from "@/lib/forum-api-usage";
 
 const LOGIC_BREAK_TYPES = [
   "none",
@@ -33,6 +34,10 @@ type EvaluationContext = {
     logic_break_type?: string | null;
     logic_break_note?: string | null;
   } | null;
+};
+
+type EvaluationUsageContext = {
+  targetId?: string | null;
 };
 
 type ObjectionPostRow = {
@@ -70,7 +75,8 @@ function extractOutputText(json: any) {
 async function evaluateLogicScore(
   content: string,
   postRole: string,
-  context?: EvaluationContext
+  context?: EvaluationContext,
+  usageContext: EvaluationUsageContext = {}
 ): Promise<LogicScoreResult> {
   const apiKey = process.env.OPENAI_API_KEY;
 
@@ -366,11 +372,36 @@ ${objectionText}
 
   if (!res.ok) {
     const errorText = await res.text();
+    await recordForumApiUsageLog({
+      featureKey: "re_evaluate_logic_score",
+      routePath: "/api/forum/re-evaluate-logic-score",
+      model: "gpt-4.1-mini",
+      promptVersion: "re_evaluate_logic_score_v1",
+      targetType: "post",
+      targetId: usageContext.targetId ?? null,
+      userId: null,
+      inputText: `${content}\n${currentEvaluationText}\n${objectionText}`,
+      status: "error",
+      errorMessage: errorText,
+    });
     throw new Error(`OpenAI API error: ${errorText}`);
   }
 
   const json = await res.json();
   const outputText = extractOutputText(json);
+  await recordForumApiUsageLog({
+    featureKey: "re_evaluate_logic_score",
+    routePath: "/api/forum/re-evaluate-logic-score",
+    model: "gpt-4.1-mini",
+    promptVersion: "re_evaluate_logic_score_v1",
+    targetType: "post",
+    targetId: usageContext.targetId ?? null,
+    userId: null,
+    inputText: `${content}\n${currentEvaluationText}\n${objectionText}`,
+    outputText,
+    usage: json?.usage,
+    status: "success",
+  });
 
   if (!outputText) {
     throw new Error("OpenAI did not return logic score JSON");
@@ -520,6 +551,9 @@ export async function POST(req: NextRequest) {
               logic_break_note: String(objection.logic_break_note ?? "").trim(),
             }
           : null,
+      },
+      {
+        targetId: postId,
       }
     );
 

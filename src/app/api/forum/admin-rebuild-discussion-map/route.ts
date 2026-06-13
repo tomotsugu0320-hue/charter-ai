@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
+import { getErrorMessage, recordForumApiUsageLog } from "@/lib/forum-api-usage";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -254,8 +255,10 @@ export async function POST(req: Request) {
 
     const client = new OpenAI({ apiKey });
 
-    const response = await client.responses.create({
-      model: "gpt-4.1-mini",
+    let response: any;
+    try {
+      response = await client.responses.create({
+        model: "gpt-4.1-mini",
       instructions: `
 あなたはAI知恵袋Forumの議論マップ編集補助AIです。
 公開中のスレッドと投稿内容だけを材料に、議論の全体マップ再編案をJSONで作成してください。
@@ -446,7 +449,35 @@ export async function POST(req: Request) {
           strict: true,
         },
       },
-    });
+      });
+      await recordForumApiUsageLog({
+        featureKey: "rebuild_discussion_map",
+        routePath: "/api/forum/admin-rebuild-discussion-map",
+        model: "gpt-4.1-mini",
+        promptVersion: "rebuild_discussion_map_v1",
+        targetType: "admin_job",
+        targetId: null,
+        userId: null,
+        inputText: JSON.stringify(discussionInput),
+        outputText: extractOutputText(response),
+        usage: response.usage,
+        status: "success",
+      });
+    } catch (error) {
+      await recordForumApiUsageLog({
+        featureKey: "rebuild_discussion_map",
+        routePath: "/api/forum/admin-rebuild-discussion-map",
+        model: "gpt-4.1-mini",
+        promptVersion: "rebuild_discussion_map_v1",
+        targetType: "admin_job",
+        targetId: null,
+        userId: null,
+        inputText: JSON.stringify(discussionInput),
+        status: "error",
+        errorMessage: getErrorMessage(error),
+      });
+      throw error;
+    }
 
     const outputText = extractOutputText(response);
 

@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
+import { getErrorMessage, recordForumApiUsageLog } from "@/lib/forum-api-usage";
 
 type ForumPost = {
   id: string;
@@ -54,6 +55,11 @@ type ThreadForSummarySave = {
 type CachedThreadSummary = {
   value: ThreadSummaryResponse;
   expiresAt: number;
+};
+
+type ThreadSummaryUsageContext = {
+  threadId?: string | null;
+  userId?: string | null;
 };
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -256,7 +262,10 @@ function ensureConflictPairs(
   ];
 }
 
-async function generateNormalSummaryWithAI(posts: ForumPost[]) {
+async function generateNormalSummaryWithAI(
+  posts: ForumPost[],
+  usageContext: ThreadSummaryUsageContext = {},
+) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not set");
@@ -349,22 +358,54 @@ async function generateNormalSummaryWithAI(posts: ForumPost[]) {
 ${inputText}
 `.trim();
 
-  const res = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-5.4-mini",
-      input: prompt,
-    }),
-  });
+  const model = "gpt-5.4-mini";
+  let data: any;
+  try {
+    const res = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        input: prompt,
+      }),
+    });
 
-  const data = await res.json();
+    data = await res.json();
 
-  if (!res.ok) {
-    throw new Error(data?.error?.message || "OpenAI summary generation failed");
+    if (!res.ok) {
+      throw new Error(data?.error?.message || "OpenAI summary generation failed");
+    }
+
+    await recordForumApiUsageLog({
+      featureKey: "thread_summary",
+      routePath: "/api/forum/thread-summary",
+      model,
+      promptVersion: "thread_summary_v1",
+      targetType: "thread",
+      targetId: usageContext.threadId ?? null,
+      userId: usageContext.userId ?? null,
+      inputText: prompt,
+      outputText: data?.output_text ?? "",
+      usage: data?.usage,
+      status: "success",
+    });
+  } catch (error) {
+    await recordForumApiUsageLog({
+      featureKey: "thread_summary",
+      routePath: "/api/forum/thread-summary",
+      model,
+      promptVersion: "thread_summary_v1",
+      targetType: "thread",
+      targetId: usageContext.threadId ?? null,
+      userId: usageContext.userId ?? null,
+      inputText: prompt,
+      status: "error",
+      errorMessage: getErrorMessage(error),
+    });
+    throw error;
   }
 
 
@@ -376,7 +417,10 @@ if (!text) {
 return text;
 }
 
-async function generateEasySummaryWithAI(posts: ForumPost[]) {
+async function generateEasySummaryWithAI(
+  posts: ForumPost[],
+  usageContext: ThreadSummaryUsageContext = {},
+) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not set");
@@ -403,22 +447,54 @@ async function generateEasySummaryWithAI(posts: ForumPost[]) {
 ${inputText}
 `.trim();
 
-  const res = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-5.4-mini",
-      input: prompt,
-    }),
-  });
+  const model = "gpt-5.4-mini";
+  let data: any;
+  try {
+    const res = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        input: prompt,
+      }),
+    });
 
-  const data = await res.json();
+    data = await res.json();
 
-  if (!res.ok) {
-    throw new Error(data?.error?.message || "OpenAI easy summary generation failed");
+    if (!res.ok) {
+      throw new Error(data?.error?.message || "OpenAI easy summary generation failed");
+    }
+
+    await recordForumApiUsageLog({
+      featureKey: "thread_summary_easy",
+      routePath: "/api/forum/thread-summary",
+      model,
+      promptVersion: "thread_summary_easy_v1",
+      targetType: "thread",
+      targetId: usageContext.threadId ?? null,
+      userId: usageContext.userId ?? null,
+      inputText: prompt,
+      outputText: data?.output_text ?? "",
+      usage: data?.usage,
+      status: "success",
+    });
+  } catch (error) {
+    await recordForumApiUsageLog({
+      featureKey: "thread_summary_easy",
+      routePath: "/api/forum/thread-summary",
+      model,
+      promptVersion: "thread_summary_easy_v1",
+      targetType: "thread",
+      targetId: usageContext.threadId ?? null,
+      userId: usageContext.userId ?? null,
+      inputText: prompt,
+      status: "error",
+      errorMessage: getErrorMessage(error),
+    });
+    throw error;
   }
 
 
@@ -929,7 +1005,10 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-      const normalAiText = await generateNormalSummaryWithAI(safePosts);
+      const normalAiText = await generateNormalSummaryWithAI(safePosts, {
+        threadId,
+        userId: activeUser.user.id,
+      });
 
       summary = {
         ...summary,
