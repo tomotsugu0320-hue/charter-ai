@@ -90,6 +90,45 @@ type RunResponse = {
   items?: BulkRefreshJobItem[];
 };
 
+type SummaryComparePayload = {
+  summary_text?: string | null;
+  provisional_answer?: string | null;
+  evidence_text?: string | null;
+  counterargument_text?: string | null;
+  related_topics?: unknown;
+};
+
+type ThreadSummaryVersion = {
+  id: string;
+  thread_id: string;
+  thread_title?: string | null;
+  job_id?: string | null;
+  job_item_id?: string | null;
+  prompt_version: string;
+  model?: string | null;
+  is_applied: boolean;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  total_tokens?: number | null;
+  actual_cost_usd?: number | null;
+  created_at?: string | null;
+  summary_text?: string | null;
+  summary_excerpt?: string | null;
+  provisional_answer?: string | null;
+  evidence_text?: string | null;
+  counterargument_text?: string | null;
+  related_topics?: unknown;
+  structure_json?: unknown;
+  raw_result?: unknown;
+  current_summary?: SummaryComparePayload | null;
+  thread?: {
+    id?: string;
+    title?: string | null;
+    category?: string | null;
+    created_at?: string | null;
+  } | null;
+};
+
 const pageStyle: CSSProperties = {
   minHeight: "100vh",
   background: "#f8fafc",
@@ -186,6 +225,45 @@ function statCard(label: string, value: string, helper?: string) {
   );
 }
 
+function formatUnknownJson(value: unknown) {
+  if (value === null || value === undefined) return "-";
+  if (typeof value === "string") return value || "-";
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function compareTextBlock(label: string, oldValue?: string | null, newValue?: string | null) {
+  const boxStyle: CSSProperties = {
+    border: "1px solid #e2e8f0",
+    borderRadius: 8,
+    background: "#f8fafc",
+    padding: 12,
+    minHeight: 96,
+    whiteSpace: "pre-wrap",
+    lineHeight: 1.7,
+    color: "#334155",
+  };
+
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      <h4 style={{ margin: 0, fontSize: 15 }}>{label}</h4>
+      <div style={gridStyle}>
+        <div>
+          <div style={{ ...labelStyle, marginBottom: 6 }}>旧データ</div>
+          <div style={boxStyle}>{oldValue?.trim() || "旧データ未取得"}</div>
+        </div>
+        <div>
+          <div style={{ ...labelStyle, marginBottom: 6 }}>新version</div>
+          <div style={boxStyle}>{newValue?.trim() || "新version未取得"}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ForumAdminBulkRefreshPreviewPage() {
   const params = useParams();
   const tenantParam = params?.tenant;
@@ -213,6 +291,11 @@ export default function ForumAdminBulkRefreshPreviewPage() {
   const [runResult, setRunResult] = useState<RunResponse | null>(null);
   const [jobs, setJobs] = useState<BulkRefreshJob[]>([]);
   const [jobsMessage, setJobsMessage] = useState("");
+  const [versions, setVersions] = useState<ThreadSummaryVersion[]>([]);
+  const [versionsMessage, setVersionsMessage] = useState("");
+  const [selectedVersion, setSelectedVersion] =
+    useState<ThreadSummaryVersion | null>(null);
+  const [versionLoadingId, setVersionLoadingId] = useState("");
 
   async function runPreview() {
     const requestAdminKey = adminKey.trim();
@@ -286,6 +369,65 @@ export default function ForumAdminBulkRefreshPreviewPage() {
     }
   }
 
+  async function loadVersions(requestAdminKey = "") {
+    setVersionsMessage("");
+
+    try {
+      const response = await fetch("/api/forum/admin/bulk-refresh/versions", {
+        headers: requestAdminKey ? { "x-admin-key": requestAdminKey } : {},
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        versions?: ThreadSummaryVersion[];
+      };
+
+      if (!response.ok || data.ok !== true) {
+        setVersions([]);
+        setVersionsMessage(
+          data.error
+            ? `生成済みversionを取得できませんでした: ${data.error}`
+            : "管理セッションがないため、生成済みversionは未取得です。"
+        );
+        return;
+      }
+
+      setVersions(data.versions ?? []);
+    } catch {
+      setVersionsMessage("生成済みversionの取得で通信エラーが発生しました。");
+    }
+  }
+
+  async function loadVersionDetail(versionId: string, requestAdminKey = "") {
+    setVersionLoadingId(versionId);
+    setVersionsMessage("");
+
+    try {
+      const response = await fetch(
+        `/api/forum/admin/bulk-refresh/versions/${encodeURIComponent(versionId)}`,
+        {
+          headers: requestAdminKey ? { "x-admin-key": requestAdminKey } : {},
+        }
+      );
+      const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        version?: ThreadSummaryVersion;
+      };
+
+      if (!response.ok || data.ok !== true || !data.version) {
+        setVersionsMessage(data.error || "version詳細を取得できませんでした。");
+        return;
+      }
+
+      setSelectedVersion(data.version);
+    } catch {
+      setVersionsMessage("version詳細の取得で通信エラーが発生しました。");
+    } finally {
+      setVersionLoadingId("");
+    }
+  }
+
   async function runThreadSummaryTest() {
     const requestAdminKey = adminKey.trim();
 
@@ -322,6 +464,7 @@ export default function ForumAdminBulkRefreshPreviewPage() {
       setRunMessage("スレッド要約テスト実行が完了しました。");
       setAdminKey("");
       await loadJobs(requestAdminKey);
+      await loadVersions(requestAdminKey);
     } catch {
       setRunMessage("テスト実行中に通信エラーが発生しました。");
     } finally {
@@ -331,6 +474,7 @@ export default function ForumAdminBulkRefreshPreviewPage() {
 
   useEffect(() => {
     void loadJobs();
+    void loadVersions();
   }, []);
 
   const samples = preview?.sample_targets ?? [];
@@ -856,6 +1000,224 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </section>
+
+        <section style={{ ...cardStyle, marginBottom: 18 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+              alignItems: "center",
+              marginBottom: 12,
+            }}
+          >
+            <div>
+              <h2 style={{ margin: 0, fontSize: 20 }}>生成済みAI要約version</h2>
+              <p style={{ margin: "8px 0 0", color: "#475569", lineHeight: 1.7 }}>
+                この一覧は、テスト実行で生成されたAI要約versionの確認用です。まだ本番表示には反映されていません。
+                既存のAI要約は上書きされていません。内容を確認して問題なければ、次の段階で1件ずつ適用する機能を検討します。
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadVersions(adminKey.trim())}
+              style={{
+                border: "1px solid #cbd5e1",
+                borderRadius: 8,
+                background: "#ffffff",
+                color: "#111827",
+                cursor: "pointer",
+                fontWeight: 800,
+                padding: "8px 12px",
+                flex: "0 0 auto",
+              }}
+            >
+              再読み込み
+            </button>
+          </div>
+
+          {versionsMessage && (
+            <p style={{ margin: "0 0 12px", color: "#92400e", lineHeight: 1.7 }}>
+              {versionsMessage}
+            </p>
+          )}
+
+          {versions.length === 0 ? (
+            <div
+              style={{
+                border: "1px dashed #cbd5e1",
+                borderRadius: 8,
+                background: "#f8fafc",
+                color: "#64748b",
+                padding: 18,
+                textAlign: "center",
+              }}
+            >
+              まだ生成済みAI要約versionはありません。
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  minWidth: 980,
+                }}
+              >
+                <thead>
+                  <tr style={{ background: "#f1f5f9", textAlign: "left" }}>
+                    <th style={{ padding: 10 }}>thread</th>
+                    <th style={{ padding: 10 }}>job</th>
+                    <th style={{ padding: 10 }}>prompt</th>
+                    <th style={{ padding: 10 }}>model</th>
+                    <th style={{ padding: 10 }}>applied</th>
+                    <th style={{ padding: 10 }}>token</th>
+                    <th style={{ padding: 10 }}>cost</th>
+                    <th style={{ padding: 10 }}>作成日時</th>
+                    <th style={{ padding: 10 }}>詳細</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {versions.map((version) => (
+                    <tr key={version.id}>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        <strong>{version.thread_title || "無題スレッド"}</strong>
+                        <div style={{ color: "#64748b", marginTop: 4 }}>
+                          {version.summary_excerpt || version.thread_id}
+                        </div>
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        <code>{version.job_id || "-"}</code>
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        {version.prompt_version}
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        {version.model || "-"}
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        {version.is_applied ? "true" : "false"}
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        {formatNumber(version.total_tokens)}
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        {formatCost(version.actual_cost_usd)}
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        {formatDate(version.created_at)}
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        <button
+                          type="button"
+                          onClick={() => void loadVersionDetail(version.id, adminKey.trim())}
+                          disabled={versionLoadingId === version.id}
+                          style={{
+                            border: "1px solid #cbd5e1",
+                            borderRadius: 8,
+                            background: "#ffffff",
+                            color: "#111827",
+                            cursor: "pointer",
+                            fontWeight: 800,
+                            padding: "8px 10px",
+                          }}
+                        >
+                          {versionLoadingId === version.id ? "取得中..." : "詳細を見る"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {selectedVersion && (
+            <div
+              style={{
+                borderTop: "1px solid #e2e8f0",
+                marginTop: 18,
+                paddingTop: 18,
+                display: "grid",
+                gap: 16,
+              }}
+            >
+              <div style={gridStyle}>
+                {statCard("version id", selectedVersion.id)}
+                {statCard("is_applied", selectedVersion.is_applied ? "true" : "false")}
+                {statCard("total token", formatNumber(selectedVersion.total_tokens))}
+                {statCard("cost", formatCost(selectedVersion.actual_cost_usd), "USD")}
+              </div>
+
+              <div
+                style={{
+                  border: "1px solid #bbf7d0",
+                  borderRadius: 8,
+                  background: "#f0fdf4",
+                  color: "#166534",
+                  padding: 12,
+                  lineHeight: 1.7,
+                }}
+              >
+                詳細表示は確認専用です。適用・削除・既存要約の更新は行いません。
+              </div>
+
+              {compareTextBlock(
+                "要約",
+                selectedVersion.current_summary?.summary_text,
+                selectedVersion.summary_text
+              )}
+              {compareTextBlock(
+                "結論",
+                selectedVersion.current_summary?.provisional_answer,
+                selectedVersion.provisional_answer
+              )}
+              {compareTextBlock(
+                "根拠",
+                selectedVersion.current_summary?.evidence_text,
+                selectedVersion.evidence_text
+              )}
+              {compareTextBlock(
+                "反論・リスク",
+                selectedVersion.current_summary?.counterargument_text,
+                selectedVersion.counterargument_text
+              )}
+
+              <div style={gridStyle}>
+                <div>
+                  <div style={{ ...labelStyle, marginBottom: 6 }}>related_topics</div>
+                  <pre
+                    style={{
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 8,
+                      background: "#f8fafc",
+                      padding: 12,
+                      overflowX: "auto",
+                      whiteSpace: "pre-wrap",
+                    }}
+                  >
+                    {formatUnknownJson(selectedVersion.related_topics)}
+                  </pre>
+                </div>
+                <div>
+                  <div style={{ ...labelStyle, marginBottom: 6 }}>structure_json</div>
+                  <pre
+                    style={{
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 8,
+                      background: "#f8fafc",
+                      padding: 12,
+                      overflowX: "auto",
+                      whiteSpace: "pre-wrap",
+                    }}
+                  >
+                    {formatUnknownJson(selectedVersion.structure_json)}
+                  </pre>
+                </div>
+              </div>
             </div>
           )}
         </section>
