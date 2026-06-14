@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 import { getErrorMessage, recordForumApiUsageLog } from "@/lib/forum-api-usage";
+import { isForumAdminAuthenticated } from "@/lib/forum-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -179,7 +180,7 @@ function errorResponse(
 }
 
 export async function POST(req: Request) {
-  if (req.headers.get("x-admin-key") !== process.env.ADMIN_KEY) {
+  if (!isForumAdminAuthenticated(req)) {
     return errorResponse("admin_key_invalid", "Unauthorized", 401);
   }
 

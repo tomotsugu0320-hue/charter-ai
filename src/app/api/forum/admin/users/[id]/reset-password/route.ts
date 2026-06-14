@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
   hashForumBetaPassword,
-  isForumAdminKeyValid,
+  isForumAdminAuthenticated,
   validateForumBetaPasswordConfirmation,
   validateForumBetaPasswordInput,
 } from "@/lib/forum-auth";
@@ -32,7 +32,7 @@ function getSupabase() {
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
-  if (!isForumAdminKeyValid(request)) {
+  if (!isForumAdminAuthenticated(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

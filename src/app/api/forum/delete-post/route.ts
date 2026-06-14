@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { isForumAdminAuthenticated } from "@/lib/forum-auth";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,7 +11,7 @@ const supabase = createClient(
 
 export async function POST(req: Request) {
   try {
-    if (req.headers.get("x-admin-key") !== process.env.ADMIN_KEY) {
+    if (!isForumAdminAuthenticated(req)) {
       return new Response("Unauthorized", { status: 401 });
     }
 

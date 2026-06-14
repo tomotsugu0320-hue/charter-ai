@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
+import {
+  getActiveForumBetaSessionUser,
+  isForumAdminAuthenticated,
+} from "@/lib/forum-auth";
 
 type RouteContext = {
   params: Promise<{
@@ -48,8 +51,7 @@ export async function PATCH(req: Request, context: RouteContext) {
     const body = await req.json().catch(() => ({}));
     const hideThread = body?.hideThread === true;
 
-    const adminKey = req.headers.get("x-admin-key") || "";
-    const isAdmin = Boolean(process.env.ADMIN_KEY) && adminKey === process.env.ADMIN_KEY;
+    const isAdmin = isForumAdminAuthenticated(req);
 
     const { data: post, error: postError } = await supabase
       .from("forum_posts")

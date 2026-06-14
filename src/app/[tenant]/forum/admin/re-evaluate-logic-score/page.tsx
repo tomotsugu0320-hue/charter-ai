@@ -327,11 +327,12 @@ export default function ReEvaluateLogicScorePage() {
   }
 
   async function reEvaluatePost(targetPostId: string, objectionPostId?: string) {
+    const requestAdminKey = adminKey.trim();
     const res = await fetch("/api/forum/re-evaluate-logic-score", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-admin-key": adminKey.trim(),
+        ...(requestAdminKey ? { "x-admin-key": requestAdminKey } : {}),
       },
       body: JSON.stringify({
         postId: targetPostId,
@@ -392,11 +393,13 @@ export default function ReEvaluateLogicScorePage() {
   }
 
   async function loadRecentPosts() {
-    if (!adminKey.trim()) {
+    if (false && !adminKey.trim()) {
       setStatus(null);
       setError("最近の投稿を読むには管理者キーを入力してください。");
       return;
     }
+
+    const requestAdminKey = adminKey.trim();
 
     setPostsLoading(true);
     setStatus(null);
@@ -404,9 +407,7 @@ export default function ReEvaluateLogicScorePage() {
 
     try {
       const res = await fetch("/api/forum/admin-posts", {
-        headers: {
-          "x-admin-key": adminKey.trim(),
-        },
+        headers: requestAdminKey ? { "x-admin-key": requestAdminKey } : undefined,
       });
 
       const raw = await res.text();

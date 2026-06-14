@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { recordForumApiUsageLog } from "@/lib/forum-api-usage";
+import { isForumAdminAuthenticated } from "@/lib/forum-auth";
 
 const LOGIC_BREAK_TYPES = [
   "none",
@@ -424,7 +425,7 @@ ${objectionText}
 }
 
 export async function POST(req: NextRequest) {
-  if (req.headers.get("x-admin-key") !== process.env.ADMIN_KEY) {
+  if (!isForumAdminAuthenticated(req)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

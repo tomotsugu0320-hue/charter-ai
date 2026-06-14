@@ -3,8 +3,10 @@ import { createClient } from "@supabase/supabase-js";
 import { promisify } from "util";
 
 export const FORUM_BETA_SESSION_COOKIE = "forum_beta_session";
+export const FORUM_ADMIN_SESSION_COOKIE = "forum_admin_session";
 
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 14;
+const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 30;
 const SCRYPT_KEY_LENGTH = 64;
 const LOGIN_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 const scryptAsync = promisify(scrypt);
@@ -12,6 +14,14 @@ const scryptAsync = promisify(scrypt);
 type ForumBetaSessionPayload = {
   sub: "forum_beta";
   userId?: string;
+  iat: number;
+  exp: number;
+  nonce: string;
+  v: 1;
+};
+
+type ForumAdminSessionPayload = {
+  sub: "forum_admin";
   iat: number;
   exp: number;
   nonce: string;
@@ -40,6 +50,14 @@ export type ActiveForumBetaSessionResult =
 
 function getSessionSecret() {
   return process.env.FORUM_BETA_SESSION_SECRET;
+}
+
+function getAdminSessionSecret() {
+  return (
+    process.env.FORUM_ADMIN_SESSION_SECRET?.trim() ||
+    process.env.FORUM_BETA_SESSION_SECRET?.trim() ||
+    process.env.ADMIN_KEY?.trim()
+  );
 }
 
 function base64UrlEncode(value: string | Buffer) {
@@ -188,16 +206,96 @@ export function isForumBetaAuthConfigured() {
 export function isForumAdminKeyValid(
   requestOrHeaders: Request | Headers | null | undefined
 ) {
-  const adminKey = process.env.ADMIN_KEY?.trim();
-
-  if (!adminKey) return false;
-
   const requestAdminKey =
     requestOrHeaders instanceof Headers
       ? requestOrHeaders.get("x-admin-key")
       : requestOrHeaders?.headers.get("x-admin-key");
 
-  return requestAdminKey === adminKey;
+  return isForumAdminKeyValueValid(requestAdminKey);
+}
+
+export function isForumAdminKeyValueValid(adminKeyValue: string | null | undefined) {
+  const adminKey = process.env.ADMIN_KEY?.trim();
+
+  if (!adminKey) return false;
+
+  return adminKeyValue?.trim() === adminKey;
+}
+
+export function createForumAdminSessionToken() {
+  const secret = getAdminSessionSecret();
+
+  if (!secret) {
+    throw new Error("FORUM_ADMIN_SESSION_SECRET or fallback secret is not configured.");
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const payload: ForumAdminSessionPayload = {
+    sub: "forum_admin",
+    iat: now,
+    exp: now + ADMIN_SESSION_MAX_AGE_SECONDS,
+    nonce: randomBytes(16).toString("base64url"),
+    v: 1,
+  };
+  const payloadPart = base64UrlEncode(JSON.stringify(payload));
+  const signature = signTokenPayload(payloadPart, secret);
+
+  return `${payloadPart}.${signature}`;
+}
+
+export function verifyForumAdminSessionToken(token: string | null | undefined) {
+  const secret = getAdminSessionSecret();
+
+  if (!secret || !token) return false;
+
+  const parts = token.split(".");
+
+  if (parts.length !== 2) return false;
+
+  const [payloadPart, signature] = parts;
+
+  if (!payloadPart || !signature) return false;
+
+  const expectedSignature = signTokenPayload(payloadPart, secret);
+
+  if (!safeEqual(signature, expectedSignature)) return false;
+
+  try {
+    const payload = JSON.parse(
+      base64UrlDecode(payloadPart)
+    ) as Partial<ForumAdminSessionPayload>;
+    const now = Math.floor(Date.now() / 1000);
+
+    return (
+      payload.sub === "forum_admin" &&
+      payload.v === 1 &&
+      typeof payload.exp === "number" &&
+      payload.exp > now
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function isForumAdminSessionValid(
+  requestOrHeaders: Request | Headers | null | undefined
+) {
+  const cookieHeader =
+    requestOrHeaders instanceof Headers
+      ? requestOrHeaders.get("cookie")
+      : requestOrHeaders?.headers.get("cookie");
+  const token = readCookieValue(cookieHeader, FORUM_ADMIN_SESSION_COOKIE);
+
+  return verifyForumAdminSessionToken(token);
+}
+
+export function isForumAdminAuthenticated(
+  requestOrHeaders: Request | Headers | null | undefined
+) {
+  return (
+    isForumAdminKeyValid(requestOrHeaders) ||
+    isForumAdminSessionValid(requestOrHeaders)
+  );
 }
 
 export function createForumBetaSessionToken(userId?: string) {
@@ -366,6 +464,28 @@ export function getForumBetaSessionCookieOptions() {
 }
 
 export function getForumBetaSessionClearCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+    expires: new Date(0),
+  };
+}
+
+export function getForumAdminSessionCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
+    expires: new Date(Date.now() + ADMIN_SESSION_MAX_AGE_SECONDS * 1000),
+  };
+}
+
+export function getForumAdminSessionClearCookieOptions() {
   return {
     httpOnly: true,
     sameSite: "lax" as const,

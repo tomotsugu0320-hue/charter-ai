@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { isForumAdminKeyValid } from "@/lib/forum-auth";
+import { isForumAdminAuthenticated } from "@/lib/forum-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -271,7 +271,7 @@ async function restorePreviousActiveVersion(
 }
 
 export async function POST(request: NextRequest) {
-  if (!isForumAdminKeyValid(request)) {
+  if (!isForumAdminAuthenticated(request)) {
     return jsonError("Unauthorized", 401);
   }
 

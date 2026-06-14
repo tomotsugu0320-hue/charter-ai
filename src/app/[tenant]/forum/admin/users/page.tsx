@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 type AdminForumBetaUser = {
   id: string;
@@ -130,6 +130,10 @@ export default function AdminUsersPage() {
     return null;
   }
 
+  function getOptionalAdminKey() {
+    return verifiedAdminKeyRef.current.trim();
+  }
+
   function updatePasswordForm(
     userId: string,
     field: keyof PasswordFormState,
@@ -190,6 +194,43 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function loadUsersFromAdminSession() {
+    setLoadingUsers(true);
+    setError(null);
+    setCardMessages({});
+
+    try {
+      const res = await fetch("/api/forum/admin/users", {
+        cache: "no-store",
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        users?: AdminForumBetaUser[];
+      };
+
+      if (!res.ok) {
+        setUsers([]);
+        return;
+      }
+
+      verifiedAdminKeyRef.current = "";
+      const nextUsers = Array.isArray(json.users) ? json.users : [];
+      setUsers(nextUsers);
+      setPasswordForms(
+        Object.fromEntries(nextUsers.map((user) => [user.id, emptyPasswordForm()]))
+      );
+      setDeleteConfirmTexts({});
+      setPurgeConfirmTexts({});
+    } catch {
+      setUsers([]);
+    } finally {
+      setLoadingUsers(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadUsersFromAdminSession();
+  }, []);
+
   function setCardMessage(userId: string, message: CardMessage) {
     setCardMessages((current) => ({
       ...current,
@@ -241,8 +282,7 @@ export default function AdminUsersPage() {
   }
 
   async function resetPassword(user: AdminForumBetaUser) {
-    const requestAdminKey = getVerifiedAdminKey();
-    if (!requestAdminKey) return;
+    const requestAdminKey = getOptionalAdminKey();
 
     const form = passwordForms[user.id] ?? emptyPasswordForm();
 
@@ -270,7 +310,7 @@ export default function AdminUsersPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-admin-key": requestAdminKey,
+            ...(requestAdminKey ? { "x-admin-key": requestAdminKey } : {}),
           },
           body: JSON.stringify({
             newPassword: form.newPassword,
@@ -310,8 +350,7 @@ export default function AdminUsersPage() {
     user: AdminForumBetaUser,
     status: "active" | "disabled"
   ) {
-    const requestAdminKey = getVerifiedAdminKey();
-    if (!requestAdminKey) return;
+    const requestAdminKey = getOptionalAdminKey();
 
     setSavingUserId(user.id);
     setError(null);
@@ -323,7 +362,7 @@ export default function AdminUsersPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-admin-key": requestAdminKey,
+            ...(requestAdminKey ? { "x-admin-key": requestAdminKey } : {}),
           },
           body: JSON.stringify({ status }),
         }
@@ -354,8 +393,7 @@ export default function AdminUsersPage() {
   }
 
   async function deleteUser(user: AdminForumBetaUser) {
-    const requestAdminKey = getVerifiedAdminKey();
-    if (!requestAdminKey) return;
+    const requestAdminKey = getOptionalAdminKey();
 
     const confirmText = (deleteConfirmTexts[user.id] ?? "").trim();
 
@@ -383,7 +421,7 @@ export default function AdminUsersPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-admin-key": requestAdminKey,
+            ...(requestAdminKey ? { "x-admin-key": requestAdminKey } : {}),
           },
           body: JSON.stringify({
             postHandling: "keep_visible",
@@ -418,8 +456,7 @@ export default function AdminUsersPage() {
   }
 
   async function purgeUser(user: AdminForumBetaUser) {
-    const requestAdminKey = getVerifiedAdminKey();
-    if (!requestAdminKey) return;
+    const requestAdminKey = getOptionalAdminKey();
 
     const confirmText = (purgeConfirmTexts[user.id] ?? "").trim();
 
@@ -447,7 +484,7 @@ export default function AdminUsersPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-admin-key": requestAdminKey,
+            ...(requestAdminKey ? { "x-admin-key": requestAdminKey } : {}),
           },
           body: JSON.stringify({ confirmText }),
         }
@@ -553,7 +590,9 @@ export default function AdminUsersPage() {
           />
           <button
             type="button"
-            onClick={() => void loadUsers()}
+            onClick={() =>
+              void (adminKey.trim() ? loadUsers() : loadUsersFromAdminSession())
+            }
             disabled={loadingUsers}
             style={{
               ...buttonStyle,

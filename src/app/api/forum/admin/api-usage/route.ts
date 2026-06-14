@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { isForumAdminKeyValid } from "@/lib/forum-auth";
+import { isForumAdminAuthenticated } from "@/lib/forum-auth";
 import { calculateOpenAiEstimatedCostUsd } from "@/lib/openai-pricing";
 
 export const dynamic = "force-dynamic";
@@ -142,7 +142,7 @@ async function countSince(supabase: ReturnType<typeof getSupabaseAdmin>, since: 
 }
 
 export async function GET(request: NextRequest) {
-  if (!isForumAdminKeyValid(request)) {
+  if (!isForumAdminAuthenticated(request)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 

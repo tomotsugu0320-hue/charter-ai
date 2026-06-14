@@ -503,7 +503,7 @@ export default function RebuildDiscussionMapPage() {
   }
 
   async function handleGenerate() {
-    if (!requestAdminKey) {
+    if (false && !requestAdminKey) {
       setError("管理者キーを入力してください。");
       setResult(null);
       return;
@@ -521,7 +521,7 @@ export default function RebuildDiscussionMapPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": requestAdminKey,
+          ...(requestAdminKey ? { "x-admin-key": requestAdminKey } : {}),
         },
       });
       const responseText = await res.text();
@@ -551,7 +551,7 @@ export default function RebuildDiscussionMapPage() {
   async function handleApplyPreview() {
     const previewId = result?.preview_id?.trim();
 
-    if (!requestAdminKey) {
+    if (false && !requestAdminKey) {
       setApplyError("ADMIN_KEYを入力してください。");
       setApplyMessage(null);
       return;
@@ -572,7 +572,7 @@ export default function RebuildDiscussionMapPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": requestAdminKey,
+          ...(requestAdminKey ? { "x-admin-key": requestAdminKey } : {}),
         },
         body: JSON.stringify({ preview_id: previewId }),
       });

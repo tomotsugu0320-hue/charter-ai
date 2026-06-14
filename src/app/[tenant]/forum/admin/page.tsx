@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 const pageStyle: CSSProperties = {
   maxWidth: 920,
@@ -74,6 +74,31 @@ export default function ForumAdminPage() {
   const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkAdminSession() {
+      try {
+        const response = await fetch("/api/forum/admin/users", {
+          cache: "no-store",
+        });
+
+        if (!cancelled && response.ok) {
+          setIsVerified(true);
+          setError("");
+        }
+      } catch {
+        // Keep showing the manual ADMIN_KEY form when the session check fails.
+      }
+    }
+
+    void checkAdminSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function verifyAdminKey() {
     const requestAdminKey = adminKey.trim();
 
@@ -87,8 +112,10 @@ export default function ForumAdminPage() {
     setAdminKey("");
 
     try {
-      const response = await fetch("/api/forum/admin/users", {
-        headers: { "x-admin-key": requestAdminKey },
+      const response = await fetch("/api/forum/admin/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminKey: requestAdminKey }),
         cache: "no-store",
       });
 
@@ -103,6 +130,22 @@ export default function ForumAdminPage() {
       setIsVerified(false);
       setError("管理者キーを確認できませんでした。");
     } finally {
+      setIsChecking(false);
+    }
+  }
+
+  async function clearAdminSession() {
+    setIsChecking(true);
+    setError("");
+
+    try {
+      await fetch("/api/forum/admin/session", {
+        method: "DELETE",
+        cache: "no-store",
+      });
+    } finally {
+      setAdminKey("");
+      setIsVerified(false);
       setIsChecking(false);
     }
   }
@@ -175,7 +218,27 @@ export default function ForumAdminPage() {
       )}
 
       {isVerified && (
-        <div style={menuGridStyle}>
+        <>
+          <section style={{ ...menuCardStyle, marginBottom: 18 }}>
+            <div style={{ fontWeight: 900, marginBottom: 8 }}>
+              管理者セッションが有効です。
+            </div>
+            <button
+              type="button"
+              onClick={() => void clearAdminSession()}
+              disabled={isChecking}
+              style={{
+                ...buttonStyle,
+                borderColor: "#991b1b",
+                background: "#991b1b",
+                opacity: isChecking ? 0.65 : 1,
+              }}
+            >
+              管理セッション解除
+            </button>
+          </section>
+
+          <div style={menuGridStyle}>
           <Link
             href={`/${tenant}/forum/admin/delete-threads`}
             style={menuCardStyle}
@@ -229,7 +292,8 @@ export default function ForumAdminPage() {
               公開中のスレッドと投稿をもとに、AIが議論ツリーの再編案を生成します。今回はプレビューのみです。
             </p>
           </Link>
-        </div>
+          </div>
+        </>
       )}
     </main>
   );

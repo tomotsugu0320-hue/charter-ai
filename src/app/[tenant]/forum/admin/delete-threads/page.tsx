@@ -47,6 +47,7 @@ export default function DeleteThreadsPage() {
 
   function requireAdminKey() {
     if (requestAdminKey) return true;
+    return true;
 
     setError("完全削除には管理者キーを入力してください。");
     return false;
@@ -180,7 +181,7 @@ export default function DeleteThreadsPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": requestAdminKey,
+          ...(requestAdminKey ? { "x-admin-key": requestAdminKey } : {}),
         },
         body: JSON.stringify({ threadId: thread.id }),
       });

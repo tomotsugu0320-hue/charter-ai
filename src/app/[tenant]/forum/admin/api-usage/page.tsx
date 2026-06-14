@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 type UsageGroup = {
   key: string;
@@ -225,22 +225,18 @@ export default function ForumAdminApiUsagePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  async function loadUsage(keyOverride?: string) {
+  async function loadUsage(
+    keyOverride?: string,
+    options: { quiet?: boolean } = {}
+  ) {
     const key = (keyOverride ?? adminKeyRef.current).trim();
-    if (!key) {
-      setMessage("ADMIN_KEYを入力してください。");
-      setIsVerified(false);
-      return;
-    }
 
     setIsLoading(true);
     setMessage("");
 
     try {
       const response = await fetch("/api/forum/admin/api-usage", {
-        headers: {
-          "x-admin-key": key,
-        },
+        headers: key ? { "x-admin-key": key } : undefined,
       });
       const data = (await response.json()) as UsageResponse;
 
@@ -257,11 +253,18 @@ export default function ForumAdminApiUsagePage() {
       setIsVerified(false);
       adminKeyRef.current = "";
       setAdminKey("");
+      if (options.quiet) {
+        return;
+      }
       setMessage(error instanceof Error ? error.message : "入力内容を確認してください。");
     } finally {
       setIsLoading(false);
     }
   }
+
+  useEffect(() => {
+    void loadUsage(undefined, { quiet: true });
+  }, []);
 
   const summary = usage?.summary;
   const latestLogs = usage?.latestLogs ?? [];
