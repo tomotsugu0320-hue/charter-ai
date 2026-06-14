@@ -10,7 +10,7 @@ export const revalidate = 0;
 const MAX_THREAD_SCAN = 5000;
 const MAX_RUN_ITEMS = 10;
 const DEFAULT_RUN_ITEMS = 3;
-const PROMPT_VERSION = "bulk-refresh-thread-summary-v1";
+const PROMPT_VERSION = "bulk-refresh-thread-summary-v2";
 const MODEL = "gpt-5.4-mini";
 const INPUT_TOKENS_PER_CALL = 8000;
 const OUTPUT_TOKENS_PER_CALL = 1800;
@@ -52,7 +52,7 @@ type ForumPostRow = {
 };
 
 type GeneratedSummary = {
-  summary_text: string;
+  summary_text: string | null;
   provisional_answer: string | null;
   evidence_text: string | null;
   counterargument_text: string | null;
@@ -189,6 +189,40 @@ function asStringArray(value: unknown) {
     : [];
 }
 
+function collectTextFromUnknown(value: unknown): string[] {
+  if (!value) return [];
+  if (typeof value === "string") {
+    const text = value.trim();
+    return text ? [text] : [];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => collectTextFromUnknown(item));
+  }
+  if (typeof value !== "object") return [];
+
+  const record = value as Record<string, unknown>;
+  const directText = [record.text, record.output_text]
+    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    .map((item) => item.trim());
+
+  return [
+    ...directText,
+    ...collectTextFromUnknown(record.content),
+    ...collectTextFromUnknown(record.output),
+    ...collectTextFromUnknown(record.message),
+  ];
+}
+
+function extractOutputTextFromResponse(data: unknown) {
+  if (!data || typeof data !== "object") return "";
+
+  const record = data as Record<string, unknown>;
+  const direct = asString(record.output_text);
+  if (direct) return direct;
+
+  return Array.from(new Set(collectTextFromUnknown(record.output))).join("\n").trim();
+}
+
 function buildPrompt(thread: ThreadRow, posts: ForumPostRow[]) {
   const postText = posts
     .map((post, index) => {
@@ -279,7 +313,7 @@ async function generateThreadSummaryVersion(
       throw new Error(data?.error?.message || "OpenAI summary generation failed");
     }
 
-    const outputText = String(data?.output_text ?? "").trim();
+    const outputText = extractOutputTextFromResponse(data);
     const usage = extractUsage(data?.usage);
     const actualCostUsd = calculateOpenAiEstimatedCostUsd({
       model: MODEL,
@@ -307,7 +341,7 @@ async function generateThreadSummaryVersion(
         ? (parsed.structure_json as Record<string, unknown>)
         : {};
     const summaryText =
-      asString(parsed?.summary_text) || outputText || "AI整理結果を取得しました。";
+      asString(parsed?.summary_text) || outputText || null;
 
     return {
       summary_text: summaryText,
@@ -320,6 +354,7 @@ async function generateThreadSummaryVersion(
         job_id: jobId,
         output_text: outputText,
         parsed,
+        response: data,
       },
       input_tokens: usage.input_tokens,
       output_tokens: usage.output_tokens,
@@ -335,7 +370,7 @@ async function generateThreadSummaryVersion(
       targetType: "thread",
       targetId: thread.id,
       inputText: prompt,
-      outputText: data?.output_text ?? "",
+      outputText: extractOutputTextFromResponse(data),
       usage: data?.usage,
       status: "error",
       errorMessage: getErrorMessage(error),

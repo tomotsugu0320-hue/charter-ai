@@ -1218,6 +1218,22 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                   </pre>
                 </div>
               </div>
+              <div>
+                <div style={{ ...labelStyle, marginBottom: 6 }}>raw_result</div>
+                <pre
+                  style={{
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 8,
+                    background: "#f8fafc",
+                    padding: 12,
+                    overflowX: "auto",
+                    whiteSpace: "pre-wrap",
+                    maxHeight: 360,
+                  }}
+                >
+                  {formatUnknownJson(selectedVersion.raw_result)}
+                </pre>
+              </div>
             </div>
           )}
         </section>
