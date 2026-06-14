@@ -467,21 +467,27 @@ function renderDiscussionMap(
     <div key={root.id}>{renderDiscussionMapNode(root, tenant, selectedNodeId)}</div>,
   ];
 
-  const addNodes = (nodes: DiscussionMapNode[], prefix = "", depth = 1) => {
+  const addNodes = (
+    nodes: DiscussionMapNode[],
+    prefix = "",
+    depth = 1,
+    parentPath = root.id
+  ) => {
     nodes.forEach((node, index) => {
       const isLastNode = index === nodes.length - 1;
       const branchPrefix = isLastNode ? "└" : "├";
       const childPrefix = `${prefix}${isLastNode ? "   " : "│  "}`;
+      const nodePath = `${parentPath}/${node.id}`;
 
       lines.push(
-        <div key={node.id}>
+        <div key={`${nodePath}/${index}`}>
           {prefix}
           {branchPrefix} {renderDiscussionMapNode(node, tenant, selectedNodeId)}
         </div>
       );
 
       if (node.children?.length && depth < maxDepth) {
-        addNodes(node.children, childPrefix, depth + 1);
+        addNodes(node.children, childPrefix, depth + 1, nodePath);
       }
     });
   };
@@ -613,6 +619,113 @@ function findDiscussionMapNodeInfo(
   };
 
   return visit(branches, [root.baseLabel ?? root.label]);
+}
+
+function getDiscussionMapDepth(nodes: DiscussionMapNode[], depth = 1): number {
+  if (nodes.length === 0) return depth - 1;
+  return Math.max(
+    ...nodes.map((node) =>
+      node.children?.length ? getDiscussionMapDepth(node.children, depth + 1) : depth
+    )
+  );
+}
+
+function findDiscussionMapNode(
+  nodes: DiscussionMapNode[],
+  target: DiscussionMapNode
+): DiscussionMapNode | null {
+  const targetIds = new Set(
+    [target.id, target.nodeId].filter((value): value is string => Boolean(value))
+  );
+
+  for (const node of nodes) {
+    if (targetIds.has(node.id) || (node.nodeId && targetIds.has(node.nodeId))) {
+      return node;
+    }
+    if (node.children?.length) {
+      const found = findDiscussionMapNode(node.children, target);
+      if (found) return found;
+    }
+  }
+
+  return null;
+}
+
+function collectDiscussionMapNodeIds(
+  nodes: DiscussionMapNode[],
+  ids = new Set<string>()
+) {
+  for (const node of nodes) {
+    ids.add(node.id);
+    if (node.children?.length) {
+      collectDiscussionMapNodeIds(node.children, ids);
+    }
+  }
+
+  return ids;
+}
+
+function cloneDiscussionMapNodeWithoutDuplicates(
+  node: DiscussionMapNode,
+  usedIds: Set<string>
+): DiscussionMapNode | null {
+  if (usedIds.has(node.id)) {
+    return null;
+  }
+
+  usedIds.add(node.id);
+
+  return {
+    ...node,
+    children:
+      node.children
+        ?.map((child) => cloneDiscussionMapNodeWithoutDuplicates(child, usedIds))
+        .filter((child): child is DiscussionMapNode => Boolean(child)) ?? [],
+  };
+}
+
+function graftFallbackChildren(
+  activeNode: DiscussionMapNode,
+  fallbackBranches: DiscussionMapNode[],
+  usedIds: Set<string>
+): DiscussionMapNode {
+  const fallbackNode = findDiscussionMapNode(fallbackBranches, activeNode);
+  const activeChildren = activeNode.children ?? [];
+  const fallbackChildren = fallbackNode?.children ?? [];
+  const children =
+    activeChildren.length > 0
+      ? activeChildren.map((child) => graftFallbackChildren(child, fallbackBranches, usedIds))
+      : fallbackChildren
+          .map((child) => cloneDiscussionMapNodeWithoutDuplicates(child, usedIds))
+          .filter((child): child is DiscussionMapNode => Boolean(child));
+
+  return {
+    ...activeNode,
+    children,
+  };
+}
+
+function buildDiscussionMapForDisplay(
+  activeMap: { root: DiscussionMapNode; branches: DiscussionMapNode[] } | null,
+  fallbackMap: { root: DiscussionMapNode; branches: DiscussionMapNode[] }
+) {
+  if (!activeMap) return fallbackMap;
+
+  const activeDepth = getDiscussionMapDepth(activeMap.branches);
+  const fallbackDepth = getDiscussionMapDepth(fallbackMap.branches);
+
+  if (activeDepth >= Math.min(fallbackDepth, 4)) {
+    return activeMap;
+  }
+
+  const usedIds = collectDiscussionMapNodeIds(activeMap.branches);
+
+  return {
+    root: activeMap.root,
+    branches: activeMap.branches.map((node) =>
+      graftFallbackChildren(node, fallbackMap.branches, usedIds)
+    ),
+  };
 }
 
 function matchesThread(thread: ThreadRow, query: string, category: string) {
@@ -870,10 +983,14 @@ export default function ForumPage() {
   const [analyzeScrollKey, setAnalyzeScrollKey] = useState(0);
   const [relatedThreads, setRelatedThreads] = useState<RelatedThread[]>([]);
   const [generatedIssue, setGeneratedIssue] = useState<GeneratedIssue | null>(null);
-  const discussionMapForDisplay = activeDiscussionMap ?? {
+  const fallbackDiscussionMap = useMemo(() => ({
     root: discussionMapRoot,
     branches: discussionMapBranches,
-  };
+  }), []);
+  const discussionMapForDisplay = useMemo(
+    () => buildDiscussionMapForDisplay(activeDiscussionMap, fallbackDiscussionMap),
+    [activeDiscussionMap, fallbackDiscussionMap]
+  );
   const selectedDiscussionMapNode = useMemo(
     () =>
       findDiscussionMapNodeInfo(
