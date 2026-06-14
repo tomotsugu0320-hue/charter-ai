@@ -192,6 +192,7 @@ function buildCurrentSummary(row: CurrentSummaryRow | null | undefined) {
   const issues = asStringArray(row.issues);
 
   return {
+    thread_id: row.thread_id,
     summary_text: row.summary_text ?? null,
     provisional_answer: row.summary_text ?? null,
     evidence_text: explanations.join("\n") || null,

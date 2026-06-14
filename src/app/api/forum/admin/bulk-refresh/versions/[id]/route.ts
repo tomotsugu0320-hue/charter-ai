@@ -176,6 +176,7 @@ function buildCurrentSummary(row: CurrentSummaryRow | null | undefined) {
   const issues = asStringArray(row.issues);
 
   return {
+    thread_id: row.thread_id,
     summary_text: row.summary_text ?? null,
     provisional_answer: row.summary_text ?? null,
     evidence_text: explanations.join("\n") || null,
@@ -287,14 +288,20 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ ok: false, error: currentSummaryError.message }, { status: 500 });
   }
 
+  const currentSummaryRow =
+    currentSummary && String((currentSummary as CurrentSummaryRow).thread_id) === threadId
+      ? (currentSummary as CurrentSummaryRow)
+      : null;
+
   return NextResponse.json({
     ok: true,
     version: {
       ...versionRow,
       ...normalizeVersionFields(versionRow),
+      thread_title: thread?.title ?? null,
       raw_result: sanitizeRawResult(versionRow.raw_result),
       thread: thread ?? null,
-      current_summary: buildCurrentSummary((currentSummary ?? null) as CurrentSummaryRow | null),
+      current_summary: buildCurrentSummary(currentSummaryRow),
     },
   });
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 type PeriodFilter = "six_months" | "one_year" | "all";
 type TargetKind = "thread_summary" | "logic_score" | "both";
@@ -91,6 +91,7 @@ type RunResponse = {
 };
 
 type SummaryComparePayload = {
+  thread_id?: string | null;
   summary_text?: string | null;
   provisional_answer?: string | null;
   evidence_text?: string | null;
@@ -296,6 +297,7 @@ export default function ForumAdminBulkRefreshPreviewPage() {
   const [selectedVersion, setSelectedVersion] =
     useState<ThreadSummaryVersion | null>(null);
   const [versionLoadingId, setVersionLoadingId] = useState("");
+  const latestVersionRequestRef = useRef("");
 
   async function runPreview() {
     const requestAdminKey = adminKey.trim();
@@ -399,8 +401,10 @@ export default function ForumAdminBulkRefreshPreviewPage() {
   }
 
   async function loadVersionDetail(versionId: string, requestAdminKey = "") {
+    latestVersionRequestRef.current = versionId;
     setVersionLoadingId(versionId);
     setVersionsMessage("");
+    setSelectedVersion(null);
 
     try {
       const response = await fetch(
@@ -420,11 +424,17 @@ export default function ForumAdminBulkRefreshPreviewPage() {
         return;
       }
 
+      if (latestVersionRequestRef.current !== versionId) {
+        return;
+      }
+
       setSelectedVersion(data.version);
     } catch {
       setVersionsMessage("version詳細の取得で通信エラーが発生しました。");
     } finally {
-      setVersionLoadingId("");
+      if (latestVersionRequestRef.current === versionId) {
+        setVersionLoadingId("");
+      }
     }
   }
 
@@ -1147,6 +1157,15 @@ export default function ForumAdminBulkRefreshPreviewPage() {
             >
               <div style={gridStyle}>
                 {statCard("version id", selectedVersion.id)}
+                {statCard("thread id", selectedVersion.thread_id)}
+                {statCard(
+                  "thread title",
+                  selectedVersion.thread_title || selectedVersion.thread?.title || "-"
+                )}
+                {statCard(
+                  "old data thread id",
+                  selectedVersion.current_summary?.thread_id || "旧データ未取得"
+                )}
                 {statCard("is_applied", selectedVersion.is_applied ? "true" : "false")}
                 {statCard("total token", formatNumber(selectedVersion.total_tokens))}
                 {statCard("cost", formatCost(selectedVersion.actual_cost_usd), "USD")}
