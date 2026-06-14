@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 type PeriodFilter = "six_months" | "one_year" | "all";
 type TargetKind = "thread_summary" | "logic_score" | "both";
@@ -43,6 +43,51 @@ type PreviewResponse = {
       output_tokens_per_call: number;
     };
   };
+};
+
+type BulkRefreshJobItem = {
+  id: string;
+  target_type: string;
+  target_id: string;
+  status: string;
+  previous_version_id?: string | null;
+  new_version_id?: string | null;
+  actual_total_tokens?: number | null;
+  actual_cost_usd?: number | null;
+  error_message?: string | null;
+  created_at?: string | null;
+  completed_at?: string | null;
+};
+
+type BulkRefreshJob = {
+  id: string;
+  status: string;
+  target_type: string;
+  max_items: number;
+  success_count: number;
+  failed_count: number;
+  skipped_count: number;
+  actual_api_calls?: number | null;
+  actual_total_tokens?: number | null;
+  actual_cost_usd?: number | null;
+  error_message?: string | null;
+  created_at?: string | null;
+  completed_at?: string | null;
+  items?: BulkRefreshJobItem[];
+};
+
+type RunResponse = {
+  ok?: boolean;
+  error?: string;
+  prompt_version?: string;
+  model?: string;
+  job?: BulkRefreshJob & {
+    actual_input_tokens?: number | null;
+    actual_output_tokens?: number | null;
+    actual_total_tokens?: number | null;
+    actual_cost_usd?: number | null;
+  };
+  items?: BulkRefreshJobItem[];
 };
 
 const pageStyle: CSSProperties = {
@@ -159,6 +204,15 @@ export default function ForumAdminBulkRefreshPreviewPage() {
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [maxRunItems, setMaxRunItems] = useState(3);
+  const [confirmNoOverwrite, setConfirmNoOverwrite] = useState(false);
+  const [confirmCost, setConfirmCost] = useState(false);
+  const [confirmMaxTen, setConfirmMaxTen] = useState(false);
+  const [runLoading, setRunLoading] = useState(false);
+  const [runMessage, setRunMessage] = useState("");
+  const [runResult, setRunResult] = useState<RunResponse | null>(null);
+  const [jobs, setJobs] = useState<BulkRefreshJob[]>([]);
+  const [jobsMessage, setJobsMessage] = useState("");
 
   async function runPreview() {
     const requestAdminKey = adminKey.trim();
@@ -203,7 +257,89 @@ export default function ForumAdminBulkRefreshPreviewPage() {
     }
   }
 
+  async function loadJobs(requestAdminKey = "") {
+    setJobsMessage("");
+
+    try {
+      const response = await fetch("/api/forum/admin/bulk-refresh/jobs", {
+        headers: requestAdminKey ? { "x-admin-key": requestAdminKey } : {},
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        jobs?: BulkRefreshJob[];
+      };
+
+      if (!response.ok || data.ok !== true) {
+        setJobs([]);
+        setJobsMessage(
+          data.error
+            ? `実行履歴を取得できませんでした: ${data.error}`
+            : "管理セッションがないため、実行履歴は未取得です。"
+        );
+        return;
+      }
+
+      setJobs(data.jobs ?? []);
+    } catch {
+      setJobsMessage("実行履歴の取得で通信エラーが発生しました。");
+    }
+  }
+
+  async function runThreadSummaryTest() {
+    const requestAdminKey = adminKey.trim();
+
+    setRunLoading(true);
+    setRunMessage("");
+    setRunResult(null);
+
+    try {
+      const response = await fetch("/api/forum/admin/bulk-refresh/run", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(requestAdminKey ? { "x-admin-key": requestAdminKey } : {}),
+        },
+        body: JSON.stringify({
+          period,
+          category,
+          target_type: "thread_summary",
+          max_items: maxRunItems,
+          excludeHiddenDeleted,
+          confirmNoOverwrite,
+          confirmCost,
+          confirmMaxTen,
+        }),
+      });
+      const data = (await response.json().catch(() => ({}))) as RunResponse;
+
+      if (!response.ok || data.ok !== true) {
+        setRunMessage(data.error || "スレッド要約テスト実行に失敗しました。");
+        return;
+      }
+
+      setRunResult(data);
+      setRunMessage("スレッド要約テスト実行が完了しました。");
+      setAdminKey("");
+      await loadJobs(requestAdminKey);
+    } catch {
+      setRunMessage("テスト実行中に通信エラーが発生しました。");
+    } finally {
+      setRunLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadJobs();
+  }, []);
+
   const samples = preview?.sample_targets ?? [];
+  const canRunThreadSummaryTest =
+    Boolean(preview) &&
+    confirmNoOverwrite &&
+    confirmCost &&
+    confirmMaxTen &&
+    !runLoading;
 
   return (
     <main style={pageStyle}>
@@ -493,10 +629,241 @@ export default function ForumAdminBulkRefreshPreviewPage() {
           </>
         )}
 
+        <section style={{ ...cardStyle, marginBottom: 18 }}>
+          <h2 style={{ margin: "0 0 12px", fontSize: 20 }}>
+            スレッド要約テスト実行
+          </h2>
+          <p style={{ margin: "0 0 12px", color: "#475569", lineHeight: 1.7 }}>
+            最大10件だけOpenAI APIを実行し、結果を新versionとして保存します。
+            既存AI回答、既存投稿本文、thread_ai_structures、forum_posts は上書きしません。
+            本番表示にもまだ反映しません。
+          </p>
+
+          <div
+            style={{
+              border: "1px solid #bfdbfe",
+              borderRadius: 8,
+              background: "#eff6ff",
+              color: "#1e3a8a",
+              padding: 12,
+              lineHeight: 1.7,
+              marginBottom: 14,
+            }}
+          >
+            <strong>対象種別:</strong> スレッド要約のみ
+            <br />
+            <span>論理スコア再評価は今回未対応です。</span>
+          </div>
+
+          <div style={gridStyle}>
+            <label style={fieldStyle}>
+              <span style={labelStyle}>最大実行件数</span>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={maxRunItems}
+                onChange={(event) =>
+                  setMaxRunItems(
+                    Math.max(1, Math.min(10, Math.floor(Number(event.target.value) || 1)))
+                  )
+                }
+                style={inputStyle}
+              />
+            </label>
+            <div style={{ ...fieldStyle, color: "#475569", lineHeight: 1.7 }}>
+              <span style={labelStyle}>実行条件</span>
+              <span>現在のプレビュー条件と同じ期間・カテゴリーで抽出します。</span>
+              <span>サーバー側でも10件以下に強制します。</span>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gap: 10, marginTop: 14, lineHeight: 1.7 }}>
+            <label>
+              <input
+                type="checkbox"
+                checked={confirmNoOverwrite}
+                onChange={(event) => setConfirmNoOverwrite(event.target.checked)}
+              />{" "}
+              過去ログを上書きしないことを確認しました
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={confirmCost}
+                onChange={(event) => setConfirmCost(event.target.checked)}
+              />{" "}
+              推定費用を確認しました
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={confirmMaxTen}
+                onChange={(event) => setConfirmMaxTen(event.target.checked)}
+              />{" "}
+              最大10件だけ実行することを確認しました
+            </label>
+          </div>
+
+          <div style={{ marginTop: 16 }}>
+            <button
+              type="button"
+              onClick={() => void runThreadSummaryTest()}
+              disabled={!canRunThreadSummaryTest}
+              style={{
+                ...buttonStyle,
+                opacity: canRunThreadSummaryTest ? 1 : 0.55,
+                cursor: canRunThreadSummaryTest ? "pointer" : "not-allowed",
+              }}
+            >
+              {runLoading ? "テスト実行中..." : "スレッド要約を最大10件だけテスト実行"}
+            </button>
+            {!preview && (
+              <p style={{ margin: "10px 0 0", color: "#92400e", lineHeight: 1.7 }}>
+                先にプレビューを実行して、対象件数と推定費用を確認してください。
+              </p>
+            )}
+          </div>
+
+          {runMessage && (
+            <p
+              style={{
+                margin: "12px 0 0",
+                color: runResult?.ok ? "#166534" : "#991b1b",
+                fontWeight: 800,
+              }}
+            >
+              {runMessage}
+            </p>
+          )}
+
+          {runResult?.job && (
+            <div style={{ ...gridStyle, marginTop: 16 }}>
+              {statCard("job id", runResult.job.id)}
+              {statCard("成功", formatNumber(runResult.job.success_count))}
+              {statCard("skipped", formatNumber(runResult.job.skipped_count))}
+              {statCard("失敗", formatNumber(runResult.job.failed_count))}
+              {statCard("実token", formatNumber(runResult.job.actual_total_tokens))}
+              {statCard("実コスト", formatCost(runResult.job.actual_cost_usd), "USD")}
+            </div>
+          )}
+        </section>
+
+        <section style={{ ...cardStyle, marginBottom: 18 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+              alignItems: "center",
+              marginBottom: 12,
+            }}
+          >
+            <h2 style={{ margin: 0, fontSize: 20 }}>テスト実行履歴</h2>
+            <button
+              type="button"
+              onClick={() => void loadJobs(adminKey.trim())}
+              style={{
+                border: "1px solid #cbd5e1",
+                borderRadius: 8,
+                background: "#ffffff",
+                color: "#111827",
+                cursor: "pointer",
+                fontWeight: 800,
+                padding: "8px 12px",
+              }}
+            >
+              再読み込み
+            </button>
+          </div>
+
+          {jobsMessage && (
+            <p style={{ margin: "0 0 12px", color: "#92400e", lineHeight: 1.7 }}>
+              {jobsMessage}
+            </p>
+          )}
+
+          {jobs.length === 0 ? (
+            <div
+              style={{
+                border: "1px dashed #cbd5e1",
+                borderRadius: 8,
+                background: "#f8fafc",
+                color: "#64748b",
+                padding: 18,
+                textAlign: "center",
+              }}
+            >
+              まだテスト実行履歴はありません。
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  minWidth: 860,
+                }}
+              >
+                <thead>
+                  <tr style={{ background: "#f1f5f9", textAlign: "left" }}>
+                    <th style={{ padding: 10 }}>job</th>
+                    <th style={{ padding: 10 }}>status</th>
+                    <th style={{ padding: 10 }}>target</th>
+                    <th style={{ padding: 10 }}>成功</th>
+                    <th style={{ padding: 10 }}>skipped</th>
+                    <th style={{ padding: 10 }}>失敗</th>
+                    <th style={{ padding: 10 }}>API</th>
+                    <th style={{ padding: 10 }}>token</th>
+                    <th style={{ padding: 10 }}>cost</th>
+                    <th style={{ padding: 10 }}>完了日時</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {jobs.map((job) => (
+                    <tr key={job.id}>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        <code>{job.id}</code>
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        {job.status}
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        {job.target_type} / max {job.max_items}
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        {formatNumber(job.success_count)}
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        {formatNumber(job.skipped_count)}
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        {formatNumber(job.failed_count)}
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        {formatNumber(job.actual_api_calls)}
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        {formatNumber(job.actual_total_tokens)}
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        {formatCost(job.actual_cost_usd)}
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        {formatDate(job.completed_at || job.created_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
         <section
           style={{
             ...cardStyle,
-            borderColor: "#fde68a",
+            border: "1px solid #fde68a",
             background: "#fffbeb",
             color: "#78350f",
           }}
