@@ -281,6 +281,15 @@ export default function ForumAdminPage() {
             </p>
           </Link>
 
+          <Link href={`/${tenant}/forum/admin/bulk-refresh`} style={menuCardStyle}>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
+              一括再整理プレビュー
+            </h2>
+            <p style={menuDescriptionStyle}>
+              既存スレッド・投稿を再整理する前に、対象件数、推定API回数、token、費用だけを確認します。OpenAI APIは実行しません。
+            </p>
+          </Link>
+
           <Link
             href={`/${tenant}/forum/admin/rebuild-discussion-map`}
             style={menuCardStyle}
