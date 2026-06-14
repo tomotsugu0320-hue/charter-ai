@@ -6,6 +6,8 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 type PeriodFilter = "six_months" | "one_year" | "all";
 type TargetKind = "thread_summary" | "logic_score" | "both";
+type VersionStatusFilter = "all" | "unapplied" | "applied" | "empty";
+type VersionStatus = "unapplied" | "applied" | "empty";
 
 type SampleTarget = {
   target_type: string;
@@ -119,6 +121,8 @@ type ThreadSummaryVersion = {
   prompt_version: string;
   model?: string | null;
   is_applied: boolean;
+  applied_at?: string | null;
+  version_status?: VersionStatus;
   input_tokens?: number | null;
   output_tokens?: number | null;
   total_tokens?: number | null;
@@ -247,6 +251,71 @@ function formatUnknownJson(value: unknown) {
   }
 }
 
+function isPlaceholderVersionSummary(value: string | null | undefined) {
+  const text = String(value ?? "").trim();
+  return (
+    !text ||
+    text.includes("AI整理結果を取得しました") ||
+    text.includes("AI謨ｴ逅")
+  );
+}
+
+function getVersionStatus(version: ThreadSummaryVersion): VersionStatus {
+  if (version.version_status === "unapplied" || version.version_status === "applied" || version.version_status === "empty") {
+    return version.version_status;
+  }
+  if (isPlaceholderVersionSummary(version.summary_text)) return "empty";
+  if (version.is_applied) return "applied";
+  return "unapplied";
+}
+
+function getVersionStatusMeta(status: VersionStatus) {
+  if (status === "applied") {
+    return {
+      label: "適用済み",
+      border: "#bbf7d0",
+      background: "#f0fdf4",
+      color: "#166534",
+    };
+  }
+  if (status === "empty") {
+    return {
+      label: "本文なし / 失敗",
+      border: "#fed7aa",
+      background: "#fff7ed",
+      color: "#9a3412",
+    };
+  }
+  return {
+    label: "未適用",
+    border: "#bfdbfe",
+    background: "#eff6ff",
+    color: "#1d4ed8",
+  };
+}
+
+function VersionStatusBadge({ status }: { status: VersionStatus }) {
+  const meta = getVersionStatusMeta(status);
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        border: `1px solid ${meta.border}`,
+        borderRadius: 999,
+        background: meta.background,
+        color: meta.color,
+        fontSize: 12,
+        fontWeight: 900,
+        padding: "4px 8px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {meta.label}
+    </span>
+  );
+}
+
 function compareTextBlock(label: string, oldValue?: string | null, newValue?: string | null) {
   const boxStyle: CSSProperties = {
     border: "1px solid #e2e8f0",
@@ -305,6 +374,10 @@ export default function ForumAdminBulkRefreshPreviewPage() {
   const [jobsMessage, setJobsMessage] = useState("");
   const [versions, setVersions] = useState<ThreadSummaryVersion[]>([]);
   const [versionsMessage, setVersionsMessage] = useState("");
+  const [versionStatusFilter, setVersionStatusFilter] =
+    useState<VersionStatusFilter>("all");
+  const [versionPromptFilter, setVersionPromptFilter] = useState("all");
+  const [versionSearchText, setVersionSearchText] = useState("");
   const [selectedVersion, setSelectedVersion] =
     useState<ThreadSummaryVersion | null>(null);
   const [versionLoadingId, setVersionLoadingId] = useState("");
@@ -545,6 +618,31 @@ export default function ForumAdminBulkRefreshPreviewPage() {
   }, []);
 
   const samples = preview?.sample_targets ?? [];
+  const versionPromptOptions = Array.from(
+    new Set(versions.map((version) => version.prompt_version).filter(Boolean))
+  );
+  const normalizedVersionSearch = versionSearchText.trim().toLowerCase();
+  const filteredVersions = versions.filter((version) => {
+    const status = getVersionStatus(version);
+    const matchesStatus =
+      versionStatusFilter === "all" || status === versionStatusFilter;
+    const matchesPrompt =
+      versionPromptFilter === "all" || version.prompt_version === versionPromptFilter;
+    const searchableText = [
+      version.thread_title,
+      version.thread?.title,
+      version.thread_id,
+      version.job_id,
+      version.prompt_version,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    const matchesSearch =
+      !normalizedVersionSearch || searchableText.includes(normalizedVersionSearch);
+
+    return matchesStatus && matchesPrompt && matchesSearch;
+  });
   const canRunThreadSummaryTest =
     Boolean(preview) &&
     confirmNoOverwrite &&
@@ -554,9 +652,13 @@ export default function ForumAdminBulkRefreshPreviewPage() {
   const selectedVersionThreadMatched =
     !selectedVersion?.current_summary?.thread_id ||
     selectedVersion.current_summary.thread_id === selectedVersion.thread_id;
+  const selectedVersionStatus = selectedVersion
+    ? getVersionStatus(selectedVersion)
+    : "empty";
   const canApplySelectedVersion =
     Boolean(selectedVersion) &&
     !selectedVersion?.is_applied &&
+    selectedVersionStatus === "unapplied" &&
     selectedVersionThreadMatched &&
     applyConfirm &&
     !applyLoading;
@@ -1121,6 +1223,81 @@ export default function ForumAdminBulkRefreshPreviewPage() {
             </p>
           )}
 
+          <div
+            style={{
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              background: "#f8fafc",
+              padding: 12,
+              display: "grid",
+              gap: 12,
+              marginBottom: 14,
+            }}
+          >
+            <div style={gridStyle}>
+              <label style={fieldStyle}>
+                <span style={labelStyle}>状態</span>
+                <select
+                  value={versionStatusFilter}
+                  onChange={(event) =>
+                    setVersionStatusFilter(event.target.value as VersionStatusFilter)
+                  }
+                  style={inputStyle}
+                >
+                  <option value="all">すべて</option>
+                  <option value="unapplied">未適用</option>
+                  <option value="applied">適用済み</option>
+                  <option value="empty">本文なし / 失敗</option>
+                </select>
+              </label>
+              <label style={fieldStyle}>
+                <span style={labelStyle}>prompt_version</span>
+                <select
+                  value={versionPromptFilter}
+                  onChange={(event) => setVersionPromptFilter(event.target.value)}
+                  style={inputStyle}
+                >
+                  <option value="all">すべて</option>
+                  {versionPromptOptions.map((promptVersion) => (
+                    <option key={promptVersion} value={promptVersion}>
+                      {promptVersion}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={fieldStyle}>
+                <span style={labelStyle}>thread title / id 検索</span>
+                <input
+                  type="search"
+                  value={versionSearchText}
+                  onChange={(event) => setVersionSearchText(event.target.value)}
+                  placeholder="タイトル、thread_id、job_id"
+                  style={inputStyle}
+                />
+              </label>
+            </div>
+            <div style={{ color: "#64748b", fontSize: 13, fontWeight: 800 }}>
+              表示中 {formatNumber(filteredVersions.length)} / 全体{" "}
+              {formatNumber(versions.length)}
+            </div>
+          </div>
+
+          {versions.length > 0 && filteredVersions.length === 0 && (
+            <div
+              style={{
+                border: "1px dashed #cbd5e1",
+                borderRadius: 8,
+                background: "#f8fafc",
+                color: "#64748b",
+                padding: 18,
+                textAlign: "center",
+                marginBottom: 14,
+              }}
+            >
+              条件に合うversionはありません。
+            </div>
+          )}
+
           {versions.length === 0 ? (
             <div
               style={{
@@ -1140,16 +1317,19 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                 style={{
                   width: "100%",
                   borderCollapse: "collapse",
-                  minWidth: 980,
+                  minWidth: 1200,
                 }}
               >
                 <thead>
                   <tr style={{ background: "#f1f5f9", textAlign: "left" }}>
+                    <th style={{ padding: 10 }}>状態</th>
                     <th style={{ padding: 10 }}>thread</th>
+                    <th style={{ padding: 10 }}>thread_id</th>
                     <th style={{ padding: 10 }}>job</th>
                     <th style={{ padding: 10 }}>prompt</th>
                     <th style={{ padding: 10 }}>model</th>
                     <th style={{ padding: 10 }}>applied</th>
+                    <th style={{ padding: 10 }}>applied_at</th>
                     <th style={{ padding: 10 }}>token</th>
                     <th style={{ padding: 10 }}>cost</th>
                     <th style={{ padding: 10 }}>作成日時</th>
@@ -1157,13 +1337,19 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {versions.map((version) => (
+                  {filteredVersions.map((version) => (
                     <tr key={version.id}>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        <VersionStatusBadge status={getVersionStatus(version)} />
+                      </td>
                       <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
                         <strong>{version.thread_title || "無題スレッド"}</strong>
                         <div style={{ color: "#64748b", marginTop: 4 }}>
                           {version.summary_excerpt || version.thread_id}
                         </div>
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        <code>{version.thread_id}</code>
                       </td>
                       <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
                         <code>{version.job_id || "-"}</code>
@@ -1176,6 +1362,9 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                       </td>
                       <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
                         {version.is_applied ? "true" : "false"}
+                      </td>
+                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
+                        {formatDate(version.applied_at)}
                       </td>
                       <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
                         {formatNumber(version.total_tokens)}
@@ -1223,6 +1412,7 @@ export default function ForumAdminBulkRefreshPreviewPage() {
             >
               <div style={gridStyle}>
                 {statCard("version id", selectedVersion.id)}
+                {statCard("状態", getVersionStatusMeta(selectedVersionStatus).label)}
                 {statCard("thread id", selectedVersion.thread_id)}
                 {statCard(
                   "thread title",
@@ -1233,6 +1423,7 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                   selectedVersion.current_summary?.thread_id || "旧データ未取得"
                 )}
                 {statCard("is_applied", selectedVersion.is_applied ? "true" : "false")}
+                {statCard("applied_at", formatDate(selectedVersion.applied_at))}
                 {statCard("total token", formatNumber(selectedVersion.total_tokens))}
                 {statCard("cost", formatCost(selectedVersion.actual_cost_usd), "USD")}
               </div>
@@ -1272,7 +1463,11 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                     thread_idが一致しないため適用できません。
                   </span>
                 )}
-                {selectedVersion.is_applied ? (
+                {selectedVersionStatus === "empty" ? (
+                  <span style={{ color: "#991b1b", fontWeight: 800 }}>
+                    本文が保存されていないため適用できません。raw_resultを確認してください。
+                  </span>
+                ) : selectedVersion.is_applied ? (
                   <span style={{ color: "#166534", fontWeight: 800 }}>
                     このversionはすでに適用済みです。
                   </span>

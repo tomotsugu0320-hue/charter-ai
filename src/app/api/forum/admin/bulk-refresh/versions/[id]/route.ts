@@ -167,6 +167,30 @@ function normalizeVersionFields(version: Record<string, unknown>) {
   };
 }
 
+function isVersionBodyMissing(
+  version: Record<string, unknown>,
+  normalized: ReturnType<typeof normalizeVersionFields>
+) {
+  const rawOutputText = extractRawOutputText(version.raw_result);
+  const parsed = getRawParsed(version.raw_result);
+
+  return (
+    isPlaceholderSummary(version.summary_text) ||
+    !asString(normalized.summary_text) ||
+    !rawOutputText ||
+    !parsed
+  );
+}
+
+function getVersionStatus(
+  version: Record<string, unknown>,
+  normalized: ReturnType<typeof normalizeVersionFields>
+) {
+  if (isVersionBodyMissing(version, normalized)) return "empty";
+  if (version.is_applied === true) return "applied";
+  return "unapplied";
+}
+
 function buildCurrentSummary(row: CurrentSummaryRow | null | undefined) {
   if (!row) return null;
 
@@ -293,11 +317,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
       ? (currentSummary as CurrentSummaryRow)
       : null;
 
+  const normalized = normalizeVersionFields(versionRow);
+
   return NextResponse.json({
     ok: true,
     version: {
       ...versionRow,
-      ...normalizeVersionFields(versionRow),
+      ...normalized,
+      version_status: getVersionStatus(versionRow, normalized),
       thread_title: thread?.title ?? null,
       raw_result: sanitizeRawResult(versionRow.raw_result),
       thread: thread ?? null,

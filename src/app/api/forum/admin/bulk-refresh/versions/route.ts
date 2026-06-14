@@ -26,6 +26,7 @@ type VersionRow = {
   total_tokens: number | null;
   actual_cost_usd: number | null;
   is_applied: boolean;
+  applied_at: string | null;
   created_at: string | null;
 };
 
@@ -183,6 +184,24 @@ function normalizeVersionFields(version: VersionRow) {
   };
 }
 
+function isVersionBodyMissing(version: VersionRow, normalized: ReturnType<typeof normalizeVersionFields>) {
+  const rawOutputText = extractRawOutputText(version.raw_result);
+  const parsed = getRawParsed(version.raw_result);
+
+  return (
+    isPlaceholderSummary(version.summary_text) ||
+    !asString(normalized.summary_text) ||
+    !rawOutputText ||
+    !parsed
+  );
+}
+
+function getVersionStatus(version: VersionRow, normalized: ReturnType<typeof normalizeVersionFields>) {
+  if (isVersionBodyMissing(version, normalized)) return "empty";
+  if (version.is_applied) return "applied";
+  return "unapplied";
+}
+
 function buildCurrentSummary(row: CurrentSummaryRow | null | undefined) {
   if (!row) return null;
 
@@ -242,6 +261,7 @@ export async function GET(request: NextRequest) {
         "total_tokens",
         "actual_cost_usd",
         "is_applied",
+        "applied_at",
         "created_at",
       ].join(", ")
     )
@@ -298,6 +318,8 @@ export async function GET(request: NextRequest) {
         prompt_version: version.prompt_version,
         model: version.model,
         is_applied: version.is_applied,
+        applied_at: version.applied_at,
+        version_status: getVersionStatus(version, normalized),
         input_tokens: version.input_tokens,
         output_tokens: version.output_tokens,
         total_tokens: version.total_tokens,
