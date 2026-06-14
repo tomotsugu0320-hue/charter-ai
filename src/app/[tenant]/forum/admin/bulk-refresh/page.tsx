@@ -655,6 +655,15 @@ export default function ForumAdminBulkRefreshPreviewPage() {
 
     return matchesStatus && matchesPrompt && matchesSearch;
   });
+  const versionStatusCounts = versions.reduce<Record<VersionStatus | "total", number>>(
+    (counts, version) => {
+      const status = getVersionStatus(version);
+      counts[status] += 1;
+      counts.total += 1;
+      return counts;
+    },
+    { total: 0, unapplied: 0, applied: 0, empty: 0 }
+  );
   const canRunThreadSummaryTest =
     Boolean(preview) &&
     confirmNoOverwrite &&
@@ -1237,6 +1246,106 @@ export default function ForumAdminBulkRefreshPreviewPage() {
 
           <div
             style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 170px), 1fr))",
+              gap: 10,
+              marginBottom: 14,
+            }}
+          >
+            <div
+              style={{
+                border: "1px solid #bfdbfe",
+                borderRadius: 10,
+                background: "#eff6ff",
+                padding: 12,
+              }}
+            >
+              <div style={{ ...labelStyle, color: "#1d4ed8" }}>未適用</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: "#1e3a8a" }}>
+                {formatNumber(versionStatusCounts.unapplied)}件
+              </div>
+            </div>
+            <div
+              style={{
+                border: "1px solid #bbf7d0",
+                borderRadius: 10,
+                background: "#f0fdf4",
+                padding: 12,
+              }}
+            >
+              <div style={{ ...labelStyle, color: "#166534" }}>適用済み</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: "#14532d" }}>
+                {formatNumber(versionStatusCounts.applied)}件
+              </div>
+            </div>
+            <div
+              style={{
+                border: "1px solid #fed7aa",
+                borderRadius: 10,
+                background: "#fff7ed",
+                padding: 12,
+              }}
+            >
+              <div style={{ ...labelStyle, color: "#9a3412" }}>本文なし / 失敗</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: "#7c2d12" }}>
+                {formatNumber(versionStatusCounts.empty)}件
+              </div>
+            </div>
+            <div
+              style={{
+                border: "1px solid #e2e8f0",
+                borderRadius: 10,
+                background: "#f8fafc",
+                padding: 12,
+              }}
+            >
+              <div style={labelStyle}>全体</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: "#0f172a" }}>
+                {formatNumber(versionStatusCounts.total)}件
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              border: "1px solid #bfdbfe",
+              borderRadius: 10,
+              background: "#eff6ff",
+              color: "#1e3a8a",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap",
+              marginBottom: 14,
+              padding: 12,
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 900 }}>次に確認する候補：未適用version</div>
+              <div style={{ fontSize: 13, marginTop: 4 }}>
+                本文ありの未適用versionを、詳細確認してから1件ずつ適用します。
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setVersionStatusFilter("unapplied")}
+              style={{
+                border: "1px solid #2563eb",
+                borderRadius: 8,
+                background: versionStatusFilter === "unapplied" ? "#2563eb" : "#ffffff",
+                color: versionStatusFilter === "unapplied" ? "#ffffff" : "#1d4ed8",
+                cursor: "pointer",
+                fontWeight: 900,
+                padding: "8px 12px",
+              }}
+            >
+              未適用だけ表示
+            </button>
+          </div>
+
+          <div
+            style={{
               border: "1px solid #e2e8f0",
               borderRadius: 8,
               background: "#f8fafc",
@@ -1354,8 +1463,60 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                       }}
                     >
                       <div style={{ minWidth: 0, flex: "1 1 320px" }}>
-                        <div style={{ marginBottom: 8 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 8,
+                            marginBottom: 8,
+                          }}
+                        >
                           <VersionStatusBadge status={status} />
+                          {status === "unapplied" && (
+                            <span
+                              style={{
+                                border: "1px solid #93c5fd",
+                                borderRadius: 999,
+                                background: "#dbeafe",
+                                color: "#1e40af",
+                                fontSize: 12,
+                                fontWeight: 900,
+                                padding: "4px 8px",
+                              }}
+                            >
+                              確認待ち
+                            </span>
+                          )}
+                          {status === "applied" && (
+                            <span
+                              style={{
+                                border: "1px solid #86efac",
+                                borderRadius: 999,
+                                background: "#dcfce7",
+                                color: "#166534",
+                                fontSize: 12,
+                                fontWeight: 900,
+                                padding: "4px 8px",
+                              }}
+                            >
+                              Forum反映済み
+                            </span>
+                          )}
+                          {status === "empty" && (
+                            <span
+                              style={{
+                                border: "1px solid #fdba74",
+                                borderRadius: 999,
+                                background: "#ffedd5",
+                                color: "#9a3412",
+                                fontSize: 12,
+                                fontWeight: 900,
+                                padding: "4px 8px",
+                              }}
+                            >
+                              適用不可
+                            </span>
+                          )}
                         </div>
                         <h3
                           style={{
@@ -1411,6 +1572,10 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                       <div>
                         <div style={labelStyle}>is_applied</div>
                         <div>{version.is_applied ? "true" : "false"}</div>
+                      </div>
+                      <div>
+                        <div style={labelStyle}>applied_at</div>
+                        <div>{formatDate(version.applied_at)}</div>
                       </div>
                       <div>
                         <div style={labelStyle}>total_tokens</div>
@@ -1473,48 +1638,92 @@ export default function ForumAdminBulkRefreshPreviewPage() {
 
               <div
                 style={{
-                  border: "1px solid #bbf7d0",
+                  border: `1px solid ${getVersionStatusMeta(selectedVersionStatus).border}`,
                   borderRadius: 8,
-                  background: "#f0fdf4",
-                  color: "#166534",
+                  background: getVersionStatusMeta(selectedVersionStatus).background,
+                  color: getVersionStatusMeta(selectedVersionStatus).color,
                   padding: 12,
                   lineHeight: 1.7,
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  flexWrap: "wrap",
                 }}
               >
-                詳細表示は確認専用です。適用・削除・既存要約の更新は行いません。
+                <div style={{ display: "grid", gap: 6 }}>
+                  <VersionStatusBadge status={selectedVersionStatus} />
+                  {selectedVersionStatus === "empty" ? (
+                    <strong>本文が保存されていないため適用できません。</strong>
+                  ) : selectedVersion.is_applied ? (
+                    <strong>
+                      このversionはすでにForumへ反映済みです。applied_at:{" "}
+                      {formatDate(selectedVersion.applied_at)}
+                    </strong>
+                  ) : (
+                    <strong>
+                      未適用の確認待ちversionです。内容を確認してから1件だけ適用できます。
+                    </strong>
+                  )}
+                  <span>
+                    詳細表示や展開だけではOpenAI APIを呼びません。forum_postsも更新しません。
+                  </span>
+                  {applyMessage && selectedVersionStatus !== "unapplied" && (
+                    <span
+                      style={{
+                        color: applyMessage.includes("反映しました") ? "#166534" : "#991b1b",
+                        fontWeight: 900,
+                      }}
+                    >
+                      {applyMessage}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedVersion(null);
+                    setApplyConfirm(false);
+                    setApplyMessage("");
+                  }}
+                  style={{
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 8,
+                    background: "#ffffff",
+                    color: "#111827",
+                    cursor: "pointer",
+                    fontWeight: 800,
+                    padding: "8px 12px",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  一覧へ戻る
+                </button>
               </div>
 
-              <div
-                style={{
-                  border: "1px solid #fde68a",
-                  borderRadius: 8,
-                  background: "#fffbeb",
-                  color: "#78350f",
-                  padding: 12,
-                  lineHeight: 1.7,
-                  display: "grid",
-                  gap: 10,
-                }}
-              >
-                <strong>1件だけ適用</strong>
-                <span>
-                  この操作は、選択中のversion 1件だけを同じthread_idの現行AI要約へ反映します。
-                  OpenAI APIは呼びません。forum_postsも更新しません。
-                </span>
-                {!selectedVersionThreadMatched && (
-                  <span style={{ color: "#991b1b", fontWeight: 800 }}>
-                    thread_idが一致しないため適用できません。
+              {selectedVersionStatus === "unapplied" && !selectedVersion.is_applied ? (
+                <div
+                  style={{
+                    border: "1px solid #fde68a",
+                    borderRadius: 8,
+                    background: "#fffbeb",
+                    color: "#78350f",
+                    padding: 12,
+                    lineHeight: 1.7,
+                    display: "grid",
+                    gap: 10,
+                  }}
+                >
+                  <strong>1件だけ適用</strong>
+                  <span>
+                    この操作は、選択中のversion 1件だけを同じthread_idの現行AI要約へ反映します。
+                    OpenAI APIは呼びません。forum_postsも更新しません。
                   </span>
-                )}
-                {selectedVersionStatus === "empty" ? (
-                  <span style={{ color: "#991b1b", fontWeight: 800 }}>
-                    本文が保存されていないため適用できません。raw_resultを確認してください。
-                  </span>
-                ) : selectedVersion.is_applied ? (
-                  <span style={{ color: "#166534", fontWeight: 800 }}>
-                    このversionはすでに適用済みです。
-                  </span>
-                ) : (
+                  {!selectedVersionThreadMatched && (
+                    <span style={{ color: "#991b1b", fontWeight: 800 }}>
+                      thread_idが一致しないため適用できません。
+                    </span>
+                  )}
                   <label>
                     <input
                       type="checkbox"
@@ -1523,33 +1732,51 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                     />{" "}
                     この1件だけを現行AI要約に反映することを確認しました
                   </label>
-                )}
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => void applySelectedVersion()}
-                    disabled={!canApplySelectedVersion}
-                    style={{
-                      ...buttonStyle,
-                      opacity: canApplySelectedVersion ? 1 : 0.55,
-                      cursor: canApplySelectedVersion ? "pointer" : "not-allowed",
-                    }}
-                  >
-                    {applyLoading ? "適用中..." : "このversionを1件だけ適用"}
-                  </button>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => void applySelectedVersion()}
+                      disabled={!canApplySelectedVersion}
+                      style={{
+                        ...buttonStyle,
+                        opacity: canApplySelectedVersion ? 1 : 0.55,
+                        cursor: canApplySelectedVersion ? "pointer" : "not-allowed",
+                      }}
+                    >
+                      {applyLoading ? "適用中..." : "このversionを1件だけ適用"}
+                    </button>
+                  </div>
+                  {applyMessage && (
+                    <p
+                      style={{
+                        margin: 0,
+                        color: applyMessage.includes("反映しました") ? "#166534" : "#991b1b",
+                        fontWeight: 800,
+                      }}
+                    >
+                      {applyMessage}
+                    </p>
+                  )}
                 </div>
-                {applyMessage && (
-                  <p
-                    style={{
-                      margin: 0,
-                      color: applyMessage.includes("反映しました") ? "#166534" : "#991b1b",
-                      fontWeight: 800,
-                    }}
-                  >
-                    {applyMessage}
-                  </p>
-                )}
-              </div>
+              ) : (
+                <div
+                  style={{
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 8,
+                    background: "#f8fafc",
+                    color: "#475569",
+                    padding: 12,
+                    lineHeight: 1.7,
+                    fontWeight: 800,
+                  }}
+                >
+                  {selectedVersionStatus === "empty"
+                    ? "本文なし / 失敗versionのため、この画面からは適用できません。"
+                    : `適用済みversionのため、再適用ボタンは表示していません。applied_at: ${formatDate(
+                        selectedVersion.applied_at
+                      )}`}
+                </div>
+              )}
 
               {compareTextBlock(
                 "要約",
