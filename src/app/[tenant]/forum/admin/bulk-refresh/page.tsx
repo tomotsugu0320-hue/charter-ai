@@ -225,6 +225,18 @@ function formatDate(value: string | null | undefined) {
   return date.toLocaleString("ja-JP");
 }
 
+function shortInlineText(value: string | null | undefined, maxLength = 110) {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength)}...`;
+}
+
+function shortId(value: string | null | undefined, maxLength = 8) {
+  const text = String(value ?? "").trim();
+  if (!text) return "-";
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+
 function statCard(label: string, value: string, helper?: string) {
   return (
     <div style={{ ...cardStyle, padding: 14 }}>
@@ -1312,91 +1324,122 @@ export default function ForumAdminBulkRefreshPreviewPage() {
               まだ生成済みAI要約versionはありません。
             </div>
           ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  minWidth: 1200,
-                }}
-              >
-                <thead>
-                  <tr style={{ background: "#f1f5f9", textAlign: "left" }}>
-                    <th style={{ padding: 10 }}>状態</th>
-                    <th style={{ padding: 10 }}>thread</th>
-                    <th style={{ padding: 10 }}>thread_id</th>
-                    <th style={{ padding: 10 }}>job</th>
-                    <th style={{ padding: 10 }}>prompt</th>
-                    <th style={{ padding: 10 }}>model</th>
-                    <th style={{ padding: 10 }}>applied</th>
-                    <th style={{ padding: 10 }}>applied_at</th>
-                    <th style={{ padding: 10 }}>token</th>
-                    <th style={{ padding: 10 }}>cost</th>
-                    <th style={{ padding: 10 }}>作成日時</th>
-                    <th style={{ padding: 10 }}>詳細</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredVersions.map((version) => (
-                    <tr key={version.id}>
-                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
-                        <VersionStatusBadge status={getVersionStatus(version)} />
-                      </td>
-                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
-                        <strong>{version.thread_title || "無題スレッド"}</strong>
-                        <div style={{ color: "#64748b", marginTop: 4 }}>
-                          {version.summary_excerpt || version.thread_id}
+            <div style={{ display: "grid", gap: 12 }}>
+              {filteredVersions.map((version) => {
+                const status = getVersionStatus(version);
+                const statusMeta = getVersionStatusMeta(status);
+                const summaryPreview =
+                  shortInlineText(version.summary_excerpt || version.summary_text, 110) ||
+                  "本文プレビューなし";
+
+                return (
+                  <article
+                    key={version.id}
+                    style={{
+                      border: `1px solid ${statusMeta.border}`,
+                      borderRadius: 10,
+                      background: "#ffffff",
+                      padding: 14,
+                      display: "grid",
+                      gap: 12,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <div style={{ minWidth: 0, flex: "1 1 320px" }}>
+                        <div style={{ marginBottom: 8 }}>
+                          <VersionStatusBadge status={status} />
                         </div>
-                      </td>
-                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
-                        <code>{version.thread_id}</code>
-                      </td>
-                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
-                        <code>{version.job_id || "-"}</code>
-                      </td>
-                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
-                        {version.prompt_version}
-                      </td>
-                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
-                        {version.model || "-"}
-                      </td>
-                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
-                        {version.is_applied ? "true" : "false"}
-                      </td>
-                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
-                        {formatDate(version.applied_at)}
-                      </td>
-                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
-                        {formatNumber(version.total_tokens)}
-                      </td>
-                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
-                        {formatCost(version.actual_cost_usd)}
-                      </td>
-                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
-                        {formatDate(version.created_at)}
-                      </td>
-                      <td style={{ borderTop: "1px solid #e2e8f0", padding: 10 }}>
-                        <button
-                          type="button"
-                          onClick={() => void loadVersionDetail(version.id, adminKey.trim())}
-                          disabled={versionLoadingId === version.id}
+                        <h3
                           style={{
-                            border: "1px solid #cbd5e1",
-                            borderRadius: 8,
-                            background: "#ffffff",
-                            color: "#111827",
-                            cursor: "pointer",
-                            fontWeight: 800,
-                            padding: "8px 10px",
+                            fontSize: 17,
+                            lineHeight: 1.4,
+                            margin: 0,
+                            overflowWrap: "anywhere",
                           }}
                         >
-                          {versionLoadingId === version.id ? "取得中..." : "詳細を見る"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          {version.thread_title || "無題スレッド"}
+                        </h3>
+                        <p
+                          style={{
+                            color: "#475569",
+                            lineHeight: 1.6,
+                            margin: "8px 0 0",
+                            overflowWrap: "anywhere",
+                          }}
+                        >
+                          {summaryPreview}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void loadVersionDetail(version.id, adminKey.trim())}
+                        disabled={versionLoadingId === version.id}
+                        style={{
+                          border: "1px solid #cbd5e1",
+                          borderRadius: 8,
+                          background: "#ffffff",
+                          color: "#111827",
+                          cursor: "pointer",
+                          fontWeight: 800,
+                          padding: "8px 12px",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {versionLoadingId === version.id ? "取得中..." : "詳細を見る"}
+                      </button>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 150px), 1fr))",
+                        gap: 10,
+                      }}
+                    >
+                      <div>
+                        <div style={labelStyle}>prompt_version</div>
+                        <div style={{ overflowWrap: "anywhere" }}>{version.prompt_version}</div>
+                      </div>
+                      <div>
+                        <div style={labelStyle}>is_applied</div>
+                        <div>{version.is_applied ? "true" : "false"}</div>
+                      </div>
+                      <div>
+                        <div style={labelStyle}>total_tokens</div>
+                        <div>{formatNumber(version.total_tokens)}</div>
+                      </div>
+                      <div>
+                        <div style={labelStyle}>cost</div>
+                        <div>{formatCost(version.actual_cost_usd)}</div>
+                      </div>
+                      <div>
+                        <div style={labelStyle}>created_at</div>
+                        <div>{formatDate(version.created_at)}</div>
+                      </div>
+                      <div>
+                        <div style={labelStyle}>version id</div>
+                        <code title={version.id}>{shortId(version.id)}</code>
+                      </div>
+                      <div>
+                        <div style={labelStyle}>thread id</div>
+                        <code title={version.thread_id}>{shortId(version.thread_id)}</code>
+                      </div>
+                      <div>
+                        <div style={labelStyle}>job id</div>
+                        <code title={version.job_id || ""}>{shortId(version.job_id)}</code>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
 
