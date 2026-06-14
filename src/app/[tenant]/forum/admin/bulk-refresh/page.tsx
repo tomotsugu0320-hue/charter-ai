@@ -90,6 +90,17 @@ type RunResponse = {
   items?: BulkRefreshJobItem[];
 };
 
+type ApplyVersionResponse = {
+  ok?: boolean;
+  error?: string;
+  version?: {
+    id: string;
+    thread_id: string;
+    is_applied: boolean;
+    applied_at?: string | null;
+  };
+};
+
 type SummaryComparePayload = {
   thread_id?: string | null;
   summary_text?: string | null;
@@ -298,6 +309,9 @@ export default function ForumAdminBulkRefreshPreviewPage() {
     useState<ThreadSummaryVersion | null>(null);
   const [versionLoadingId, setVersionLoadingId] = useState("");
   const latestVersionRequestRef = useRef("");
+  const [applyConfirm, setApplyConfirm] = useState(false);
+  const [applyLoading, setApplyLoading] = useState(false);
+  const [applyMessage, setApplyMessage] = useState("");
 
   async function runPreview() {
     const requestAdminKey = adminKey.trim();
@@ -405,6 +419,8 @@ export default function ForumAdminBulkRefreshPreviewPage() {
     setVersionLoadingId(versionId);
     setVersionsMessage("");
     setSelectedVersion(null);
+    setApplyConfirm(false);
+    setApplyMessage("");
 
     try {
       const response = await fetch(
@@ -435,6 +451,47 @@ export default function ForumAdminBulkRefreshPreviewPage() {
       if (latestVersionRequestRef.current === versionId) {
         setVersionLoadingId("");
       }
+    }
+  }
+
+  async function applySelectedVersion() {
+    if (!selectedVersion || !applyConfirm || applyLoading) return;
+
+    const requestAdminKey = adminKey.trim();
+    setApplyLoading(true);
+    setApplyMessage("");
+
+    try {
+      const response = await fetch(
+        `/api/forum/admin/bulk-refresh/versions/${encodeURIComponent(
+          selectedVersion.id
+        )}/apply`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(requestAdminKey ? { "x-admin-key": requestAdminKey } : {}),
+          },
+          body: JSON.stringify({
+            confirmApply: true,
+          }),
+        }
+      );
+      const data = (await response.json().catch(() => ({}))) as ApplyVersionResponse;
+
+      if (!response.ok || data.ok !== true) {
+        setApplyMessage(data.error || "このversionを適用できませんでした。");
+        return;
+      }
+
+      setApplyConfirm(false);
+      await loadVersions(requestAdminKey);
+      await loadVersionDetail(selectedVersion.id, requestAdminKey);
+      setApplyMessage("このversionを1件だけ現行AI要約に反映しました。");
+    } catch {
+      setApplyMessage("version適用中に通信エラーが発生しました。");
+    } finally {
+      setApplyLoading(false);
     }
   }
 
@@ -494,6 +551,15 @@ export default function ForumAdminBulkRefreshPreviewPage() {
     confirmCost &&
     confirmMaxTen &&
     !runLoading;
+  const selectedVersionThreadMatched =
+    !selectedVersion?.current_summary?.thread_id ||
+    selectedVersion.current_summary.thread_id === selectedVersion.thread_id;
+  const canApplySelectedVersion =
+    Boolean(selectedVersion) &&
+    !selectedVersion?.is_applied &&
+    selectedVersionThreadMatched &&
+    applyConfirm &&
+    !applyLoading;
 
   return (
     <main style={pageStyle}>
@@ -1182,6 +1248,69 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                 }}
               >
                 詳細表示は確認専用です。適用・削除・既存要約の更新は行いません。
+              </div>
+
+              <div
+                style={{
+                  border: "1px solid #fde68a",
+                  borderRadius: 8,
+                  background: "#fffbeb",
+                  color: "#78350f",
+                  padding: 12,
+                  lineHeight: 1.7,
+                  display: "grid",
+                  gap: 10,
+                }}
+              >
+                <strong>1件だけ適用</strong>
+                <span>
+                  この操作は、選択中のversion 1件だけを同じthread_idの現行AI要約へ反映します。
+                  OpenAI APIは呼びません。forum_postsも更新しません。
+                </span>
+                {!selectedVersionThreadMatched && (
+                  <span style={{ color: "#991b1b", fontWeight: 800 }}>
+                    thread_idが一致しないため適用できません。
+                  </span>
+                )}
+                {selectedVersion.is_applied ? (
+                  <span style={{ color: "#166534", fontWeight: 800 }}>
+                    このversionはすでに適用済みです。
+                  </span>
+                ) : (
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={applyConfirm}
+                      onChange={(event) => setApplyConfirm(event.target.checked)}
+                    />{" "}
+                    この1件だけを現行AI要約に反映することを確認しました
+                  </label>
+                )}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => void applySelectedVersion()}
+                    disabled={!canApplySelectedVersion}
+                    style={{
+                      ...buttonStyle,
+                      opacity: canApplySelectedVersion ? 1 : 0.55,
+                      cursor: canApplySelectedVersion ? "pointer" : "not-allowed",
+                    }}
+                  >
+                    {applyLoading ? "適用中..." : "このversionを1件だけ適用"}
+                  </button>
+                </div>
+                {applyMessage && (
+                  <p
+                    style={{
+                      margin: 0,
+                      color: applyMessage.includes("反映しました") ? "#166534" : "#991b1b",
+                      fontWeight: 800,
+                    }}
+                  >
+                    {applyMessage}
+                  </p>
+                )}
               </div>
 
               {compareTextBlock(
