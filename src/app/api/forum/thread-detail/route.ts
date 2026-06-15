@@ -33,6 +33,25 @@ type StoredSummaryRow = {
   explanations?: unknown;
 };
 
+type PostAiClassificationForResponse = {
+  classification: string;
+  confidence: number | null;
+  reason: string | null;
+  extracted_premise: string | null;
+  extracted_evidence: string | null;
+  suggested_metrics: string[];
+};
+
+type PostAiClassificationRow = {
+  post_id?: string | null;
+  classification?: string | null;
+  confidence?: number | string | null;
+  reason?: string | null;
+  extracted_premise?: string | null;
+  extracted_evidence?: string | null;
+  suggested_metrics?: unknown;
+};
+
 function shortText(value: string, max = 120) {
   const text = value.replace(/\s+/g, " ").trim();
   if (!text) return "";
@@ -63,6 +82,31 @@ function asStringArray(value: unknown) {
   }
 
   return [];
+}
+
+function normalizeSuggestedMetrics(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (typeof item === "string") return item.trim();
+      if (typeof item === "number" || typeof item === "boolean") return String(item);
+      return "";
+    })
+    .filter((item) => item.length > 0);
+}
+
+function toNullableNumber(value: unknown) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
 }
 
 function getAuthorKey(req: NextRequest) {
@@ -389,6 +433,58 @@ if (!thread) {
       );
     }
 
+    const postIds = Array.from(
+      new Set(
+        (posts ?? [])
+          .map((post: any) => (typeof post.id === "string" ? post.id : ""))
+          .filter(Boolean)
+      )
+    );
+    const classificationMap: Record<string, PostAiClassificationForResponse> = {};
+
+    if (postIds.length > 0) {
+      const { data: classificationRows, error: classificationError } = await supabase
+        .from("forum_post_ai_classifications")
+        .select(
+          `
+          post_id,
+          classification,
+          confidence,
+          reason,
+          extracted_premise,
+          extracted_evidence,
+          suggested_metrics,
+          created_at
+        `
+        )
+        .eq("thread_id", threadId)
+        .eq("is_active", true)
+        .in("post_id", postIds)
+        .order("created_at", { ascending: false });
+
+      if (classificationError) {
+        console.warn(
+          "[thread-detail classifications skipped]",
+          classificationError.message
+        );
+      } else {
+        (classificationRows ?? []).forEach((row: PostAiClassificationRow) => {
+          if (!row.post_id || !row.classification || classificationMap[row.post_id]) {
+            return;
+          }
+
+          classificationMap[row.post_id] = {
+            classification: row.classification,
+            confidence: toNullableNumber(row.confidence),
+            reason: row.reason ?? null,
+            extracted_premise: row.extracted_premise ?? null,
+            extracted_evidence: row.extracted_evidence ?? null,
+            suggested_metrics: normalizeSuggestedMetrics(row.suggested_metrics),
+          };
+        });
+      }
+    }
+
     const { data: storedSummary, error: storedSummaryError } = await supabase
       .from("thread_ai_structures")
       .select("summary_text, issues, opinions, rebuttals, supplements, explanations")
@@ -459,6 +555,7 @@ if (!thread) {
           evidence_unknown: 0,
           counterargument_unknown: 0,
         },
+        ai_classification: classificationMap[post.id] ?? null,
       };
     });
 
