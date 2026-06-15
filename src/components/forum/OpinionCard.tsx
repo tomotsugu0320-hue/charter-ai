@@ -8,6 +8,27 @@ import PrimaryButton from "@/components/forum/PrimaryButton";
 import ReplyGroup from "@/components/forum/ReplyGroup";
 import SectionCard from "@/components/forum/SectionCard";
 
+type AiClassification = {
+  classification?: string | null;
+  confidence?: number | null;
+  reason?: string | null;
+  extracted_premise?: string | null;
+  extracted_evidence?: string | null;
+  suggested_metrics?: string[];
+};
+
+const CLASSIFICATION_LABELS: Record<string, string> = {
+  agreement: "同意",
+  rebuttal: "反論",
+  premise_addition: "前提追加",
+  evidence_addition: "根拠追加",
+  case_addition: "事例追加",
+  metric_suggestion: "検証指標",
+  topic_shift: "論点ずれ",
+  emotional_reaction: "感情反応",
+  needs_review_or_misinformation_risk: "要確認",
+};
+
 function splitContent(content: string) {
   if (!content) return { claim: "", premises: [], reasons: [] };
 
@@ -218,6 +239,37 @@ function scoreBadgeStyle(score?: number | null) {
   };
 }
 
+function classificationLabel(classification?: string | null) {
+  if (!classification) return "";
+  return CLASSIFICATION_LABELS[classification] ?? classification;
+}
+
+function formatConfidence(confidence?: number | null) {
+  if (typeof confidence !== "number" || !Number.isFinite(confidence)) return "";
+  const percentage = confidence <= 1 ? confidence * 100 : confidence;
+  const rounded = Math.round(Math.max(0, Math.min(100, percentage)));
+  return `信頼度 ${rounded}%`;
+}
+
+function classificationBadgeStyle(classification?: string | null) {
+  const isReview = classification === "needs_review_or_misinformation_risk";
+
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    padding: "2px 8px",
+    fontSize: 12,
+    fontWeight: 700,
+    lineHeight: 1.4,
+    whiteSpace: "nowrap" as const,
+    border: isReview ? "1px solid #fde68a" : "1px solid #cbd5e1",
+    background: isReview ? "#fffbeb" : "#f8fafc",
+    color: isReview ? "#92400e" : "#475569",
+  };
+}
+
 export default function OpinionCard({
   op,
   hideLowScore,
@@ -266,6 +318,15 @@ const logicBreakType = String(op.opinion.logic_break_type ?? "").trim();
 const logicBreakNote = String(op.opinion.logic_break_note ?? "").trim();
 const shouldShowLogicBreakNote =
   logicBreakType && logicBreakType !== "none" && logicBreakNote;
+const aiClassification = op.opinion.ai_classification as
+  | AiClassification
+  | null
+  | undefined;
+const aiClassificationLabel = classificationLabel(aiClassification?.classification);
+const aiClassificationConfidence = formatConfidence(aiClassification?.confidence);
+const aiClassificationTitle = aiClassification?.reason
+  ? `理由: ${aiClassification.reason}`
+  : undefined;
 const feedbackActions = [
   ["conclusion_unknown", "AIで結論を解説"],
   ["counterargument_unknown", "AIで反対意見を解説"],
@@ -314,6 +375,17 @@ const feedbackActions = [
     ? `AI論理スコア ${score}点`
     : `参考スコア ${score}点`}
 </span>
+          {aiClassificationLabel && (
+            <span
+              title={aiClassificationTitle}
+              style={classificationBadgeStyle(aiClassification?.classification)}
+            >
+              AI分類: {aiClassificationLabel}
+              {aiClassificationConfidence
+                ? ` / ${aiClassificationConfidence}`
+                : ""}
+            </span>
+          )}
           {score !== null && score !== undefined && !hasLogicScoreReason && (
             <span
               style={{
