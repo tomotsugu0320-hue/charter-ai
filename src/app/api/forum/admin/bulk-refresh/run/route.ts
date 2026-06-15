@@ -11,17 +11,31 @@ const MAX_THREAD_SCAN = 5000;
 const MAX_RUN_ITEMS = 10;
 const DEFAULT_RUN_ITEMS = 3;
 const PROMPT_VERSION = "bulk-refresh-thread-summary-v2";
+const LOGIC_SCORE_PROMPT_VERSION = "bulk-refresh-logic-score-v1";
 const MODEL = "gpt-5.4-mini";
+const LOGIC_SCORE_MODEL = "gpt-4.1-mini";
 const INPUT_TOKENS_PER_CALL = 8000;
 const OUTPUT_TOKENS_PER_CALL = 1800;
+const LOGIC_SCORE_INPUT_TOKENS_PER_CALL = 2500;
+const LOGIC_SCORE_OUTPUT_TOKENS_PER_CALL = 600;
 const CATEGORY_OPTIONS = [
   "経済・政策",
   "AI・技術",
   "特許・発明",
   "生活・健康",
 ] as const;
+const LOGIC_BREAK_TYPES = [
+  "none",
+  "emotional",
+  "authority_based",
+  "weak_causality",
+  "unclear_premise",
+  "off_topic",
+  "other",
+] as const;
 
 type PeriodFilter = "six_months" | "one_year" | "all";
+type LogicBreakType = (typeof LOGIC_BREAK_TYPES)[number];
 
 type RunRequest = {
   period?: PeriodFilter;
@@ -29,6 +43,8 @@ type RunRequest = {
   target_type?: string;
   targetKind?: string;
   max_items?: number | string | null;
+  minLogicScore?: number | string | null;
+  includeNoLogicScore?: boolean;
   excludeHiddenDeleted?: boolean;
   confirmNoOverwrite?: boolean;
   confirmCost?: boolean;
@@ -51,6 +67,16 @@ type ForumPostRow = {
   created_at: string | null;
 };
 
+type LogicScorePostRow = ForumPostRow & {
+  thread_id: string | null;
+  logic_score: number | null;
+  logic_score_reason: string | null;
+  logic_break_type: string | null;
+  logic_break_note: string | null;
+  thread_title?: string | null;
+  thread_category?: string | null;
+};
+
 type GeneratedSummary = {
   summary_text: string | null;
   provisional_answer: string | null;
@@ -58,6 +84,18 @@ type GeneratedSummary = {
   counterargument_text: string | null;
   related_topics: string[];
   structure_json: Record<string, unknown>;
+  raw_result: Record<string, unknown>;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  actual_cost_usd: number | null;
+};
+
+type GeneratedLogicScore = {
+  logic_score: number;
+  logic_score_reason: string;
+  logic_break_type: LogicBreakType;
+  logic_break_note: string;
   raw_result: Record<string, unknown>;
   input_tokens: number;
   output_tokens: number;
@@ -93,6 +131,26 @@ function normalizeMaxItems(value: unknown) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return DEFAULT_RUN_ITEMS;
   return Math.max(1, Math.min(MAX_RUN_ITEMS, Math.floor(numeric)));
+}
+
+function toOptionalScore(value: unknown) {
+  if (value === null || value === undefined || value === "") return null;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.max(0, Math.min(100, Math.round(numeric)));
+}
+
+function clampScore(value: unknown) {
+  const score = Number(value);
+  if (!Number.isFinite(score)) return 50;
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function normalizeBreakType(value: unknown): LogicBreakType {
+  const type = String(value ?? "").trim();
+  return LOGIC_BREAK_TYPES.includes(type as LogicBreakType)
+    ? (type as LogicBreakType)
+    : "other";
 }
 
 function getPeriodStart(period: PeriodFilter) {
@@ -379,6 +437,179 @@ async function generateThreadSummaryVersion(
   }
 }
 
+function buildLogicScorePrompt(post: LogicScorePostRow) {
+  return `
+あなたはAI知恵袋Forumの投稿を再評価する採点者です。
+これは一括再整理の安全テスト実行です。既存の forum_posts は更新せず、新しいversionとして保存するための評価だけを行います。
+
+必ずJSONだけを返してください。Markdownや説明文は不要です。
+
+JSON形式:
+{
+  "logic_score": 82,
+  "logic_score_reason": "評価理由を日本語で2〜4文。",
+  "logic_break_type": "none",
+  "logic_break_note": "主な弱点、改善点、反論余地。"
+}
+
+評価観点:
+- 問いに答えているか。
+- 前提が明示されているか。
+- 根拠や因果関係が飛んでいないか。
+- 反論・例外・条件分岐があるか。
+- 両論併記だけで終わらず、どの条件なら成立するかを説明しているか。
+- 経済・政策テーマでは、デフレ/インフレ、需要不足/需要超過、供給制約、物価、雇用、賃金、消費など景気局面の確認が必要な場合に触れているか。
+
+logic_score は0〜100点です。
+logic_score_reason には、強みと弱点が読める評価理由を書いてください。
+logic_break_type は次のいずれかだけを使ってください:
+${LOGIC_BREAK_TYPES.join(", ")}
+logic_break_note には、足りない前提・因果・反論余地・確認すべき指標を簡潔に書いてください。
+
+スレッドタイトル:
+${post.thread_title || "不明"}
+
+カテゴリー:
+${post.thread_category || "未分類"}
+
+投稿分類:
+${post.post_role || "opinion"}
+
+現在のAI論理スコア:
+- score: ${post.logic_score ?? "未評価"}
+- reason: ${post.logic_score_reason || "なし"}
+- break_type: ${post.logic_break_type || "なし"}
+- break_note: ${post.logic_break_note || "なし"}
+
+投稿本文:
+${compactText(post.content, 3200)}
+`.trim();
+}
+
+async function generateLogicScoreVersion(post: LogicScorePostRow, jobId: string) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not set");
+  }
+
+  const prompt = buildLogicScorePrompt(post);
+  let data: any = null;
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: LOGIC_SCORE_MODEL,
+        input: prompt,
+        temperature: 0,
+        text: {
+          format: {
+            type: "json_schema",
+            name: "bulk_refresh_logic_score_result",
+            schema: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                logic_score: {
+                  type: "number",
+                  minimum: 0,
+                  maximum: 100,
+                },
+                logic_score_reason: {
+                  type: "string",
+                },
+                logic_break_type: {
+                  type: "string",
+                  enum: LOGIC_BREAK_TYPES,
+                },
+                logic_break_note: {
+                  type: "string",
+                },
+              },
+              required: [
+                "logic_score",
+                "logic_score_reason",
+                "logic_break_type",
+                "logic_break_note",
+              ],
+            },
+            strict: true,
+          },
+        },
+      }),
+    });
+
+    data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(data?.error?.message || "OpenAI logic score generation failed");
+    }
+
+    const outputText = extractOutputTextFromResponse(data);
+    const usage = extractUsage(data?.usage);
+    const actualCostUsd = calculateOpenAiEstimatedCostUsd({
+      model: LOGIC_SCORE_MODEL,
+      inputTokenEstimate: usage.input_tokens,
+      outputTokenEstimate: usage.output_tokens,
+    });
+
+    const parsed = parseJsonObject(outputText);
+    if (!parsed) {
+      throw new Error("Failed to parse OpenAI logic score JSON");
+    }
+
+    await recordForumApiUsageLog({
+      featureKey: "bulk_refresh_logic_score",
+      routePath: "/api/forum/admin/bulk-refresh/run",
+      model: LOGIC_SCORE_MODEL,
+      promptVersion: LOGIC_SCORE_PROMPT_VERSION,
+      targetType: "post",
+      targetId: post.id,
+      inputText: prompt,
+      outputText,
+      usage: data?.usage,
+      status: "success",
+      estimatedCost: actualCostUsd,
+    });
+
+    return {
+      logic_score: clampScore(parsed.logic_score),
+      logic_score_reason: asString(parsed.logic_score_reason) || "評価理由が取得できませんでした。",
+      logic_break_type: normalizeBreakType(parsed.logic_break_type),
+      logic_break_note: asString(parsed.logic_break_note) || "主な補足はありません。",
+      raw_result: {
+        job_id: jobId,
+        output_text: outputText,
+        parsed,
+        response: data,
+      },
+      input_tokens: usage.input_tokens,
+      output_tokens: usage.output_tokens,
+      total_tokens: usage.total_tokens,
+      actual_cost_usd: actualCostUsd,
+    } satisfies GeneratedLogicScore;
+  } catch (error) {
+    await recordForumApiUsageLog({
+      featureKey: "bulk_refresh_logic_score",
+      routePath: "/api/forum/admin/bulk-refresh/run",
+      model: LOGIC_SCORE_MODEL,
+      promptVersion: LOGIC_SCORE_PROMPT_VERSION,
+      targetType: "post",
+      targetId: post.id,
+      inputText: prompt,
+      outputText: extractOutputTextFromResponse(data),
+      usage: data?.usage,
+      status: "error",
+      errorMessage: getErrorMessage(error),
+    });
+    throw error;
+  }
+}
+
 async function loadCandidateThreads(
   supabase: any,
   body: RunRequest,
@@ -409,6 +640,73 @@ async function loadCandidateThreads(
   );
 }
 
+async function loadCandidateLogicScorePosts(
+  supabase: any,
+  body: RunRequest,
+) {
+  const period = normalizePeriod(body.period);
+  const periodStart = getPeriodStart(period);
+  const minLogicScore = toOptionalScore(body.minLogicScore);
+  const includeNoLogicScore = body.includeNoLogicScore !== false;
+  const candidateThreads = await loadCandidateThreads(supabase, body);
+  const threadById = new Map(candidateThreads.map((thread) => [thread.id, thread]));
+  const threadIds = Array.from(threadById.keys());
+
+  if (threadIds.length === 0) return [];
+
+  let postQuery = supabase
+    .from("forum_posts")
+    .select(
+      [
+        "id",
+        "thread_id",
+        "content",
+        "post_role",
+        "created_at",
+        "logic_score",
+        "logic_score_reason",
+        "logic_break_type",
+        "logic_break_note",
+      ].join(", ")
+    )
+    .in("thread_id", threadIds)
+    .eq("is_deleted", false)
+    .order("created_at", { ascending: false })
+    .limit(10000);
+
+  if (periodStart) {
+    postQuery = postQuery.gte("created_at", periodStart);
+  }
+
+  const { data, error } = await postQuery;
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as LogicScorePostRow[])
+    .filter((post) => {
+      if (!String(post.content ?? "").trim()) return false;
+
+      const score =
+        typeof post.logic_score === "number" && Number.isFinite(post.logic_score)
+          ? post.logic_score
+          : null;
+
+      if (score === null) return includeNoLogicScore;
+      if (minLogicScore === null) return true;
+      return score >= minLogicScore;
+    })
+    .map((post) => {
+      const thread = threadById.get(String(post.thread_id ?? ""));
+      return {
+        ...post,
+        thread_title: thread?.title ?? null,
+        thread_category: thread?.category ?? null,
+      };
+    });
+}
+
 async function updateJobTotals(
   supabase: any,
   jobId: string,
@@ -434,6 +732,266 @@ async function updateJobTotals(
     .eq("id", jobId);
 }
 
+async function runLogicScoreTest(supabase: any, body: RunRequest) {
+  const maxItems = normalizeMaxItems(body.max_items);
+  let jobId: string | null = null;
+
+  try {
+    const candidates = await loadCandidateLogicScorePosts(supabase, body);
+    const selectedPosts = candidates.slice(0, maxItems);
+    const estimatedInputTokens = selectedPosts.length * LOGIC_SCORE_INPUT_TOKENS_PER_CALL;
+    const estimatedOutputTokens = selectedPosts.length * LOGIC_SCORE_OUTPUT_TOKENS_PER_CALL;
+    const estimatedCostUsd = calculateOpenAiEstimatedCostUsd({
+      model: LOGIC_SCORE_MODEL,
+      inputTokenEstimate: estimatedInputTokens,
+      outputTokenEstimate: estimatedOutputTokens,
+    });
+
+    const { data: jobRow, error: jobError } = await supabase
+      .from("forum_bulk_refresh_jobs")
+      .insert({
+        status: "running",
+        target_type: "logic_score",
+        filter_json: {
+          period: normalizePeriod(body.period),
+          category: normalizeCategory(body.category),
+          minLogicScore: toOptionalScore(body.minLogicScore),
+          includeNoLogicScore: body.includeNoLogicScore !== false,
+          excludeHiddenDeleted: true,
+          prompt_version: LOGIC_SCORE_PROMPT_VERSION,
+        },
+        max_items: maxItems,
+        estimated_api_calls: selectedPosts.length,
+        estimated_input_tokens: estimatedInputTokens,
+        estimated_output_tokens: estimatedOutputTokens,
+        estimated_total_tokens: estimatedInputTokens + estimatedOutputTokens,
+        estimated_cost_usd: estimatedCostUsd,
+        started_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+
+    if (jobError || !jobRow?.id) {
+      throw new Error(jobError?.message || "Failed to create bulk refresh job.");
+    }
+
+    jobId = jobRow.id as string;
+
+    const totals = {
+      actual_api_calls: 0,
+      actual_input_tokens: 0,
+      actual_output_tokens: 0,
+      actual_total_tokens: 0,
+      actual_cost_usd: 0,
+      success_count: 0,
+      failed_count: 0,
+      skipped_count: 0,
+    };
+    const items: Array<{
+      id: string;
+      target_id: string;
+      status: string;
+      new_version_id?: string | null;
+      previous_version_id?: string | null;
+      error_message?: string | null;
+    }> = [];
+
+    for (const post of selectedPosts) {
+      const { data: itemRow, error: itemError } = await supabase
+        .from("forum_bulk_refresh_job_items")
+        .insert({
+          job_id: jobId,
+          target_type: "logic_score",
+          target_id: post.id,
+          status: "pending",
+        })
+        .select("id")
+        .single();
+
+      if (itemError || !itemRow?.id) {
+        totals.failed_count += 1;
+        items.push({
+          id: "",
+          target_id: post.id,
+          status: "failed",
+          error_message: itemError?.message || "Failed to create job item.",
+        });
+        continue;
+      }
+
+      const itemId = itemRow.id as string;
+
+      const { data: existingVersion, error: existingVersionError } = await supabase
+        .from("forum_post_logic_score_versions")
+        .select("id")
+        .eq("post_id", post.id)
+        .eq("prompt_version", LOGIC_SCORE_PROMPT_VERSION)
+        .limit(1)
+        .maybeSingle();
+
+      if (existingVersionError) {
+        await supabase
+          .from("forum_bulk_refresh_job_items")
+          .update({
+            status: "failed",
+            error_message: existingVersionError.message,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", itemId);
+        totals.failed_count += 1;
+        items.push({
+          id: itemId,
+          target_id: post.id,
+          status: "failed",
+          error_message: existingVersionError.message,
+        });
+        continue;
+      }
+
+      if (existingVersion?.id) {
+        await supabase
+          .from("forum_bulk_refresh_job_items")
+          .update({
+            status: "skipped",
+            previous_version_id: existingVersion.id,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", itemId);
+        totals.skipped_count += 1;
+        items.push({
+          id: itemId,
+          target_id: post.id,
+          status: "skipped",
+          previous_version_id: existingVersion.id as string,
+        });
+        continue;
+      }
+
+      await supabase
+        .from("forum_bulk_refresh_job_items")
+        .update({
+          status: "running",
+          started_at: new Date().toISOString(),
+        })
+        .eq("id", itemId);
+
+      try {
+        totals.actual_api_calls += 1;
+        const generated = await generateLogicScoreVersion(post, jobId);
+
+        const { data: versionRow, error: versionError } = await supabase
+          .from("forum_post_logic_score_versions")
+          .insert({
+            post_id: post.id,
+            job_id: jobId,
+            job_item_id: itemId,
+            prompt_version: LOGIC_SCORE_PROMPT_VERSION,
+            model: LOGIC_SCORE_MODEL,
+            logic_score: generated.logic_score,
+            logic_score_reason: generated.logic_score_reason,
+            logic_break_type: generated.logic_break_type,
+            logic_break_note: generated.logic_break_note,
+            raw_result: generated.raw_result,
+            input_tokens: generated.input_tokens,
+            output_tokens: generated.output_tokens,
+            total_tokens: generated.total_tokens,
+            actual_cost_usd: generated.actual_cost_usd,
+            is_applied: false,
+          })
+          .select("id")
+          .single();
+
+        if (versionError || !versionRow?.id) {
+          throw new Error(versionError?.message || "Failed to save logic score version.");
+        }
+
+        const actualCost = generated.actual_cost_usd ?? 0;
+        totals.actual_input_tokens += generated.input_tokens;
+        totals.actual_output_tokens += generated.output_tokens;
+        totals.actual_total_tokens += generated.total_tokens;
+        totals.actual_cost_usd += actualCost;
+        totals.success_count += 1;
+
+        await supabase
+          .from("forum_bulk_refresh_job_items")
+          .update({
+            status: "completed",
+            new_version_id: versionRow.id,
+            actual_input_tokens: generated.input_tokens,
+            actual_output_tokens: generated.output_tokens,
+            actual_total_tokens: generated.total_tokens,
+            actual_cost_usd: actualCost,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", itemId);
+
+        items.push({
+          id: itemId,
+          target_id: post.id,
+          status: "completed",
+          new_version_id: versionRow.id as string,
+        });
+      } catch (error) {
+        const message = getErrorMessage(error);
+        totals.failed_count += 1;
+        await supabase
+          .from("forum_bulk_refresh_job_items")
+          .update({
+            status: "failed",
+            error_message: message,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", itemId);
+        items.push({
+          id: itemId,
+          target_id: post.id,
+          status: "failed",
+          error_message: message,
+        });
+      }
+    }
+
+    await updateJobTotals(supabase, jobId, {
+      status: "completed",
+      ...totals,
+      actual_cost_usd: Number(totals.actual_cost_usd.toFixed(8)),
+    });
+
+    return NextResponse.json({
+      ok: true,
+      job: {
+        id: jobId,
+        status: "completed",
+        target_type: "logic_score",
+        max_items: maxItems,
+        ...totals,
+        actual_cost_usd: Number(totals.actual_cost_usd.toFixed(8)),
+      },
+      items,
+      prompt_version: LOGIC_SCORE_PROMPT_VERSION,
+      model: LOGIC_SCORE_MODEL,
+    });
+  } catch (error) {
+    const message = getErrorMessage(error);
+    if (jobId) {
+      await updateJobTotals(supabase, jobId, {
+        status: "failed",
+        actual_api_calls: 0,
+        actual_input_tokens: 0,
+        actual_output_tokens: 0,
+        actual_total_tokens: 0,
+        actual_cost_usd: 0,
+        success_count: 0,
+        failed_count: 0,
+        skipped_count: 0,
+        error_message: message,
+      });
+    }
+
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   if (!isForumAdminAuthenticated(request)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -442,9 +1000,9 @@ export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as RunRequest;
   const targetType = body.target_type || body.targetKind;
 
-  if (targetType !== "thread_summary") {
+  if (targetType !== "thread_summary" && targetType !== "logic_score") {
     return NextResponse.json(
-      { ok: false, error: "Only thread_summary test runs are supported." },
+      { ok: false, error: "Only thread_summary or logic_score test runs are supported." },
       { status: 400 }
     );
   }
@@ -466,6 +1024,10 @@ export async function POST(request: NextRequest) {
       { ok: false, error: "Supabase service role is not configured." },
       { status: 500 }
     );
+  }
+
+  if (targetType === "logic_score") {
+    return runLogicScoreTest(supabase, body);
   }
 
   const maxItems = normalizeMaxItems(body.max_items);

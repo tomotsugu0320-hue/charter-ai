@@ -145,6 +145,32 @@ type ThreadSummaryVersion = {
   } | null;
 };
 
+type LogicScoreVersion = {
+  id: string;
+  post_id: string;
+  thread_id?: string | null;
+  thread_title?: string | null;
+  thread_category?: string | null;
+  post_excerpt?: string | null;
+  current_logic_score?: number | null;
+  current_logic_score_reason?: string | null;
+  job_id?: string | null;
+  job_item_id?: string | null;
+  prompt_version: string;
+  model?: string | null;
+  logic_score?: number | null;
+  logic_score_reason?: string | null;
+  logic_break_type?: string | null;
+  logic_break_note?: string | null;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  total_tokens?: number | null;
+  actual_cost_usd?: number | null;
+  is_applied: boolean;
+  applied_at?: string | null;
+  created_at?: string | null;
+};
+
 const pageStyle: CSSProperties = {
   minHeight: "100vh",
   background: "#f8fafc",
@@ -386,6 +412,8 @@ export default function ForumAdminBulkRefreshPreviewPage() {
   const [jobsMessage, setJobsMessage] = useState("");
   const [versions, setVersions] = useState<ThreadSummaryVersion[]>([]);
   const [versionsMessage, setVersionsMessage] = useState("");
+  const [logicScoreVersions, setLogicScoreVersions] = useState<LogicScoreVersion[]>([]);
+  const [logicScoreVersionsMessage, setLogicScoreVersionsMessage] = useState("");
   const [versionStatusFilter, setVersionStatusFilter] =
     useState<VersionStatusFilter>("all");
   const [versionPromptFilter, setVersionPromptFilter] = useState("all");
@@ -496,6 +524,35 @@ export default function ForumAdminBulkRefreshPreviewPage() {
       setVersions(data.versions ?? []);
     } catch {
       setVersionsMessage("生成済みversionの取得で通信エラーが発生しました。");
+    }
+  }
+
+  async function loadLogicScoreVersions(requestAdminKey = "") {
+    setLogicScoreVersionsMessage("");
+
+    try {
+      const response = await fetch("/api/forum/admin/bulk-refresh/logic-score-versions", {
+        headers: requestAdminKey ? { "x-admin-key": requestAdminKey } : {},
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        versions?: LogicScoreVersion[];
+      };
+
+      if (!response.ok || data.ok !== true) {
+        setLogicScoreVersions([]);
+        setLogicScoreVersionsMessage(
+          data.error
+            ? `logic_score versionを取得できませんでした: ${data.error}`
+            : "管理セッションがないため、logic_score versionは未取得です。"
+        );
+        return;
+      }
+
+      setLogicScoreVersions(data.versions ?? []);
+    } catch {
+      setLogicScoreVersionsMessage("logic_score versionの取得で通信エラーが発生しました。");
     }
   }
 
@@ -624,9 +681,56 @@ export default function ForumAdminBulkRefreshPreviewPage() {
     }
   }
 
+  async function runLogicScoreTest() {
+    const requestAdminKey = adminKey.trim();
+
+    setRunLoading(true);
+    setRunMessage("");
+    setRunResult(null);
+
+    try {
+      const response = await fetch("/api/forum/admin/bulk-refresh/run", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(requestAdminKey ? { "x-admin-key": requestAdminKey } : {}),
+        },
+        body: JSON.stringify({
+          period,
+          category,
+          target_type: "logic_score",
+          max_items: maxRunItems,
+          minLogicScore: minLogicScore.trim() || null,
+          includeNoLogicScore,
+          excludeHiddenDeleted,
+          confirmNoOverwrite,
+          confirmCost,
+          confirmMaxTen,
+        }),
+      });
+      const data = (await response.json().catch(() => ({}))) as RunResponse;
+
+      if (!response.ok || data.ok !== true) {
+        setRunMessage(data.error || "logic_scoreテスト実行に失敗しました。");
+        return;
+      }
+
+      setRunResult(data);
+      setRunMessage("logic_scoreテスト実行が完了しました。");
+      setAdminKey("");
+      await loadJobs(requestAdminKey);
+      await loadLogicScoreVersions(requestAdminKey);
+    } catch {
+      setRunMessage("logic_scoreテスト実行中に通信エラーが発生しました。");
+    } finally {
+      setRunLoading(false);
+    }
+  }
+
   useEffect(() => {
     void loadJobs();
     void loadVersions();
+    void loadLogicScoreVersions();
   }, []);
 
   const samples = preview?.sample_targets ?? [];
@@ -973,9 +1077,7 @@ export default function ForumAdminBulkRefreshPreviewPage() {
         )}
 
         <section style={{ ...cardStyle, marginBottom: 18 }}>
-          <h2 style={{ margin: "0 0 12px", fontSize: 20 }}>
-            スレッド要約テスト実行
-          </h2>
+          <h2 style={{ margin: "0 0 12px", fontSize: 20 }}>安全テスト実行</h2>
           <p style={{ margin: "0 0 12px", color: "#475569", lineHeight: 1.7 }}>
             最大10件だけOpenAI APIを実行し、結果を新versionとして保存します。
             既存AI回答、既存投稿本文、thread_ai_structures、forum_posts は上書きしません。
@@ -993,9 +1095,12 @@ export default function ForumAdminBulkRefreshPreviewPage() {
               marginBottom: 14,
             }}
           >
-            <strong>対象種別:</strong> スレッド要約のみ
+            <strong>対象種別:</strong> スレッド要約 / logic_score
             <br />
-            <span>論理スコア再評価は今回未対応です。</span>
+            <span>
+              logic_scoreは forum_post_logic_score_versions に is_applied=false で保存します。
+              forum_posts.logic_score は更新しません。
+            </span>
           </div>
 
           <div style={gridStyle}>
@@ -1049,18 +1154,34 @@ export default function ForumAdminBulkRefreshPreviewPage() {
           </div>
 
           <div style={{ marginTop: 16 }}>
-            <button
-              type="button"
-              onClick={() => void runThreadSummaryTest()}
-              disabled={!canRunThreadSummaryTest}
-              style={{
-                ...buttonStyle,
-                opacity: canRunThreadSummaryTest ? 1 : 0.55,
-                cursor: canRunThreadSummaryTest ? "pointer" : "not-allowed",
-              }}
-            >
-              {runLoading ? "テスト実行中..." : "スレッド要約を最大10件だけテスト実行"}
-            </button>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => void runThreadSummaryTest()}
+                disabled={!canRunThreadSummaryTest}
+                style={{
+                  ...buttonStyle,
+                  opacity: canRunThreadSummaryTest ? 1 : 0.55,
+                  cursor: canRunThreadSummaryTest ? "pointer" : "not-allowed",
+                }}
+              >
+                {runLoading ? "テスト実行中..." : "スレッド要約を最大10件だけテスト実行"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void runLogicScoreTest()}
+                disabled={!canRunThreadSummaryTest}
+                style={{
+                  ...buttonStyle,
+                  background: "#2563eb",
+                  borderColor: "#2563eb",
+                  opacity: canRunThreadSummaryTest ? 1 : 0.55,
+                  cursor: canRunThreadSummaryTest ? "pointer" : "not-allowed",
+                }}
+              >
+                {runLoading ? "テスト実行中..." : "logic_scoreを最大10件だけテスト実行"}
+              </button>
+            </div>
             {!preview && (
               <p style={{ margin: "10px 0 0", color: "#92400e", lineHeight: 1.7 }}>
                 先にプレビューを実行して、対象件数と推定費用を確認してください。
@@ -1083,11 +1204,199 @@ export default function ForumAdminBulkRefreshPreviewPage() {
           {runResult?.job && (
             <div style={{ ...gridStyle, marginTop: 16 }}>
               {statCard("job id", runResult.job.id)}
+              {statCard("target", runResult.job.target_type)}
               {statCard("成功", formatNumber(runResult.job.success_count))}
               {statCard("skipped", formatNumber(runResult.job.skipped_count))}
               {statCard("失敗", formatNumber(runResult.job.failed_count))}
               {statCard("実token", formatNumber(runResult.job.actual_total_tokens))}
               {statCard("実コスト", formatCost(runResult.job.actual_cost_usd), "USD")}
+            </div>
+          )}
+        </section>
+
+        <section style={{ ...cardStyle, marginBottom: 18 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+              alignItems: "center",
+              marginBottom: 12,
+            }}
+          >
+            <div>
+              <h2 style={{ margin: 0, fontSize: 20 }}>生成済みlogic_score version</h2>
+              <p style={{ margin: "8px 0 0", color: "#475569", lineHeight: 1.7 }}>
+                logic_scoreテスト実行で保存された再評価versionの確認用です。
+                まだforum_posts.logic_scoreには反映されていません。適用機能もありません。
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadLogicScoreVersions(adminKey.trim())}
+              style={{
+                border: "1px solid #cbd5e1",
+                borderRadius: 8,
+                background: "#ffffff",
+                color: "#111827",
+                cursor: "pointer",
+                fontWeight: 800,
+                padding: "8px 12px",
+                flex: "0 0 auto",
+              }}
+            >
+              再読み込み
+            </button>
+          </div>
+
+          {logicScoreVersionsMessage && (
+            <p style={{ margin: "0 0 12px", color: "#92400e", lineHeight: 1.7 }}>
+              {logicScoreVersionsMessage}
+            </p>
+          )}
+
+          {logicScoreVersions.length === 0 ? (
+            <div
+              style={{
+                border: "1px dashed #cbd5e1",
+                borderRadius: 8,
+                background: "#f8fafc",
+                color: "#64748b",
+                padding: 18,
+                textAlign: "center",
+              }}
+            >
+              まだ生成済みlogic_score versionはありません。
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: 12 }}>
+              {logicScoreVersions.map((version) => (
+                <article
+                  key={version.id}
+                  style={{
+                    border: "1px solid #dbe3ef",
+                    borderRadius: 10,
+                    background: "#ffffff",
+                    padding: 14,
+                    display: "grid",
+                    gap: 10,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div style={{ minWidth: 0, flex: "1 1 320px" }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                        <span
+                          style={{
+                            border: "1px solid #bfdbfe",
+                            borderRadius: 999,
+                            background: "#eff6ff",
+                            color: "#1d4ed8",
+                            fontSize: 12,
+                            fontWeight: 900,
+                            padding: "4px 8px",
+                          }}
+                        >
+                          未適用
+                        </span>
+                        <span
+                          style={{
+                            border: "1px solid #fde68a",
+                            borderRadius: 999,
+                            background: "#fffbeb",
+                            color: "#92400e",
+                            fontSize: 12,
+                            fontWeight: 900,
+                            padding: "4px 8px",
+                          }}
+                        >
+                          適用機能なし
+                        </span>
+                      </div>
+                      <h3 style={{ margin: 0, fontSize: 17, lineHeight: 1.4 }}>
+                        {version.thread_title || "スレッド未取得"}
+                      </h3>
+                      <p
+                        style={{
+                          margin: "8px 0 0",
+                          color: "#475569",
+                          lineHeight: 1.6,
+                          overflowWrap: "anywhere",
+                        }}
+                      >
+                        {version.post_excerpt || "投稿本文プレビューなし"}
+                      </p>
+                    </div>
+                    <div
+                      style={{
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 10,
+                        background: "#f8fafc",
+                        color: "#0f172a",
+                        fontSize: 28,
+                        fontWeight: 900,
+                        minWidth: 78,
+                        padding: "10px 12px",
+                        textAlign: "center",
+                      }}
+                    >
+                      {version.logic_score ?? "-"}
+                    </div>
+                  </div>
+
+                  <div style={{ color: "#334155", lineHeight: 1.7 }}>
+                    {shortInlineText(version.logic_score_reason, 180) || "評価理由なし"}
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 150px), 1fr))",
+                      gap: 10,
+                    }}
+                  >
+                    <div>
+                      <div style={labelStyle}>post id</div>
+                      <code title={version.post_id}>{shortId(version.post_id)}</code>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>thread id</div>
+                      <code title={version.thread_id || ""}>{shortId(version.thread_id)}</code>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>prompt_version</div>
+                      <div style={{ overflowWrap: "anywhere" }}>{version.prompt_version}</div>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>is_applied</div>
+                      <div>{version.is_applied ? "true" : "false"}</div>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>current score</div>
+                      <div>{version.current_logic_score ?? "-"}</div>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>total_tokens</div>
+                      <div>{formatNumber(version.total_tokens)}</div>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>cost</div>
+                      <div>{formatCost(version.actual_cost_usd)}</div>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>created_at</div>
+                      <div>{formatDate(version.created_at)}</div>
+                    </div>
+                  </div>
+                </article>
+              ))}
             </div>
           )}
         </section>
