@@ -58,6 +58,32 @@ const MAX_DRAFT_ARRAY_ITEMS = 20;
 const MAX_DRAFT_ITEM_LENGTH = 1000;
 const MAX_DRAFT_CONFLICT_ITEM_LENGTH = 1500;
 
+const EXTERNAL_AI_SECTION_LABELS = [
+  "【誰でも分かる説明】",
+  "【もう少し詳しい説明】",
+  "【深層・専門的な補足】",
+  "短く言うと:",
+  "短く言うと：",
+  "もう少し詳しく:",
+  "もう少し詳しく：",
+  "AI回答・整理:",
+  "AI回答・整理：",
+  "補足:",
+  "補足：",
+  "前提:",
+  "前提：",
+  "根拠:",
+  "根拠：",
+  "反論・リスク:",
+  "反論・リスク：",
+  "反論:",
+  "反論：",
+  "子論点候補:",
+  "子論点候補：",
+  "分割しなかった理由:",
+  "分割しなかった理由：",
+];
+
 function textLength(value: unknown) {
   return String(value ?? "").trim().length;
 }
@@ -78,19 +104,114 @@ function toCleanStringArray(values: unknown[], max = 5) {
     .slice(0, max);
 }
 
-function extractAiAnswerFromClaim(claim: string) {
-  const labels = ["AI回答・整理:", "AI回答・整理："];
-  const label = labels.find((item) => claim.includes(item));
-  if (!label) return "";
+function extractLabeledSection(text: string, labels: string[], stopLabels: string[]) {
+  const matchedLabel = labels.find((label) => text.includes(label));
+  if (!matchedLabel) return "";
 
-  const afterLabel = claim.slice(claim.indexOf(label) + label.length).trim();
+  const afterLabel = text.slice(text.indexOf(matchedLabel) + matchedLabel.length).trim();
   if (!afterLabel) return "";
 
-  const nextHeading = afterLabel.search(
-    /\n\s*(補足|前提|根拠|反論|反論・リスク)[:：]/
+  const nextIndex = stopLabels.reduce<number | null>((current, label) => {
+    if (labels.includes(label)) return current;
+    const index = afterLabel.indexOf(label);
+    if (index < 0) return current;
+    return current === null ? index : Math.min(current, index);
+  }, null);
+
+  return (nextIndex === null ? afterLabel : afterLabel.slice(0, nextIndex)).trim();
+}
+
+function extractAiAnswerFromClaim(claim: string) {
+  const shortAnswer = extractLabeledSection(
+    claim,
+    ["【誰でも分かる説明】", "短く言うと:", "短く言うと："],
+    EXTERNAL_AI_SECTION_LABELS
+  );
+  const detailedAnswer = extractLabeledSection(
+    claim,
+    ["【もう少し詳しい説明】", "もう少し詳しく:", "もう少し詳しく："],
+    EXTERNAL_AI_SECTION_LABELS
+  );
+  const deepAnswer = extractLabeledSection(
+    claim,
+    ["【深層・専門的な補足】"],
+    EXTERNAL_AI_SECTION_LABELS
   );
 
-  return (nextHeading >= 0 ? afterLabel.slice(0, nextHeading) : afterLabel).trim();
+  if (shortAnswer || detailedAnswer || deepAnswer) {
+    return buildLayeredAnswerText({
+      simple: shortAnswer || shortText(detailedAnswer || deepAnswer, 160),
+      detailed: detailedAnswer || shortAnswer || deepAnswer,
+      deep: deepAnswer,
+    });
+  }
+
+  const legacyAnswer = extractLabeledSection(
+    claim,
+    ["AI回答・整理:", "AI回答・整理："],
+    EXTERNAL_AI_SECTION_LABELS
+  );
+  const legacySupplement = extractLabeledSection(
+    claim,
+    ["補足:", "補足："],
+    EXTERNAL_AI_SECTION_LABELS
+  );
+
+  if (legacyAnswer || legacySupplement) {
+    return buildLayeredAnswerText({
+      simple: legacyAnswer || shortText(legacySupplement, 160),
+      detailed: legacySupplement || legacyAnswer,
+      deep: "",
+    });
+  }
+
+  return "";
+}
+
+function getExternalAiQuestionPart(claim: string) {
+  const firstLabelIndex = EXTERNAL_AI_SECTION_LABELS.reduce<number | null>(
+    (current, label) => {
+      const index = claim.indexOf(label);
+      if (index < 0) return current;
+      return current === null ? index : Math.min(current, index);
+    },
+    null
+  );
+
+  return (firstLabelIndex === null ? claim : claim.slice(0, firstLabelIndex)).trim();
+}
+
+function buildExternalAiDraftClaim({
+  claim,
+  aiAnswerShort,
+  aiAnswerDetail,
+  aiAnswer,
+  supplements,
+  childTopics,
+  notSplitReason,
+}: {
+  claim: string;
+  aiAnswerShort: string;
+  aiAnswerDetail: string;
+  aiAnswer: string;
+  supplements: string[];
+  childTopics: string[];
+  notSplitReason: string;
+}) {
+  if (!aiAnswerShort && !aiAnswerDetail) return claim;
+
+  const question = getExternalAiQuestionPart(claim);
+  const parts = [
+    question,
+    aiAnswerShort ? `${ANSWER_LAYER_LABELS[0]}\n${aiAnswerShort}` : "",
+    aiAnswerDetail ? `${ANSWER_LAYER_LABELS[1]}\n${aiAnswerDetail}` : "",
+    aiAnswer ? `AI回答・整理:\n${aiAnswer}` : "",
+    supplements.length ? `補足:\n${supplements.join("\n")}` : "",
+    childTopics.length ? `子論点候補:\n${childTopics.join("\n")}` : "",
+    notSplitReason ? `分割しなかった理由:\n${notSplitReason}` : "",
+  ].filter(Boolean);
+
+  return parts.join("\n\n") || claim;
 }
 
 function looksLikeEconomyPolicyText(text: string) {
@@ -369,6 +490,20 @@ export async function POST(req: NextRequest) {
 
     const title = String(body?.title || "").trim();
     const claim = String(body?.claim || "").trim();
+    const aiAnswerShort = String(body?.ai_answer_short || body?.aiAnswerShort || "").trim();
+    const aiAnswerDetail = String(body?.ai_answer_detail || body?.aiAnswerDetail || "").trim();
+    const aiAnswer = String(body?.ai_answer || body?.aiAnswer || "").trim();
+    const draftSupplements: unknown[] = Array.isArray(body?.supplements)
+      ? body.supplements
+      : [];
+    const draftChildTopics: unknown[] = Array.isArray(body?.child_topics)
+      ? body.child_topics
+      : Array.isArray(body?.childTopics)
+      ? body.childTopics
+      : [];
+    const notSplitReason = String(
+      body?.not_split_reason || body?.notSplitReason || ""
+    ).trim();
     const premises: unknown[] = Array.isArray(body?.premises) ? body.premises : [];
     const reasons: unknown[] = Array.isArray(body?.reasons) ? body.reasons : [];
     const conflicts: Conflict[] = Array.isArray(body?.conflicts) ? body.conflicts : [];
@@ -388,7 +523,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (claim.length > MAX_DRAFT_CLAIM_LENGTH) {
+    const draftClaim = buildExternalAiDraftClaim({
+      claim,
+      aiAnswerShort,
+      aiAnswerDetail,
+      aiAnswer,
+      supplements: toCleanStringArray(draftSupplements, 8),
+      childTopics: toCleanStringArray(draftChildTopics, 8),
+      notSplitReason,
+    });
+
+    if (draftClaim.length > MAX_DRAFT_CLAIM_LENGTH) {
       return NextResponse.json(
         { success: false, error: "投稿候補の本文が長すぎます。短くしてから投稿してください。" },
         { status: 400 }
@@ -429,7 +574,7 @@ export async function POST(req: NextRequest) {
 
     const totalDraftLength =
       title.length +
-      claim.length +
+      draftClaim.length +
       premises.reduce<number>((sum, premise) => sum + textLength(premise), 0) +
       reasons.reduce<number>((sum, reason) => sum + textLength(reason), 0) +
       conflicts.reduce<number>((sum, conflict) => sum + conflictTextLength(conflict), 0);
@@ -477,7 +622,7 @@ export async function POST(req: NextRequest) {
       .insert({
         title,
         slug,
-        original_post: claim,
+        original_post: draftClaim,
         category: null,
         ai_summary: null,
         is_deleted: false,
@@ -505,7 +650,7 @@ export async function POST(req: NextRequest) {
     }[] = [
     {
       thread_id: threadId,
-      content: claim,
+      content: draftClaim,
       source_type: postType === "auto" ? "ai" : "human",
       post_role: "issue_raise",
       trust_status: "trusted",
@@ -585,10 +730,10 @@ export async function POST(req: NextRequest) {
     }
 
     const rawInitialAiAnswer =
-      extractAiAnswerFromClaim(claim) || buildInitialSummaryText(claim, title);
+      extractAiAnswerFromClaim(draftClaim) || buildInitialSummaryText(draftClaim, title);
     const initialAiAnswer = buildLayeredInitialSummaryText(
       rawInitialAiAnswer,
-      claim,
+      draftClaim,
       title
     );
 
@@ -613,7 +758,7 @@ export async function POST(req: NextRequest) {
         .from("thread_ai_structures")
         .insert({
           thread_id: threadId,
-          original_post: claim,
+          original_post: draftClaim,
           normalized_theme: title,
           summary_text: initialAiAnswer,
           easy_summary_text: shortText(initialAiAnswer),

@@ -706,6 +706,9 @@ function extractLabeledExternalAiSection(
 function extractExternalAiAnswer(originalPost?: string | null) {
   const text = originalPost ?? "";
   const stopLabels = [
+    "【誰でも分かる説明】",
+    "【もう少し詳しい説明】",
+    "【深層・専門的な補足】",
     "短く言うと:",
     "短く言うと：",
     "もう少し詳しく:",
@@ -730,19 +733,30 @@ function extractExternalAiAnswer(originalPost?: string | null) {
 
   const shortAnswer = extractLabeledExternalAiSection(
     text,
-    ["短く言うと:", "短く言うと："],
-    stopLabels.filter((label) => !["短く言うと:", "短く言うと："].includes(label))
+    ["【誰でも分かる説明】", "短く言うと:", "短く言うと："],
+    stopLabels.filter(
+      (label) => !["【誰でも分かる説明】", "短く言うと:", "短く言うと："].includes(label)
+    )
   );
   const detailedAnswer = extractLabeledExternalAiSection(
     text,
-    ["もう少し詳しく:", "もう少し詳しく："],
-    stopLabels.filter((label) => !["もう少し詳しく:", "もう少し詳しく："].includes(label))
+    ["【もう少し詳しい説明】", "もう少し詳しく:", "もう少し詳しく："],
+    stopLabels.filter(
+      (label) =>
+        !["【もう少し詳しい説明】", "もう少し詳しく:", "もう少し詳しく："].includes(label)
+    )
+  );
+  const deepAnswer = extractLabeledExternalAiSection(
+    text,
+    ["【深層・専門的な補足】"],
+    stopLabels.filter((label) => label !== "【深層・専門的な補足】")
   );
 
-  if (shortAnswer || detailedAnswer) {
+  if (shortAnswer || detailedAnswer || deepAnswer) {
     return [
       shortAnswer ? `【誰でも分かる説明】\n${shortAnswer}` : "",
       detailedAnswer ? `【もう少し詳しい説明】\n${detailedAnswer}` : "",
+      deepAnswer ? `【深層・専門的な補足】\n${deepAnswer}` : "",
     ]
       .filter(Boolean)
       .join("\n\n");
@@ -783,6 +797,9 @@ function extractExternalAiAnswerFromTexts(values: Array<string | null | undefine
 function stripExternalAiInternalSections(value?: string | null) {
   const text = value ?? "";
   const labels = [
+    "【誰でも分かる説明】",
+    "【もう少し詳しい説明】",
+    "【深層・専門的な補足】",
     "短く言うと:",
     "短く言うと：",
     "もう少し詳しく:",

@@ -674,12 +674,12 @@ function buildCandidateClaim(candidate: ExternalAiCandidate) {
   const childTopics = safeItems(candidate.child_topics);
   const answerParts = [
     candidate.ai_answer_short
-      ? `短く言うと:\n${candidate.ai_answer_short}`
+      ? `【誰でも分かる説明】\n${candidate.ai_answer_short}`
       : "",
     candidate.ai_answer_detail
-      ? `もう少し詳しく:\n${candidate.ai_answer_detail}`
+      ? `【もう少し詳しい説明】\n${candidate.ai_answer_detail}`
       : "",
-    !candidate.ai_answer_short && !candidate.ai_answer_detail && candidate.ai_answer
+    candidate.ai_answer
       ? `AI回答・整理:\n${candidate.ai_answer}`
       : "",
   ].filter(Boolean);
@@ -946,6 +946,12 @@ export default function ExternalAiImportModal({
       tenantSlug: tenant,
       title: candidate.title || candidate.question || "外部AI整理からの投稿",
       claim: buildCandidateClaim(candidate),
+      ai_answer_short: candidate.ai_answer_short,
+      ai_answer_detail: candidate.ai_answer_detail,
+      ai_answer: candidate.ai_answer,
+      supplements: safeItems(candidate.supplements),
+      child_topics: safeItems(candidate.child_topics),
+      not_split_reason: candidate.not_split_reason,
       premises,
       reasons: safeItems(candidate.reasons),
       conflicts: risks.map((risk) => ({
