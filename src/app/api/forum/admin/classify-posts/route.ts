@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const MODEL = "gpt-4.1-mini";
-const PROMPT_VERSION = "post_ai_classification_v1";
+const PROMPT_VERSION = "post_ai_classification_v1_ja";
 const MAX_ITEMS = 10;
 const DEFAULT_MAX_ITEMS = 5;
 const TARGET_POST_ROLES = [
@@ -203,6 +203,15 @@ function buildPrompt(
 - 感情表現が中心で論拠が弱い場合は emotional_reaction
 - 明確な誤情報の疑い、断定的な不確実情報、確認が必要な主張は needs_review_or_misinformation_risk
 - JSONのみ返す
+
+Output language rules:
+- Keep classification exactly as one of the English keys listed above.
+- Write reason only in Japanese.
+- Write extracted_premise only in Japanese. If no premise is available, use an empty string.
+- Write extracted_evidence only in Japanese. If no evidence is available, use an empty string.
+- Write each suggested_metrics item in Japanese. If no metric is available, use an empty array.
+- Even if the input text contains English, translate and summarize display fields in Japanese.
+- Do not output English sentences in reason, extracted_premise, extracted_evidence, or suggested_metrics.
 
 スレッド:
 - title: ${compactText(thread.title, 240)}
