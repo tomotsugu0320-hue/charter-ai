@@ -14,6 +14,8 @@ type ExternalAiCandidate = {
   reasons: string[];
   risks: string[];
   supplements: string[];
+  child_topics: string[];
+  not_split_reason: string;
   category: string;
   related_categories: string[];
   sub_category: string;
@@ -270,7 +272,7 @@ ${modeInstruction}
 ${economyPolicyInstruction}
 
 目的：
-雑多な会話ログから、複数の問題・質問・回答・論点・反論・補足を抽出し、掲示板に投稿しやすい形に整理することです。
+雑多な会話ログから、掲示板に投稿しやすい親テーマと、その中に含める子論点・補足・反論を整理することです。
 
 プライバシー保護：
 投稿候補を作る前に、以下を必ず除去・匿名化してください。
@@ -286,15 +288,32 @@ ${economyPolicyInstruction}
 判断に迷う情報は、投稿候補に含めず、一般化してください。
 
 投稿候補数と整理方針：
-投稿候補は最大10件までにしてください。
+会話ログ内に中心テーマが1つしかない場合、投稿候補は原則1件にまとめてください。
+複数投稿に分けるのは、問い・結論・論点対象が明確に別テーマの場合だけにしてください。
+同じテーマ内の補足・反論・具体例・枝論点は、独立投稿にせず、1つの投稿候補内の関連論点や子論点としてまとめてください。
+投稿候補は多くても3件までを基本にしてください。
+AIが迷う場合は、分割より統合を優先してください。
+出力前に必ず「この話は同じ親テーマに統合できるか？」を判定してください。
+親テーマの問いは、後から子論点を追加できるように、できるだけ広く作ってください。
 重要度が高いと思われる順に並べてください。
 似ている論点・重複する質問は、別々に出さず、1つの投稿候補に統合してください。
 細かすぎる話題は、必要に応じて大きな論点へまとめてください。
 
+分割してよい例：
+- 税制の話とAI著作権の話のように、問いも結論も対象分野も別である
+- 政策判断の話と個人の生活相談の話のように、投稿先カテゴリーが明確に別である
+
+分割してはいけない例：
+- 同じ主張を言い換えただけの投稿候補を複数作る
+- 1つの政策テーマを細切れにして5件以上にする
+- 補足説明だけを独立投稿にする
+- 反論だけを親テーマなしで独立投稿にする
+
 ルール：
 - 個人情報、住所、電話番号、氏名、メールアドレス、個人的すぎる内容は除去または匿名化してください。
 - 雑談や投稿に不要な内容は除外してください。
-- 複数の論点がある場合は、論点ごとに分けてください。
+- 複数の論点があっても、同じ親テーマに属する場合は1つの投稿候補にまとめてください。
+- 別投稿にした場合は、別テーマとして分けた理由が分かるようにしてください。
 - 事実と推測を混同しないでください。
 - 断定しすぎず、必要に応じて「可能性がある」と表現してください。
 - 各投稿候補に main_category を必ず1つ付けてください。
@@ -322,6 +341,8 @@ ${economyPolicyFinalCheck}
       "reasons": ["根拠1", "根拠2"],
       "risks": ["反論・リスク1", "反論・リスク2"],
       "supplements": ["補足1", "補足2"],
+      "child_topics": ["子論点候補1", "子論点候補2"],
+      "not_split_reason": "同じ親テーマに統合した理由",
       "category": "主カテゴリー",
       "node": "候補ノード"
     }
@@ -484,6 +505,19 @@ function normalizeCandidate(value: unknown): ExternalAiCandidate | null {
     toText(record.content);
   const mainCategory = toText(record.main_category) || toText(record.category);
   const subCategory = toText(record.sub_category);
+  const childTopics =
+    toTextArray(record.child_topics).length > 0
+      ? toTextArray(record.child_topics)
+      : toTextArray(record.child_issues).length > 0
+      ? toTextArray(record.child_issues)
+      : toTextArray(record.sub_topics).length > 0
+      ? toTextArray(record.sub_topics)
+      : toTextArray(record.related_points);
+  const notSplitReason =
+    toText(record.not_split_reason) ||
+    toText(record.merge_reason) ||
+    toText(record.consolidation_reason) ||
+    toText(record.not_separated_reason);
 
   if (!title && !question && !aiAnswer) {
     return null;
@@ -497,6 +531,8 @@ function normalizeCandidate(value: unknown): ExternalAiCandidate | null {
     reasons: toTextArray(record.reasons),
     risks: toTextArray(record.risks),
     supplements: toTextArray(record.supplements),
+    child_topics: childTopics,
+    not_split_reason: notSplitReason,
     category: mainCategory,
     related_categories: toTextArray(record.related_categories),
     sub_category: subCategory,
@@ -595,10 +631,15 @@ function safeItems(items: string[] | undefined) {
 
 function buildCandidateClaim(candidate: ExternalAiCandidate) {
   const supplements = safeItems(candidate.supplements);
+  const childTopics = safeItems(candidate.child_topics);
   const parts = [
     candidate.question,
     candidate.ai_answer ? `AI回答・整理:\n${candidate.ai_answer}` : "",
     supplements.length ? `補足:\n${supplements.join("\n")}` : "",
+    childTopics.length ? `子論点候補:\n${childTopics.join("\n")}` : "",
+    candidate.not_split_reason
+      ? `分割しなかった理由:\n${candidate.not_split_reason}`
+      : "",
   ].filter(Boolean);
 
   return parts.join("\n\n") || candidate.title || "外部AI整理からの投稿";
@@ -613,6 +654,8 @@ function buildPrivateLogCandidate(candidate: ExternalAiCandidate) {
     reasons: safeItems(candidate.reasons),
     risks: safeItems(candidate.risks),
     supplements: safeItems(candidate.supplements),
+    child_topics: safeItems(candidate.child_topics),
+    not_split_reason: candidate.not_split_reason,
     category: candidate.category,
     main_category: candidate.category,
     related_categories: safeItems(candidate.related_categories),
@@ -1810,29 +1853,50 @@ export default function ExternalAiImportModal({
                             style={{ ...inputStyle, marginTop: 6 }}
                           />
                         </label>
-                        {(["premises", "reasons", "risks", "supplements"] as const).map(
-                          (field) => (
-                            <label key={field} style={labelStyle}>
-                              {field === "premises"
-                                ? "前提"
-                                : field === "reasons"
-                                ? "根拠"
-                                : field === "risks"
-                                ? "反論・リスク"
-                                : "補足"}
-                              <textarea
-                                value={candidate[field].join("\n")}
-                                onChange={(event) =>
-                                  updateCandidate(index, {
-                                    [field]: linesToArray(event.target.value),
-                                  })
-                                }
-                                rows={3}
-                                style={{ ...inputStyle, marginTop: 6 }}
-                              />
-                            </label>
-                          )
-                        )}
+                        {(
+                          [
+                            "premises",
+                            "reasons",
+                            "risks",
+                            "supplements",
+                            "child_topics",
+                          ] as const
+                        ).map((field) => (
+                          <label key={field} style={labelStyle}>
+                            {field === "premises"
+                              ? "前提"
+                              : field === "reasons"
+                              ? "根拠"
+                              : field === "risks"
+                              ? "反論・リスク"
+                              : field === "child_topics"
+                              ? "子論点候補"
+                              : "補足"}
+                            <textarea
+                              value={candidate[field].join("\n")}
+                              onChange={(event) =>
+                                updateCandidate(index, {
+                                  [field]: linesToArray(event.target.value),
+                                })
+                              }
+                              rows={3}
+                              style={{ ...inputStyle, marginTop: 6 }}
+                            />
+                          </label>
+                        ))}
+                        <label style={labelStyle}>
+                          分割しなかった理由
+                          <textarea
+                            value={candidate.not_split_reason}
+                            onChange={(event) =>
+                              updateCandidate(index, {
+                                not_split_reason: event.target.value,
+                              })
+                            }
+                            rows={2}
+                            style={{ ...inputStyle, marginTop: 6 }}
+                          />
+                        </label>
                         <div
                           style={{
                             display: "grid",
@@ -1921,6 +1985,10 @@ export default function ExternalAiImportModal({
                         <ListBlock label="根拠" items={candidate.reasons} />
                         <ListBlock label="反論・リスク" items={candidate.risks} />
                         <ListBlock label="補足" items={candidate.supplements} />
+                        <ListBlock label="子論点候補" items={candidate.child_topics} />
+                        <FieldBlock label="分割しなかった理由">
+                          {candidate.not_split_reason}
+                        </FieldBlock>
                         <div
                           style={{
                             display: "grid",
