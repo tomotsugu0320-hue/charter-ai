@@ -1172,15 +1172,6 @@ const [explanations, setExplanations] = useState<Record<string, string>>({});
 const [feedbackLoadingPostId, setFeedbackLoadingPostId] = useState<string | null>(null);
 
 
-const [mode, setMode] = useState<"normal" | "easy">("normal");
-useEffect(() => {
-  const saved = localStorage.getItem("forum_default_mode");
-  if (saved === "easy" || saved === "normal") {
-    setMode(saved);
-  }
-}, []);
-
-
 const [summaryLoading, setSummaryLoading] = useState(false);
 const [summaryNotice, setSummaryNotice] = useState<string | null>(null);
 
@@ -2059,10 +2050,6 @@ const useExternalAiAnswerFallback = shouldPreferExternalAiAnswer(
 const displaySummaryText = useExternalAiAnswerFallback
   ? externalAiAnswerFromThreadContent
   : storedSummaryText;
-const displayEasySummaryText = useExternalAiAnswerFallback
-  ? parseLayeredProvisionalAnswer(externalAiAnswerFromThreadContent).simple ||
-    compactText(externalAiAnswerFromThreadContent, 160)
-  : summary?.easy_summary_text?.trim() ?? "";
 const summaryProvisionalAnswer = useExternalAiAnswerFallback
   ? externalAiAnswerFromThreadContent
   : summary?.provisional_answer?.trim() ?? "";
@@ -2700,17 +2687,6 @@ function renderDiscussionCard({
         </div>
       ) : (
         <>
-
-
-<div style={{ marginBottom: 12 }}>
-  <PrimaryButton
-    onClick={() => setMode(mode === "normal" ? "easy" : "normal")}
-  >
-    {mode === "normal"
-      ? "🐵 やさしくする（小学生向け）"
-      : "🧠 通常表示に戻す"}
-  </PrimaryButton>
-</div>
 
 
 <SectionCard variant="info">
@@ -3672,7 +3648,7 @@ function renderDiscussionCard({
       minHeight: 44,
     }}
   >
-    <span>{mode === "normal" ? "この議論の要約を見る" : "全体理解（やさしい要約）を見る"}</span>
+    <span>この議論の要約を見る</span>
     <span
       style={{
         fontSize: currentFont.base * 0.85,
@@ -3707,8 +3683,7 @@ function renderDiscussionCard({
       color: "#111",
     }}
   >
-
-{mode === "normal" ? "この議論の要約" : "🐵 全体理解（やさしい要約）"}
+この議論の要約
   </h2>
 <PrimaryButton
   onClick={jumpToMainIssues}
@@ -3726,9 +3701,7 @@ function renderDiscussionCard({
 
 </div>
 
-    {mode === "normal" ? (
-      <>
-        {!summaryLoading && (
+    {!summaryLoading && (
 
 <PrimaryButton
   onClick={(e) => {
@@ -3773,24 +3746,6 @@ function renderDiscussionCard({
   </div>
 )}
         </div>
-      </>
-    ) : (
-      <div
-        style={{
-          marginTop: 14,
-          fontSize: currentFont.base,
-          lineHeight: 1.8,
-        }}
-      >
-{displayEasySummaryText ? (
-  displayEasySummaryText
-) : (
-  <div style={{ color: "#999" }}>
-    まだやさしい要約はありません。
-  </div>
-)}
-      </div>
-    )}
   </div>
 
 
