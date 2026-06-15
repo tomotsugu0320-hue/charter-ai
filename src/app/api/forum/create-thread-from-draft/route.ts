@@ -490,6 +490,9 @@ export async function POST(req: NextRequest) {
 
     const title = String(body?.title || "").trim();
     const claim = String(body?.claim || "").trim();
+    const category = String(
+      body?.category || body?.main_category || body?.mainCategory || ""
+    ).trim();
     const aiAnswerShort = String(body?.ai_answer_short || body?.aiAnswerShort || "").trim();
     const aiAnswerDetail = String(body?.ai_answer_detail || body?.aiAnswerDetail || "").trim();
     const aiAnswer = String(body?.ai_answer || body?.aiAnswer || "").trim();
@@ -623,7 +626,7 @@ export async function POST(req: NextRequest) {
         title,
         slug,
         original_post: draftClaim,
-        category: null,
+        category: category || null,
         ai_summary: null,
         is_deleted: false,
       })
