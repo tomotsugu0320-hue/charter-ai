@@ -2133,6 +2133,9 @@ const classifiedSummaryHighlights = Array.from(
     ].filter(Boolean)
   )
 ).slice(0, 3);
+const classifiedSummaryEasyText = summary?.easy_summary_text?.trim() ?? "";
+const classifiedSummaryDetailFallbackText =
+  classifiedSummaryConclusions.length > 0 ? "" : summary?.summary_text?.trim() ?? "";
 const classifiedSummarySections = [
   {
     key: "discussion-position",
@@ -2177,9 +2180,13 @@ const classifiedSummarySections = [
   .filter((section) => section.items.length > 0);
 const shouldShowClassifiedSummary =
   summary?.summary_type === "thread_summary_from_classifications" ||
+  Boolean(classifiedSummaryEasyText) ||
+  Boolean(classifiedSummaryDetailFallbackText) ||
   classifiedSummaryConclusions.length > 0 ||
   classifiedSummaryHighlights.length > 0 ||
   classifiedSummarySections.length > 0;
+const shouldShowClassifiedSummaryDetails =
+  classifiedSummaryHighlights.length > 0 || classifiedSummarySections.length > 0;
 
 /*
 const oldPremiseSectionTitle = hasInferred(displayPremiseItems)
@@ -3290,7 +3297,7 @@ function renderDiscussionCard({
       AI分類済みコメントを材料に、議論後の変化を整理したものです。分類は補助判断であり、確定判定ではありません。
     </div>
 
-    {classifiedSummaryConclusions.length > 0 && (
+    {classifiedSummaryEasyText && (
       <div
         style={{
           marginTop: 12,
@@ -3309,8 +3316,44 @@ function renderDiscussionCard({
             marginBottom: 6,
           }}
         >
-          まず読むべき結論
+          誰でも分かりやすい説明
         </div>
+        <div
+          style={{
+            color: "#1e293b",
+            fontSize: currentFont.base * 0.95,
+            lineHeight: 1.7,
+            whiteSpace: "pre-line",
+          }}
+        >
+          {compactText(classifiedSummaryEasyText, 180)}
+        </div>
+      </div>
+    )}
+
+    {(classifiedSummaryConclusions.length > 0 ||
+      classifiedSummaryDetailFallbackText) && (
+      <div
+        style={{
+          marginTop: 10,
+          border: "1px solid #dbeafe",
+          borderRadius: 10,
+          background: "#ffffff",
+          padding: 12,
+        }}
+      >
+        <div
+          style={{
+            color: "#1e40af",
+            fontSize: currentFont.base * 0.95,
+            fontWeight: 900,
+            lineHeight: 1.4,
+            marginBottom: 6,
+          }}
+        >
+          もう少し詳しい説明
+        </div>
+        {classifiedSummaryConclusions.length > 0 ? (
         <ul
           style={{
             margin: 0,
@@ -3326,11 +3369,23 @@ function renderDiscussionCard({
             </li>
           ))}
         </ul>
+        ) : (
+          <div
+            style={{
+              color: "#1e293b",
+              fontSize: currentFont.base * 0.95,
+              lineHeight: 1.7,
+              whiteSpace: "pre-line",
+            }}
+          >
+            {compactText(classifiedSummaryDetailFallbackText, 260)}
+          </div>
+        )}
       </div>
     )}
 
-    {classifiedSummaryHighlights.length > 0 && (
-      <div
+    {shouldShowClassifiedSummaryDetails && (
+      <details
         style={{
           marginTop: 10,
           border: "1px solid #e2e8f0",
@@ -3339,80 +3394,106 @@ function renderDiscussionCard({
           padding: 12,
         }}
       >
-        <div
+        <summary
           style={{
             color: "#334155",
             fontSize: currentFont.base * 0.95,
             fontWeight: 900,
             lineHeight: 1.4,
-            marginBottom: 6,
+            cursor: "pointer",
           }}
         >
-          今回の重要ポイント
-        </div>
-        <ul
-          style={{
-            margin: 0,
-            paddingLeft: 18,
-            color: "#475569",
-            fontSize: currentFont.base * 0.92,
-            lineHeight: 1.65,
-          }}
-        >
-          {classifiedSummaryHighlights.map((item, index) => (
-            <li key={`classified-highlight-${index}`}>
-              {compactText(item, 130)}
-            </li>
-          ))}
-        </ul>
-      </div>
-    )}
+          もっと詳しく見る
+        </summary>
 
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
-        gap: 10,
-        marginTop: 12,
-      }}
-    >
-      {classifiedSummarySections.map((section) => (
-        <section
-          key={section.key}
+        {classifiedSummaryHighlights.length > 0 && (
+          <div
           style={{
-            border: "1px solid #dbeafe",
-            borderRadius: 8,
-            background: "#ffffff",
-            padding: 10,
+              marginTop: 10,
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              background: "#f8fafc",
+              padding: 10,
           }}
         >
           <div
             style={{
-              color: "#1e40af",
-              fontSize: currentFont.base * 0.9,
+                color: "#334155",
+                fontSize: currentFont.base * 0.92,
               fontWeight: 900,
               lineHeight: 1.4,
               marginBottom: 6,
             }}
           >
-            {section.title}
+              今回の重要ポイント
           </div>
           <ul
             style={{
               margin: 0,
               paddingLeft: 18,
-              color: "#334155",
+                color: "#475569",
               fontSize: currentFont.base * 0.92,
               lineHeight: 1.65,
             }}
           >
-            {section.items.map((item, index) => (
-              <li key={`${section.key}-${index}`}>{compactText(item, 130)}</li>
+              {classifiedSummaryHighlights.map((item, index) => (
+                <li key={`classified-highlight-${index}`}>
+                  {compactText(item, 130)}
+                </li>
             ))}
           </ul>
-        </section>
-      ))}
-    </div>
+          </div>
+        )}
+
+        {classifiedSummarySections.length > 0 && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+              gap: 10,
+              marginTop: 12,
+            }}
+          >
+            {classifiedSummarySections.map((section) => (
+              <section
+                key={section.key}
+                style={{
+                  border: "1px solid #dbeafe",
+                  borderRadius: 8,
+                  background: "#ffffff",
+                  padding: 10,
+                }}
+              >
+                <div
+                  style={{
+                    color: "#1e40af",
+                    fontSize: currentFont.base * 0.9,
+                    fontWeight: 900,
+                    lineHeight: 1.4,
+                    marginBottom: 6,
+                  }}
+                >
+                  {section.title}
+                </div>
+                <ul
+                  style={{
+                    margin: 0,
+                    paddingLeft: 18,
+                    color: "#334155",
+                    fontSize: currentFont.base * 0.92,
+                    lineHeight: 1.65,
+                  }}
+                >
+                  {section.items.map((item, index) => (
+                    <li key={`${section.key}-${index}`}>{compactText(item, 130)}</li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+        )}
+      </details>
+    )}
   </div>
 )}
 
