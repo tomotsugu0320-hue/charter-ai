@@ -71,6 +71,16 @@ function getPostThread(post: ForumPostRow) {
   return post.forum_threads ?? null;
 }
 
+function getLogicScoreVersionStatus(version: LogicScoreVersionRow) {
+  if (typeof version.logic_score !== "number" || !String(version.logic_score_reason ?? "").trim()) {
+    return "empty";
+  }
+  if (version.is_applied === true && Boolean(version.applied_at)) {
+    return "applied";
+  }
+  return "unapplied";
+}
+
 export async function GET(request: NextRequest) {
   if (!isForumAdminAuthenticated(request)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -165,6 +175,7 @@ export async function GET(request: NextRequest) {
         logic_score_reason: version.logic_score_reason,
         logic_break_type: version.logic_break_type,
         logic_break_note: version.logic_break_note,
+        version_status: getLogicScoreVersionStatus(version),
         input_tokens: version.input_tokens,
         output_tokens: version.output_tokens,
         total_tokens: version.total_tokens,

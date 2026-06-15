@@ -8,6 +8,7 @@ type PeriodFilter = "six_months" | "one_year" | "all";
 type TargetKind = "thread_summary" | "logic_score" | "both";
 type VersionStatusFilter = "all" | "unapplied" | "applied" | "empty";
 type VersionStatus = "unapplied" | "applied" | "empty";
+type LogicScoreVersionStatus = "unapplied" | "applied" | "empty";
 
 type SampleTarget = {
   target_type: string;
@@ -180,6 +181,7 @@ type LogicScoreVersion = {
   logic_score_reason?: string | null;
   logic_break_type?: string | null;
   logic_break_note?: string | null;
+  version_status?: LogicScoreVersionStatus;
   input_tokens?: number | null;
   output_tokens?: number | null;
   total_tokens?: number | null;
@@ -348,6 +350,19 @@ function getVersionStatusMeta(status: VersionStatus) {
     background: "#eff6ff",
     color: "#1d4ed8",
   };
+}
+
+function getLogicScoreVersionStatus(version: LogicScoreVersion): LogicScoreVersionStatus {
+  if (version.version_status === "unapplied" || version.version_status === "applied" || version.version_status === "empty") {
+    return version.version_status;
+  }
+  if (typeof version.logic_score !== "number" || !String(version.logic_score_reason ?? "").trim()) {
+    return "empty";
+  }
+  if (version.is_applied === true && Boolean(version.applied_at)) {
+    return "applied";
+  }
+  return "unapplied";
 }
 
 function VersionStatusBadge({ status }: { status: VersionStatus }) {
@@ -1350,11 +1365,16 @@ export default function ForumAdminBulkRefreshPreviewPage() {
             </div>
           ) : (
             <div style={{ display: "grid", gap: 12 }}>
-              {logicScoreVersions.map((version) => (
+              {logicScoreVersions.map((version) => {
+                const logicScoreStatus = getLogicScoreVersionStatus(version);
+                const logicScoreStatusMeta = getVersionStatusMeta(logicScoreStatus);
+                const canApplyLogicScoreVersion = logicScoreStatus === "unapplied";
+
+                return (
                 <article
                   key={version.id}
                   style={{
-                    border: `1px solid ${version.is_applied ? "#bbf7d0" : "#dbe3ef"}`,
+                    border: `1px solid ${logicScoreStatusMeta.border}`,
                     borderRadius: 10,
                     background: "#ffffff",
                     padding: 14,
@@ -1375,31 +1395,49 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
                         <span
                           style={{
-                            border: `1px solid ${version.is_applied ? "#86efac" : "#bfdbfe"}`,
+                            border: `1px solid ${logicScoreStatusMeta.border}`,
                             borderRadius: 999,
-                            background: version.is_applied ? "#dcfce7" : "#eff6ff",
-                            color: version.is_applied ? "#166534" : "#1d4ed8",
+                            background: logicScoreStatusMeta.background,
+                            color: logicScoreStatusMeta.color,
                             fontSize: 12,
                             fontWeight: 900,
                             padding: "4px 8px",
                           }}
                         >
-                          {version.is_applied ? "適用済み" : "未適用"}
+                          {logicScoreStatusMeta.label}
                         </span>
                         <span
                           style={{
-                            border: `1px solid ${version.is_applied ? "#86efac" : "#fde68a"}`,
+                            border: `1px solid ${
+                              logicScoreStatus === "applied"
+                                ? "#86efac"
+                                : logicScoreStatus === "empty"
+                                  ? "#fdba74"
+                                  : "#fde68a"
+                            }`,
                             borderRadius: 999,
-                            background: version.is_applied ? "#dcfce7" : "#fffbeb",
-                            color: version.is_applied ? "#166534" : "#92400e",
+                            background:
+                              logicScoreStatus === "applied"
+                                ? "#dcfce7"
+                                : logicScoreStatus === "empty"
+                                  ? "#ffedd5"
+                                  : "#fffbeb",
+                            color:
+                              logicScoreStatus === "applied"
+                                ? "#166534"
+                                : logicScoreStatus === "empty"
+                                  ? "#9a3412"
+                                  : "#92400e",
                             fontSize: 12,
                             fontWeight: 900,
                             padding: "4px 8px",
                           }}
                         >
-                          {version.is_applied
+                          {logicScoreStatus === "applied"
                             ? `applied_at: ${formatDate(version.applied_at)}`
-                            : "1件だけ適用候補"}
+                            : logicScoreStatus === "empty"
+                              ? "適用不可"
+                              : "確認待ち"}
                         </span>
                       </div>
                       <h3 style={{ margin: 0, fontSize: 17, lineHeight: 1.4 }}>
@@ -1506,7 +1544,7 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                     </div>
                   </div>
 
-                  {!version.is_applied ? (
+                  {canApplyLogicScoreVersion ? (
                     <div
                       style={{
                         border: "1px solid #fde68a",
@@ -1557,6 +1595,20 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                         </button>
                       </div>
                     </div>
+                  ) : logicScoreStatus === "empty" ? (
+                    <div
+                      style={{
+                        border: "1px solid #fdba74",
+                        borderRadius: 8,
+                        background: "#fff7ed",
+                        color: "#9a3412",
+                        fontWeight: 800,
+                        lineHeight: 1.7,
+                        padding: 12,
+                      }}
+                    >
+                      本文なし / 失敗versionのため、この画面からは適用できません。
+                    </div>
                   ) : (
                     <div
                       style={{
@@ -1597,6 +1649,10 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                       <div>{version.is_applied ? "true" : "false"}</div>
                     </div>
                     <div>
+                      <div style={labelStyle}>状態</div>
+                      <div>{logicScoreStatusMeta.label}</div>
+                    </div>
+                    <div>
                       <div style={labelStyle}>total_tokens</div>
                       <div>{formatNumber(version.total_tokens)}</div>
                     </div>
@@ -1614,7 +1670,8 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                     </div>
                   </div>
                 </article>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
