@@ -10,9 +10,15 @@ type ExternalAiCandidate = {
   title: string;
   question: string;
   ai_answer: string;
+  ai_answer_short: string;
+  ai_answer_detail: string;
   premises: string[];
+  visible_premises: string[];
+  hidden_premises: string[];
   reasons: string[];
   risks: string[];
+  visible_risks: string[];
+  hidden_risks: string[];
   supplements: string[];
   child_topics: string[];
   not_split_reason: string;
@@ -299,6 +305,16 @@ AIが迷う場合は、分割より統合を優先してください。
 似ている論点・重複する質問は、別々に出さず、1つの投稿候補に統合してください。
 細かすぎる話題は、必要に応じて大きな論点へまとめてください。
 
+読みやすさのための2層構造：
+- ai_answer は従来互換用に必ず残してください。
+- ai_answer_short は、中学生でも分かる短い説明にしてください。専門用語をなるべく避け、まず結論を示してください。
+- ai_answer_detail は、専門的な因果関係・条件分岐・検証指標を含む詳しい説明にしてください。
+- visible_premises は、一般ユーザーに最初から見せる重要前提を2〜3件までにしてください。
+- hidden_premises は、残りの詳しい前提・確認条件を入れてください。
+- visible_risks は、本質的な反論・リスクを最大3件までにしてください。
+- hidden_risks は、補足的な反論・リスクを入れてください。
+- premises / risks は従来互換用に残しつつ、visible / hidden の分け方を優先してください。
+
 分割してよい例：
 - 税制の話とAI著作権の話のように、問いも結論も対象分野も別である
 - 政策判断の話と個人の生活相談の話のように、投稿先カテゴリーが明確に別である
@@ -337,9 +353,15 @@ ${economyPolicyFinalCheck}
       "title": "投稿タイトル案",
       "question": "問題・質問",
       "ai_answer": "AI回答・整理",
+      "ai_answer_short": "誰でも分かる短い説明",
+      "ai_answer_detail": "専門的な因果関係・条件分岐・検証指標を含む詳しい説明",
       "premises": ["前提1", "前提2"],
+      "visible_premises": ["最初から見せる前提1", "最初から見せる前提2"],
+      "hidden_premises": ["詳しい前提1"],
       "reasons": ["根拠1", "根拠2"],
       "risks": ["反論・リスク1", "反論・リスク2"],
+      "visible_risks": ["本質的な反論・リスク1", "本質的な反論・リスク2"],
+      "hidden_risks": ["補足的な反論・リスク1"],
       "supplements": ["補足1", "補足2"],
       "child_topics": ["子論点候補1", "子論点候補2"],
       "not_split_reason": "同じ親テーマに統合した理由",
@@ -498,11 +520,14 @@ function normalizeCandidate(value: unknown): ExternalAiCandidate | null {
   const record = isRecord(value) ? value : {};
   const title = toText(record.title);
   const question = toText(record.question);
+  const aiAnswerShort = toText(record.ai_answer_short) || toText(record.short_answer);
+  const aiAnswerDetail = toText(record.ai_answer_detail) || toText(record.detail_answer);
   const aiAnswer =
     toText(record.ai_answer) ||
     toText(record.answer) ||
     toText(record.summary) ||
-    toText(record.content);
+    toText(record.content) ||
+    [aiAnswerShort, aiAnswerDetail].filter(Boolean).join("\n\n");
   const mainCategory = toText(record.main_category) || toText(record.category);
   const subCategory = toText(record.sub_category);
   const childTopics =
@@ -519,7 +544,7 @@ function normalizeCandidate(value: unknown): ExternalAiCandidate | null {
     toText(record.consolidation_reason) ||
     toText(record.not_separated_reason);
 
-  if (!title && !question && !aiAnswer) {
+  if (!title && !question && !aiAnswer && !aiAnswerShort && !aiAnswerDetail) {
     return null;
   }
 
@@ -527,9 +552,15 @@ function normalizeCandidate(value: unknown): ExternalAiCandidate | null {
     title,
     question,
     ai_answer: aiAnswer,
+    ai_answer_short: aiAnswerShort,
+    ai_answer_detail: aiAnswerDetail,
     premises: toTextArray(record.premises),
+    visible_premises: toTextArray(record.visible_premises),
+    hidden_premises: toTextArray(record.hidden_premises),
     reasons: toTextArray(record.reasons),
     risks: toTextArray(record.risks),
+    visible_risks: toTextArray(record.visible_risks),
+    hidden_risks: toTextArray(record.hidden_risks),
     supplements: toTextArray(record.supplements),
     child_topics: childTopics,
     not_split_reason: notSplitReason,
@@ -629,12 +660,32 @@ function safeItems(items: string[] | undefined) {
   return Array.isArray(items) ? items.filter(Boolean) : [];
 }
 
+function uniqueItems(...groups: Array<string[] | undefined>) {
+  const seen = new Set<string>();
+  return groups.flatMap(safeItems).filter((item) => {
+    if (seen.has(item)) return false;
+    seen.add(item);
+    return true;
+  });
+}
+
 function buildCandidateClaim(candidate: ExternalAiCandidate) {
   const supplements = safeItems(candidate.supplements);
   const childTopics = safeItems(candidate.child_topics);
+  const answerParts = [
+    candidate.ai_answer_short
+      ? `短く言うと:\n${candidate.ai_answer_short}`
+      : "",
+    candidate.ai_answer_detail
+      ? `もう少し詳しく:\n${candidate.ai_answer_detail}`
+      : "",
+    !candidate.ai_answer_short && !candidate.ai_answer_detail && candidate.ai_answer
+      ? `AI回答・整理:\n${candidate.ai_answer}`
+      : "",
+  ].filter(Boolean);
   const parts = [
     candidate.question,
-    candidate.ai_answer ? `AI回答・整理:\n${candidate.ai_answer}` : "",
+    ...answerParts,
     supplements.length ? `補足:\n${supplements.join("\n")}` : "",
     childTopics.length ? `子論点候補:\n${childTopics.join("\n")}` : "",
     candidate.not_split_reason
@@ -650,9 +701,15 @@ function buildPrivateLogCandidate(candidate: ExternalAiCandidate) {
     title: candidate.title,
     question: candidate.question,
     ai_answer: candidate.ai_answer,
+    ai_answer_short: candidate.ai_answer_short,
+    ai_answer_detail: candidate.ai_answer_detail,
     premises: safeItems(candidate.premises),
+    visible_premises: safeItems(candidate.visible_premises),
+    hidden_premises: safeItems(candidate.hidden_premises),
     reasons: safeItems(candidate.reasons),
     risks: safeItems(candidate.risks),
+    visible_risks: safeItems(candidate.visible_risks),
+    hidden_risks: safeItems(candidate.hidden_risks),
     supplements: safeItems(candidate.supplements),
     child_topics: safeItems(candidate.child_topics),
     not_split_reason: candidate.not_split_reason,
@@ -875,12 +932,21 @@ export default function ExternalAiImportModal({
   const submitCandidate = async (
     candidate: ExternalAiCandidate
   ): Promise<SubmitResult> => {
-    const risks = safeItems(candidate.risks);
+    const premises = uniqueItems(
+      candidate.visible_premises,
+      candidate.hidden_premises,
+      candidate.premises
+    );
+    const risks = uniqueItems(
+      candidate.visible_risks,
+      candidate.hidden_risks,
+      candidate.risks
+    );
     const body = {
       tenantSlug: tenant,
       title: candidate.title || candidate.question || "外部AI整理からの投稿",
       claim: buildCandidateClaim(candidate),
-      premises: safeItems(candidate.premises),
+      premises,
       reasons: safeItems(candidate.reasons),
       conflicts: risks.map((risk) => ({
         opinion: "",
@@ -1008,11 +1074,21 @@ export default function ExternalAiImportModal({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          text: [candidate.title, candidate.question, candidate.ai_answer]
+          text: [
+            candidate.title,
+            candidate.question,
+            candidate.ai_answer_short,
+            candidate.ai_answer_detail,
+            candidate.ai_answer,
+          ]
             .filter(Boolean)
             .join("\n\n"),
           claim: candidate.question || candidate.title,
-          premises: safeItems(candidate.premises),
+          premises: uniqueItems(
+            candidate.visible_premises,
+            candidate.hidden_premises,
+            candidate.premises
+          ),
           reasons: safeItems(candidate.reasons),
           disableFallback: true,
         }),
@@ -1853,11 +1929,41 @@ export default function ExternalAiImportModal({
                             style={{ ...inputStyle, marginTop: 6 }}
                           />
                         </label>
+                        <label style={labelStyle}>
+                          短い説明
+                          <textarea
+                            value={candidate.ai_answer_short}
+                            onChange={(event) =>
+                              updateCandidate(index, {
+                                ai_answer_short: event.target.value,
+                              })
+                            }
+                            rows={3}
+                            style={{ ...inputStyle, marginTop: 6 }}
+                          />
+                        </label>
+                        <label style={labelStyle}>
+                          詳しい説明
+                          <textarea
+                            value={candidate.ai_answer_detail}
+                            onChange={(event) =>
+                              updateCandidate(index, {
+                                ai_answer_detail: event.target.value,
+                              })
+                            }
+                            rows={4}
+                            style={{ ...inputStyle, marginTop: 6 }}
+                          />
+                        </label>
                         {(
                           [
                             "premises",
+                            "visible_premises",
+                            "hidden_premises",
                             "reasons",
                             "risks",
+                            "visible_risks",
+                            "hidden_risks",
                             "supplements",
                             "child_topics",
                           ] as const
@@ -1865,10 +1971,18 @@ export default function ExternalAiImportModal({
                           <label key={field} style={labelStyle}>
                             {field === "premises"
                               ? "前提"
+                              : field === "visible_premises"
+                              ? "表示する前提"
+                              : field === "hidden_premises"
+                              ? "詳しい前提"
                               : field === "reasons"
                               ? "根拠"
                               : field === "risks"
                               ? "反論・リスク"
+                              : field === "visible_risks"
+                              ? "表示する反論・リスク"
+                              : field === "hidden_risks"
+                              ? "詳しい反論・リスク"
                               : field === "child_topics"
                               ? "子論点候補"
                               : "補足"}
@@ -1978,11 +2092,33 @@ export default function ExternalAiImportModal({
                       <div style={{ display: "grid", gap: 12 }}>
                         <FieldBlock label="タイトル">{candidate.title}</FieldBlock>
                         <FieldBlock label="問題・質問">{candidate.question}</FieldBlock>
+                        <FieldBlock label="短い説明">
+                          {candidate.ai_answer_short}
+                        </FieldBlock>
+                        <FieldBlock label="詳しい説明">
+                          {candidate.ai_answer_detail}
+                        </FieldBlock>
                         <FieldBlock label="AI回答・整理">
                           {candidate.ai_answer}
                         </FieldBlock>
+                        <ListBlock
+                          label="表示する前提"
+                          items={candidate.visible_premises}
+                        />
+                        <ListBlock
+                          label="詳しい前提"
+                          items={candidate.hidden_premises}
+                        />
                         <ListBlock label="前提" items={candidate.premises} />
                         <ListBlock label="根拠" items={candidate.reasons} />
+                        <ListBlock
+                          label="表示する反論・リスク"
+                          items={candidate.visible_risks}
+                        />
+                        <ListBlock
+                          label="詳しい反論・リスク"
+                          items={candidate.hidden_risks}
+                        />
                         <ListBlock label="反論・リスク" items={candidate.risks} />
                         <ListBlock label="補足" items={candidate.supplements} />
                         <ListBlock label="子論点候補" items={candidate.child_topics} />
