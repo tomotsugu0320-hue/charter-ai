@@ -55,6 +55,14 @@ type PostRow = {
   ai_conclusion_explained_at?: string | null;
   ai_counterargument_explanation?: string | null;
   ai_counterargument_explained_at?: string | null;
+  ai_classification?: {
+    classification: string;
+    confidence: number | null;
+    reason: string | null;
+    extracted_premise?: string | null;
+    extracted_evidence?: string | null;
+    suggested_metrics?: string[];
+  } | null;
   feedback_counts?: {
     term_unknown?: number;
     premise_unknown?: number;
