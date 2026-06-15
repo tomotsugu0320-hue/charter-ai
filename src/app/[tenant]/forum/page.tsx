@@ -966,7 +966,6 @@ export default function ForumPage() {
   const [activeThreads, setActiveThreads] = useState<ThreadRow[]>([]);
   const [recentThreads, setRecentThreads] = useState<ThreadRow[]>([]);
   const [rankingMode, setRankingMode] = useState<RankingMode>("score");
-  const [defaultMode, setDefaultMode] = useState<"normal" | "easy">("normal");
   const [fontSizeMode, setFontSizeMode] =
     useState<"small" | "medium" | "large">("medium");
 
@@ -1160,13 +1159,6 @@ export default function ForumPage() {
   useEffect(() => {
     setSearchResultPage(1);
   }, [categoryFilter, node, searchQuery]);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("forum_default_mode");
-    if (saved === "easy" || saved === "normal") {
-      setDefaultMode(saved);
-    }
-  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem("forum_font_size");
@@ -1517,11 +1509,6 @@ export default function ForumPage() {
     }
   }
 
-  function selectMode(mode: "normal" | "easy") {
-    localStorage.setItem("forum_default_mode", mode);
-    setDefaultMode(mode);
-  }
-
   function selectFontSize(size: "small" | "medium" | "large") {
     localStorage.setItem("forum_font_size", size);
     setFontSizeMode(size);
@@ -1576,43 +1563,6 @@ export default function ForumPage() {
             alignItems: "center",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              flexWrap: "wrap",
-              flex: "1 1 280px",
-            }}
-          >
-            <div style={{ fontWeight: 800, minWidth: 92 }}>表示モード：</div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={() => selectMode("normal")}
-                style={{
-                  ...ghostButtonStyle,
-                  background: defaultMode === "normal" ? "#111827" : "#ffffff",
-                  color: defaultMode === "normal" ? "#ffffff" : "#111827",
-                  borderColor: defaultMode === "normal" ? "#111827" : "#cbd5e1",
-                }}
-              >
-                標準
-              </button>
-              <button
-                type="button"
-                onClick={() => selectMode("easy")}
-                style={{
-                  ...ghostButtonStyle,
-                  background: defaultMode === "easy" ? "#111827" : "#ffffff",
-                  color: defaultMode === "easy" ? "#ffffff" : "#111827",
-                  borderColor: defaultMode === "easy" ? "#111827" : "#cbd5e1",
-                }}
-              >
-                やさしい表示
-              </button>
-            </div>
-          </div>
           <div
             style={{
               display: "flex",
@@ -2960,22 +2910,6 @@ export default function ForumPage() {
         >
           <div style={panelStyle}>
             <h2 style={{ margin: 0, fontSize: 22 }}>3. 論点の整理結果</h2>
-            {generatedIssue.easySummary && defaultMode === "easy" && (
-              <div
-                style={{
-                  marginTop: 12,
-                  border: "1px solid #bbf7d0",
-                  borderRadius: 8,
-                  padding: 12,
-                  background: "#f0fdf4",
-                  whiteSpace: "pre-wrap",
-                  lineHeight: 1.9,
-                  fontSize: currentFontSize,
-                }}
-              >
-                {generatedIssue.easySummary}
-              </div>
-            )}
 
             <div style={{ marginTop: 16 }}>
               <div style={labelStyle}>
