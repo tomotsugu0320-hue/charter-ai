@@ -1178,6 +1178,8 @@ export default function ForumThreadPage({ params }: PageProps) {
   const [isForumAdmin, setIsForumAdmin] = useState(false);
   const [classifyLoading, setClassifyLoading] = useState(false);
   const [classifyMessage, setClassifyMessage] = useState<string | null>(null);
+  const [rebuildSummaryLoading, setRebuildSummaryLoading] = useState(false);
+  const [rebuildSummaryMessage, setRebuildSummaryMessage] = useState<string | null>(null);
 
 const [explanations, setExplanations] = useState<Record<string, string>>({});
 const [feedbackLoadingPostId, setFeedbackLoadingPostId] = useState<string | null>(null);
@@ -2320,6 +2322,50 @@ setTimeout(() => {
     }
   }
 
+  async function handleRebuildSummaryFromClassifications() {
+    if (rebuildSummaryLoading || !threadId) return;
+
+    setRebuildSummaryLoading(true);
+    setRebuildSummaryMessage(null);
+
+    try {
+      const res = await fetch(
+        "/api/forum/admin/thread-summary/rebuild-from-classifications",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            thread_id: threadId,
+          }),
+        }
+      );
+      const result = await res.json().catch(() => null);
+
+      if (!res.ok || result?.ok === false) {
+        if (res.status === 401 || res.status === 403) {
+          setIsForumAdmin(false);
+          throw new Error(
+            "管理セッションが切れました。管理トップで再認証してください。"
+          );
+        }
+
+        throw new Error(result?.error || "AI再総括に失敗しました。");
+      }
+
+      const classifiedCount = Number(result?.classified_count ?? 0);
+      const usedCount = Number(result?.used_count ?? 0);
+      setRebuildSummaryMessage(
+        `AI再総括しました（分類済みコメント ${classifiedCount}件 / 使用 ${usedCount}件）。`
+      );
+      await loadThread();
+    } catch (e: any) {
+      console.error(e);
+      setRebuildSummaryMessage(e?.message || "AI再総括に失敗しました。");
+    } finally {
+      setRebuildSummaryLoading(false);
+    }
+  }
+
   async function handlePost() {
     let contentToPost = "";
 
@@ -3431,7 +3477,7 @@ function renderDiscussionCard({
   >
     <div>
       <div style={{ fontWeight: 800, color: "#0f172a" }}>管理者操作</div>
-      <div>未分類コメントを最大5件だけAI分類します。</div>
+      <div>未分類コメントのAI分類と、分類済みコメントを使ったAI再総括を実行できます。</div>
       {classifyMessage && (
         <div
           style={{
@@ -3448,25 +3494,61 @@ function renderDiscussionCard({
           {classifyMessage}
         </div>
       )}
+      {rebuildSummaryMessage && (
+        <div
+          style={{
+            marginTop: 4,
+            color:
+              rebuildSummaryMessage.includes("失敗しました") ||
+              rebuildSummaryMessage.includes("切れました") ||
+              rebuildSummaryMessage.includes("not found")
+                ? "#92400e"
+                : "#475569",
+            fontWeight: 700,
+          }}
+        >
+          {rebuildSummaryMessage}
+        </div>
+      )}
     </div>
-    <button
-      type="button"
-      onClick={() => void handleClassifyPosts()}
-      disabled={classifyLoading}
-      style={{
-        border: "1px solid #cbd5e1",
-        borderRadius: 999,
-        background: classifyLoading ? "#e5e7eb" : "#ffffff",
-        color: classifyLoading ? "#64748b" : "#0f172a",
-        cursor: classifyLoading ? "not-allowed" : "pointer",
-        fontSize: currentFont.base * 0.9,
-        fontWeight: 800,
-        padding: "7px 12px",
-        whiteSpace: "nowrap",
-      }}
-    >
-      {classifyLoading ? "AI分類中..." : "コメントをAI分類"}
-    </button>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+      <button
+        type="button"
+        onClick={() => void handleClassifyPosts()}
+        disabled={classifyLoading}
+        style={{
+          border: "1px solid #cbd5e1",
+          borderRadius: 999,
+          background: classifyLoading ? "#e5e7eb" : "#ffffff",
+          color: classifyLoading ? "#64748b" : "#0f172a",
+          cursor: classifyLoading ? "not-allowed" : "pointer",
+          fontSize: currentFont.base * 0.9,
+          fontWeight: 800,
+          padding: "7px 12px",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {classifyLoading ? "AI分類中..." : "コメントをAI分類"}
+      </button>
+      <button
+        type="button"
+        onClick={() => void handleRebuildSummaryFromClassifications()}
+        disabled={rebuildSummaryLoading}
+        style={{
+          border: "1px solid #cbd5e1",
+          borderRadius: 999,
+          background: rebuildSummaryLoading ? "#e5e7eb" : "#ffffff",
+          color: rebuildSummaryLoading ? "#64748b" : "#0f172a",
+          cursor: rebuildSummaryLoading ? "not-allowed" : "pointer",
+          fontSize: currentFont.base * 0.9,
+          fontWeight: 800,
+          padding: "7px 12px",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {rebuildSummaryLoading ? "AI再総括中..." : "AI再総括"}
+      </button>
+    </div>
   </div>
 )}
 
