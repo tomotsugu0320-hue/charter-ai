@@ -25,7 +25,10 @@ type ConflictPair = {
 };
 
 type StoredSummaryRow = {
+  summary_type?: string | null;
   summary_text?: string | null;
+  easy_summary_text?: string | null;
+  key_points?: unknown;
   issues?: unknown;
   opinions?: unknown;
   rebuttals?: unknown;
@@ -82,6 +85,12 @@ function asStringArray(value: unknown) {
   }
 
   return [];
+}
+
+function asRecord(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 function normalizeSuggestedMetrics(value: unknown) {
@@ -301,6 +310,22 @@ function buildStoredSummaryPayload(
     typeof storedSummary?.summary_text === "string"
       ? storedSummary.summary_text.trim()
       : "";
+  const storedKeyPoints = asRecord(storedSummary?.key_points);
+  const classifiedKeyPoints = {
+    discussion_position: asStringArray(storedKeyPoints.discussion_position),
+    added_premises: asStringArray(storedKeyPoints.added_premises),
+    added_evidence: asStringArray(storedKeyPoints.added_evidence),
+    main_agreements: asStringArray(storedKeyPoints.main_agreements),
+    main_rebuttals: asStringArray(storedKeyPoints.main_rebuttals),
+    verification_metrics: asStringArray(storedKeyPoints.verification_metrics),
+    needs_review: asStringArray(storedKeyPoints.needs_review),
+    changes_from_initial_answer: asStringArray(
+      storedKeyPoints.changes_from_initial_answer
+    ),
+    current_tentative_conclusion: asStringArray(
+      storedKeyPoints.current_tentative_conclusion
+    ),
+  };
   const keyPoints = {
     issues: asStringArray(storedSummary?.issues),
     opinions: asStringArray(storedSummary?.opinions),
@@ -308,7 +333,9 @@ function buildStoredSummaryPayload(
     supplements: asStringArray(storedSummary?.supplements),
     explanations: asStringArray(storedSummary?.explanations),
   };
-  const hasKeyPoints = Object.values(keyPoints).some((items) => items.length > 0);
+  const hasKeyPoints = [...Object.values(keyPoints), ...Object.values(classifiedKeyPoints)].some(
+    (items) => items.length > 0
+  );
 
   if (!summaryText && !hasKeyPoints) return null;
 
@@ -323,8 +350,10 @@ function buildStoredSummaryPayload(
   return {
     summary: {
       counts: buildCounts(posts),
+      summary_type: storedSummary?.summary_type ?? null,
       summary_text,
-      easy_summary_text: shortText(summary_text, 160),
+      easy_summary_text:
+        storedSummary?.easy_summary_text?.trim() || shortText(summary_text, 160),
       provisional_answer: buildProvisionalAnswerFromStored(
         summary_text,
         keyPoints,
@@ -332,6 +361,7 @@ function buildStoredSummaryPayload(
       ),
       key_points: {
         ...keyPoints,
+        ...classifiedKeyPoints,
         premises: toSourceItems(pickPremiseTexts(keyPoints)),
         reasons: toSourceItems([...keyPoints.explanations, ...keyPoints.opinions]),
         counterpoints: toSourceItems(keyPoints.rebuttals),
@@ -487,7 +517,9 @@ if (!thread) {
 
     const { data: storedSummary, error: storedSummaryError } = await supabase
       .from("thread_ai_structures")
-      .select("summary_text, issues, opinions, rebuttals, supplements, explanations")
+      .select(
+        "summary_type, summary_text, easy_summary_text, key_points, issues, opinions, rebuttals, supplements, explanations"
+      )
       .eq("thread_id", threadId)
       .maybeSingle();
 

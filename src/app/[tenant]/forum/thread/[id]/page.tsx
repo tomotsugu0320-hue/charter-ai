@@ -94,6 +94,7 @@ type ThreadSummary = {
     supplement: number;
     explanation: number;
   };
+  summary_type?: string | null;
   summary_text: string;
   easy_summary_text?: string;
   provisional_answer?: string | null;
@@ -106,6 +107,15 @@ type ThreadSummary = {
     premises?: SourceItem[];
     reasons?: SourceItem[];
     counterpoints?: SourceItem[];
+    discussion_position?: string[];
+    added_premises?: string[];
+    added_evidence?: string[];
+    main_agreements?: string[];
+    main_rebuttals?: string[];
+    verification_metrics?: string[];
+    needs_review?: string[];
+    changes_from_initial_answer?: string[];
+    current_tentative_conclusion?: string[];
   };
 };
 
@@ -2097,6 +2107,60 @@ const provisionalAnswerText =
   "まだAIの暫定回答はありません。AIまとめを確認・更新すると表示されます。";
 const layeredProvisionalAnswer =
   parseLayeredProvisionalAnswer(provisionalAnswerText);
+const classifiedSummaryKeyPoints = summary?.key_points;
+const classifiedSummarySections = [
+  {
+    key: "discussion-position",
+    title: "議論後の現在地",
+    items: classifiedSummaryKeyPoints?.discussion_position,
+  },
+  {
+    key: "added-premises",
+    title: "追加された前提",
+    items: classifiedSummaryKeyPoints?.added_premises,
+  },
+  {
+    key: "added-evidence",
+    title: "追加された根拠",
+    items: classifiedSummaryKeyPoints?.added_evidence,
+  },
+  {
+    key: "main-rebuttals",
+    title: "主な反論",
+    items: classifiedSummaryKeyPoints?.main_rebuttals,
+  },
+  {
+    key: "verification-metrics",
+    title: "検証すべき指標",
+    items: classifiedSummaryKeyPoints?.verification_metrics,
+  },
+  {
+    key: "current-tentative-conclusion",
+    title: "現時点の暫定結論",
+    items: classifiedSummaryKeyPoints?.current_tentative_conclusion,
+  },
+  {
+    key: "needs-review",
+    title: "要確認",
+    items: classifiedSummaryKeyPoints?.needs_review,
+  },
+  {
+    key: "changes-from-initial-answer",
+    title: "初期回答からの変化",
+    items: classifiedSummaryKeyPoints?.changes_from_initial_answer,
+  },
+]
+  .map((section) => ({
+    ...section,
+    items: (section.items ?? [])
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 4),
+  }))
+  .filter((section) => section.items.length > 0);
+const shouldShowClassifiedSummary =
+  summary?.summary_type === "thread_summary_from_classifications" ||
+  classifiedSummarySections.length > 0;
 
 /*
 const oldPremiseSectionTitle = hasInferred(displayPremiseItems)
@@ -3173,6 +3237,87 @@ function renderDiscussionCard({
   )}
 
 </div>
+
+{shouldShowClassifiedSummary && (
+  <div
+    style={{
+      marginTop: 16,
+      padding: 14,
+      border: "1px solid #bfdbfe",
+      borderRadius: 10,
+      background: "#f8fbff",
+      color: "#111",
+    }}
+  >
+    <h2
+      style={{
+        margin: 0,
+        fontSize: currentFont.title,
+        fontWeight: 900,
+        lineHeight: 1.4,
+        color: "#1e3a8a",
+      }}
+    >
+      AI再総括（分類済みコメント反映）
+    </h2>
+    <div
+      style={{
+        marginTop: 6,
+        color: "#475569",
+        fontSize: currentFont.base * 0.9,
+        lineHeight: 1.6,
+      }}
+    >
+      AI分類済みコメントを材料に、議論後の変化を整理したものです。分類は補助判断であり、確定判定ではありません。
+    </div>
+
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+        gap: 10,
+        marginTop: 12,
+      }}
+    >
+      {classifiedSummarySections.map((section) => (
+        <section
+          key={section.key}
+          style={{
+            border: "1px solid #dbeafe",
+            borderRadius: 8,
+            background: "#ffffff",
+            padding: 10,
+          }}
+        >
+          <div
+            style={{
+              color: "#1e40af",
+              fontSize: currentFont.base * 0.9,
+              fontWeight: 900,
+              lineHeight: 1.4,
+              marginBottom: 6,
+            }}
+          >
+            {section.title}
+          </div>
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: 18,
+              color: "#334155",
+              fontSize: currentFont.base * 0.92,
+              lineHeight: 1.65,
+            }}
+          >
+            {section.items.map((item, index) => (
+              <li key={`${section.key}-${index}`}>{compactText(item, 130)}</li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  </div>
+)}
 
 {(overviewPremises.length > 0 || overviewReasons.length > 0) && (
   <div
