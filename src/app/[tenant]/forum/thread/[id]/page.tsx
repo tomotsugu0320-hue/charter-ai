@@ -683,26 +683,33 @@ function splitContent(content: string) {
   };
 }
 
-function extractExternalAiAnswer(originalPost?: string | null) {
-  const text = originalPost ?? "";
-  const labels = ["AI回答・整理:", "AI回答・整理："];
+function extractLabeledExternalAiSection(
+  text: string,
+  labels: string[],
+  nextLabels: string[]
+) {
   const matchedLabel = labels.find((label) => text.includes(label));
-
   if (!matchedLabel) return "";
 
   const afterLabel = text.slice(text.indexOf(matchedLabel) + matchedLabel.length).trim();
   if (!afterLabel) return "";
 
-  const nextHeading = afterLabel.search(
-    /\n\s*(補足|前提|根拠|反論|反論・リスク)[:：]/
-  );
+  const nextIndex = nextLabels.reduce<number | null>((current, label) => {
+    const index = afterLabel.indexOf(label);
+    if (index < 0) return current;
+    return current === null ? index : Math.min(current, index);
+  }, null);
 
-  return (nextHeading >= 0 ? afterLabel.slice(0, nextHeading) : afterLabel).trim();
+  return (nextIndex === null ? afterLabel : afterLabel.slice(0, nextIndex)).trim();
 }
 
-function stripExternalAiInternalSections(value?: string | null) {
-  const text = value ?? "";
-  const labels = [
+function extractExternalAiAnswer(originalPost?: string | null) {
+  const text = originalPost ?? "";
+  const stopLabels = [
+    "短く言うと:",
+    "短く言うと：",
+    "もう少し詳しく:",
+    "もう少し詳しく：",
     "AI回答・整理:",
     "AI回答・整理：",
     "補足:",
@@ -715,6 +722,87 @@ function stripExternalAiInternalSections(value?: string | null) {
     "反論・リスク：",
     "反論:",
     "反論：",
+    "子論点候補:",
+    "子論点候補：",
+    "分割しなかった理由:",
+    "分割しなかった理由：",
+  ];
+
+  const shortAnswer = extractLabeledExternalAiSection(
+    text,
+    ["短く言うと:", "短く言うと："],
+    stopLabels.filter((label) => !["短く言うと:", "短く言うと："].includes(label))
+  );
+  const detailedAnswer = extractLabeledExternalAiSection(
+    text,
+    ["もう少し詳しく:", "もう少し詳しく："],
+    stopLabels.filter((label) => !["もう少し詳しく:", "もう少し詳しく："].includes(label))
+  );
+
+  if (shortAnswer || detailedAnswer) {
+    return [
+      shortAnswer ? `【誰でも分かる説明】\n${shortAnswer}` : "",
+      detailedAnswer ? `【もう少し詳しい説明】\n${detailedAnswer}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  const legacyAnswer = extractLabeledExternalAiSection(
+    text,
+    ["AI回答・整理:", "AI回答・整理："],
+    stopLabels.filter((label) => !["AI回答・整理:", "AI回答・整理："].includes(label))
+  );
+  const legacySupplement = extractLabeledExternalAiSection(
+    text,
+    ["補足:", "補足："],
+    stopLabels.filter((label) => !["補足:", "補足："].includes(label))
+  );
+
+  if (legacyAnswer || legacySupplement) {
+    return [
+      legacyAnswer ? `【誰でも分かる説明】\n${legacyAnswer}` : "",
+      legacySupplement ? `【もう少し詳しい説明】\n${legacySupplement}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  return "";
+}
+
+function extractExternalAiAnswerFromTexts(values: Array<string | null | undefined>) {
+  for (const value of values) {
+    const answer = extractExternalAiAnswer(value);
+    if (answer.trim()) return answer;
+  }
+
+  return "";
+}
+
+function stripExternalAiInternalSections(value?: string | null) {
+  const text = value ?? "";
+  const labels = [
+    "短く言うと:",
+    "短く言うと：",
+    "もう少し詳しく:",
+    "もう少し詳しく：",
+    "AI回答・整理:",
+    "AI回答・整理：",
+    "補足:",
+    "補足：",
+    "前提:",
+    "前提：",
+    "根拠:",
+    "根拠：",
+    "反論・リスク:",
+    "反論・リスク：",
+    "反論:",
+    "反論：",
+    "子論点候補:",
+    "子論点候補：",
+    "分割しなかった理由:",
+    "分割しなかった理由：",
   ];
   const firstLabelIndex = labels.reduce<number | null>((current, label) => {
     const index = text.indexOf(label);
@@ -723,6 +811,39 @@ function stripExternalAiInternalSections(value?: string | null) {
   }, null);
 
   return (firstLabelIndex === null ? text : text.slice(0, firstLabelIndex)).trim();
+}
+
+function containsSocialInsuranceCoreText(value?: string | null) {
+  const text = String(value ?? "");
+  return [
+    "社会保険料",
+    "社会保険",
+    "保険料",
+    "厚生年金",
+    "健康保険",
+    "介護保険",
+    "年金保険",
+    "給与天引き",
+    "労使折半",
+    "社会保障負担",
+  ].some((keyword) => text.includes(keyword));
+}
+
+function shouldPreferExternalAiAnswer(
+  summaryText: string,
+  externalAiAnswer: string,
+  title?: string | null,
+  originalPost?: string | null,
+  postContentText?: string | null
+) {
+  if (!summaryText.trim() || !externalAiAnswer.trim()) return false;
+
+  const contextText = `${title ?? ""}\n${originalPost ?? ""}\n${postContentText ?? ""}`;
+
+  return (
+    containsSocialInsuranceCoreText(summaryText) &&
+    !containsSocialInsuranceCoreText(contextText)
+  );
 }
 
 function isTemplateProvisionalAnswer(value?: string | null) {
@@ -1727,7 +1848,11 @@ const groupedByOpinion = useMemo(() => {
     return splitContent(thread?.original_post ?? "");
   }, [thread?.original_post]);
 
-const externalAiAnswerFromOriginalPost = extractExternalAiAnswer(thread?.original_post);
+const externalAiAnswerFromThreadContent = extractExternalAiAnswerFromTexts([
+  thread?.original_post,
+  ...posts.map((post) => post.content),
+]);
+const postContentTextForThemeCheck = posts.map((post) => post.content).join("\n");
 const postPremiseFallbackItems = normalizeSourceItems(
   posts
     .filter((post) => post.post_role === "supplement")
@@ -1906,13 +2031,30 @@ const shouldShowMacroEconomyGuide =
   String(thread?.category ?? "").trim() === "経済・政策";
 const initialPostCount = summary?.counts?.total ?? posts.length;
 const showInitialDiscussionNote = initialPostCount <= 3;
-const summaryProvisionalAnswer = summary?.provisional_answer?.trim() ?? "";
+const storedSummaryText = summary?.summary_text?.trim() ?? "";
+const useExternalAiAnswerFallback = shouldPreferExternalAiAnswer(
+  storedSummaryText,
+  externalAiAnswerFromThreadContent,
+  thread?.title,
+  thread?.original_post,
+  postContentTextForThemeCheck
+);
+const displaySummaryText = useExternalAiAnswerFallback
+  ? externalAiAnswerFromThreadContent
+  : storedSummaryText;
+const displayEasySummaryText = useExternalAiAnswerFallback
+  ? parseLayeredProvisionalAnswer(externalAiAnswerFromThreadContent).simple ||
+    compactText(externalAiAnswerFromThreadContent, 160)
+  : summary?.easy_summary_text?.trim() ?? "";
+const summaryProvisionalAnswer = useExternalAiAnswerFallback
+  ? externalAiAnswerFromThreadContent
+  : summary?.provisional_answer?.trim() ?? "";
 const naturalSummaryAnswer = isTemplateProvisionalAnswer(summaryProvisionalAnswer)
-  ? summary?.summary_text?.trim() || externalAiAnswerFromOriginalPost
+  ? displaySummaryText || externalAiAnswerFromThreadContent
   : summaryProvisionalAnswer;
 const provisionalAnswerText =
   naturalSummaryAnswer ||
-  externalAiAnswerFromOriginalPost ||
+  externalAiAnswerFromThreadContent ||
   "まだAIの暫定回答はありません。AIまとめを確認・更新すると表示されます。";
 const layeredProvisionalAnswer =
   parseLayeredProvisionalAnswer(provisionalAnswerText);
@@ -3577,7 +3719,7 @@ function renderDiscussionCard({
     handleGenerateSummary();
   }}
 >
-            {summary?.summary_text
+            {displaySummaryText
               ? "AIまとめを確認・更新する"
               : "AIまとめを作成する"}
           </PrimaryButton>
@@ -3606,8 +3748,8 @@ function renderDiscussionCard({
             lineHeight: 1.8,
           }}
         >
-{summary?.summary_text ? (
-  summary.summary_text
+{displaySummaryText ? (
+  displaySummaryText
 ) : (
   <div style={{ color: "#999" }}>
     まだAIまとめはありません。「AIでこの議論をまとめる」を押してください。
@@ -3623,8 +3765,8 @@ function renderDiscussionCard({
           lineHeight: 1.8,
         }}
       >
-{summary?.easy_summary_text ? (
-  summary.easy_summary_text
+{displayEasySummaryText ? (
+  displayEasySummaryText
 ) : (
   <div style={{ color: "#999" }}>
     まだやさしい要約はありません。

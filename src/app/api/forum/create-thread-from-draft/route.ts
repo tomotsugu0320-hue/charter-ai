@@ -144,7 +144,7 @@ function looksLikePriceRateTaxPolicyText(text: string) {
 }
 
 function looksLikeSocialInsuranceBurdenText(text: string) {
-  return includesAnyKeyword(text, [
+  if (includesAnyKeyword(text, [
     "社会保険料",
     "社会保険",
     "保険料",
@@ -152,15 +152,26 @@ function looksLikeSocialInsuranceBurdenText(text: string) {
     "健康保険",
     "介護保険",
     "年金保険",
-    "可処分所得",
     "給与天引き",
     "天引き",
     "労使折半",
-    "現役世代",
-    "少子化",
-    "子育て",
-    "賃上げ",
-  ]);
+  ])) {
+    return true;
+  }
+
+  return (
+    includesAnyKeyword(text, [
+      "社会保障負担",
+      "現役世代負担",
+    ]) &&
+    includesAnyKeyword(text, [
+      "可処分所得",
+      "給与",
+      "手取り",
+      "雇用コスト",
+      "企業負担",
+    ])
+  );
 }
 
 function looksLikeLaborCostRationalizationText(text: string) {
