@@ -2108,6 +2108,31 @@ const provisionalAnswerText =
 const layeredProvisionalAnswer =
   parseLayeredProvisionalAnswer(provisionalAnswerText);
 const classifiedSummaryKeyPoints = summary?.key_points;
+const normalizeClassifiedSummaryItems = (items?: string[], limit = 3) =>
+  Array.isArray(items)
+    ? Array.from(
+        new Set(items.map((item) => item.trim()).filter(Boolean))
+      ).slice(0, limit)
+    : [];
+const classifiedSummaryConclusions = normalizeClassifiedSummaryItems(
+  classifiedSummaryKeyPoints?.current_tentative_conclusion,
+  3
+);
+const classifiedSummaryHighlights = Array.from(
+  new Set(
+    [
+      ...normalizeClassifiedSummaryItems(
+        classifiedSummaryKeyPoints?.changes_from_initial_answer,
+        3
+      ),
+      ...normalizeClassifiedSummaryItems(
+        classifiedSummaryKeyPoints?.discussion_position,
+        3
+      ),
+      ...normalizeClassifiedSummaryItems(classifiedSummaryKeyPoints?.needs_review, 3),
+    ].filter(Boolean)
+  )
+).slice(0, 3);
 const classifiedSummarySections = [
   {
     key: "discussion-position",
@@ -2135,11 +2160,6 @@ const classifiedSummarySections = [
     items: classifiedSummaryKeyPoints?.verification_metrics,
   },
   {
-    key: "current-tentative-conclusion",
-    title: "現時点の暫定結論",
-    items: classifiedSummaryKeyPoints?.current_tentative_conclusion,
-  },
-  {
     key: "needs-review",
     title: "要確認",
     items: classifiedSummaryKeyPoints?.needs_review,
@@ -2152,14 +2172,13 @@ const classifiedSummarySections = [
 ]
   .map((section) => ({
     ...section,
-    items: (section.items ?? [])
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .slice(0, 4),
+    items: normalizeClassifiedSummaryItems(section.items, 3),
   }))
   .filter((section) => section.items.length > 0);
 const shouldShowClassifiedSummary =
   summary?.summary_type === "thread_summary_from_classifications" ||
+  classifiedSummaryConclusions.length > 0 ||
+  classifiedSummaryHighlights.length > 0 ||
   classifiedSummarySections.length > 0;
 
 /*
@@ -3270,6 +3289,84 @@ function renderDiscussionCard({
     >
       AI分類済みコメントを材料に、議論後の変化を整理したものです。分類は補助判断であり、確定判定ではありません。
     </div>
+
+    {classifiedSummaryConclusions.length > 0 && (
+      <div
+        style={{
+          marginTop: 12,
+          border: "1px solid #bfdbfe",
+          borderRadius: 10,
+          background: "#eff6ff",
+          padding: 12,
+        }}
+      >
+        <div
+          style={{
+            color: "#1e3a8a",
+            fontSize: currentFont.base,
+            fontWeight: 900,
+            lineHeight: 1.4,
+            marginBottom: 6,
+          }}
+        >
+          まず読むべき結論
+        </div>
+        <ul
+          style={{
+            margin: 0,
+            paddingLeft: 18,
+            color: "#1e293b",
+            fontSize: currentFont.base * 0.95,
+            lineHeight: 1.7,
+          }}
+        >
+          {classifiedSummaryConclusions.map((item, index) => (
+            <li key={`classified-conclusion-${index}`}>
+              {compactText(item, 150)}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
+
+    {classifiedSummaryHighlights.length > 0 && (
+      <div
+        style={{
+          marginTop: 10,
+          border: "1px solid #e2e8f0",
+          borderRadius: 10,
+          background: "#ffffff",
+          padding: 12,
+        }}
+      >
+        <div
+          style={{
+            color: "#334155",
+            fontSize: currentFont.base * 0.95,
+            fontWeight: 900,
+            lineHeight: 1.4,
+            marginBottom: 6,
+          }}
+        >
+          今回の重要ポイント
+        </div>
+        <ul
+          style={{
+            margin: 0,
+            paddingLeft: 18,
+            color: "#475569",
+            fontSize: currentFont.base * 0.92,
+            lineHeight: 1.65,
+          }}
+        >
+          {classifiedSummaryHighlights.map((item, index) => (
+            <li key={`classified-highlight-${index}`}>
+              {compactText(item, 130)}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
 
     <div
       style={{
