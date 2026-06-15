@@ -270,6 +270,29 @@ function classificationBadgeStyle(classification?: string | null) {
   };
 }
 
+function childClassificationSummary(children: unknown) {
+  if (!Array.isArray(children)) return "";
+
+  const counts = new Map<string, number>();
+
+  for (const child of children) {
+    if (!child || typeof child !== "object") continue;
+
+    const classification = (child as { ai_classification?: AiClassification | null })
+      .ai_classification?.classification;
+
+    if (!classification) continue;
+
+    counts.set(classification, (counts.get(classification) ?? 0) + 1);
+  }
+
+  const parts = Array.from(counts.entries()).map(
+    ([classification, count]) => `${classificationLabel(classification)}${count}`
+  );
+
+  return parts.length > 0 ? `AI整理済み: ${parts.join("・")}` : "";
+}
+
 export default function OpinionCard({
   op,
   hideLowScore,
@@ -327,6 +350,7 @@ const aiClassificationConfidence = formatConfidence(aiClassification?.confidence
 const aiClassificationTitle = aiClassification?.reason
   ? `理由: ${aiClassification.reason}`
   : undefined;
+const childAiClassificationSummary = childClassificationSummary(op.children);
 const feedbackActions = [
   ["conclusion_unknown", "AIで結論を解説"],
   ["counterargument_unknown", "AIで反対意見を解説"],
@@ -384,6 +408,11 @@ const feedbackActions = [
               {aiClassificationConfidence
                 ? ` / ${aiClassificationConfidence}`
                 : ""}
+            </span>
+          )}
+          {childAiClassificationSummary && (
+            <span style={classificationBadgeStyle(null)}>
+              {childAiClassificationSummary}
             </span>
           )}
           {score !== null && score !== undefined && !hasLogicScoreReason && (
