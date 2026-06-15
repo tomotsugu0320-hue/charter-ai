@@ -1175,6 +1175,9 @@ export default function ForumThreadPage({ params }: PageProps) {
   const [isForumBetaLoggedIn, setIsForumBetaLoggedIn] = useState<boolean | null>(
     null
   );
+  const [isForumAdmin, setIsForumAdmin] = useState(false);
+  const [classifyLoading, setClassifyLoading] = useState(false);
+  const [classifyMessage, setClassifyMessage] = useState<string | null>(null);
 
 const [explanations, setExplanations] = useState<Record<string, string>>({});
 const [feedbackLoadingPostId, setFeedbackLoadingPostId] = useState<string | null>(null);
@@ -1400,6 +1403,28 @@ const [treeVariant] = useState<"A" | "C">("A");
     }
 
     void loadLoginStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAdminStatus() {
+      try {
+        const res = await fetch("/api/forum/admin/users", {
+          cache: "no-store",
+        });
+
+        if (!cancelled) setIsForumAdmin(res.ok);
+      } catch {
+        if (!cancelled) setIsForumAdmin(false);
+      }
+    }
+
+    void loadAdminStatus();
 
     return () => {
       cancelled = true;
@@ -2245,6 +2270,53 @@ setTimeout(() => {
       setError(e?.message || "読込失敗");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleClassifyPosts() {
+    if (classifyLoading || !threadId) return;
+
+    setClassifyLoading(true);
+    setClassifyMessage(null);
+
+    try {
+      const res = await fetch("/api/forum/admin/classify-posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          thread_id: threadId,
+          max_items: 5,
+          force_reclassify: false,
+        }),
+      });
+      const result = await res.json().catch(() => null);
+
+      if (!res.ok || result?.ok === false) {
+        if (res.status === 401 || res.status === 403) {
+          setIsForumAdmin(false);
+          throw new Error(
+            "管理セッションが切れました。管理トップで再認証してください。"
+          );
+        }
+
+        throw new Error(result?.error || "コメントのAI分類に失敗しました。");
+      }
+
+      const processed = Number(result?.processed_count ?? 0);
+      const success = Number(result?.success_count ?? 0);
+      const skipped = Number(result?.skipped_count ?? 0);
+      const failed = Number(result?.failed_count ?? 0);
+      const failedNote = failed > 0 ? " 一部失敗があります。" : "";
+
+      setClassifyMessage(
+        `AI分類完了: 処理 ${processed}件 / 成功 ${success}件 / skip ${skipped}件 / 失敗 ${failed}件。${failedNote}`
+      );
+      await loadThread();
+    } catch (e: any) {
+      console.error(e);
+      setClassifyMessage(e?.message || "コメントのAI分類に失敗しました。");
+    } finally {
+      setClassifyLoading(false);
     }
   }
 
@@ -3340,6 +3412,63 @@ function renderDiscussionCard({
             ) : (
               <div style={{ display: "grid", gap: 14 }}>
 
+{isForumAdmin && (
+  <div
+    style={{
+      border: "1px solid #d7dde8",
+      borderRadius: 10,
+      background: "#f8fafc",
+      padding: "10px 12px",
+      display: "flex",
+      flexWrap: "wrap",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+      color: "#334155",
+      fontSize: currentFont.base * 0.9,
+      lineHeight: 1.5,
+    }}
+  >
+    <div>
+      <div style={{ fontWeight: 800, color: "#0f172a" }}>管理者操作</div>
+      <div>未分類コメントを最大5件だけAI分類します。</div>
+      {classifyMessage && (
+        <div
+          style={{
+            marginTop: 4,
+            color:
+              classifyMessage.includes("一部失敗") ||
+              classifyMessage.includes("失敗しました") ||
+              classifyMessage.includes("切れました")
+                ? "#92400e"
+                : "#475569",
+            fontWeight: 700,
+          }}
+        >
+          {classifyMessage}
+        </div>
+      )}
+    </div>
+    <button
+      type="button"
+      onClick={() => void handleClassifyPosts()}
+      disabled={classifyLoading}
+      style={{
+        border: "1px solid #cbd5e1",
+        borderRadius: 999,
+        background: classifyLoading ? "#e5e7eb" : "#ffffff",
+        color: classifyLoading ? "#64748b" : "#0f172a",
+        cursor: classifyLoading ? "not-allowed" : "pointer",
+        fontSize: currentFont.base * 0.9,
+        fontWeight: 800,
+        padding: "7px 12px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {classifyLoading ? "AI分類中..." : "コメントをAI分類"}
+    </button>
+  </div>
+)}
 
 
 <OpinionView
