@@ -103,6 +103,24 @@ type ApplyVersionResponse = {
   };
 };
 
+type ApplyLogicScoreVersionResponse = {
+  ok?: boolean;
+  error?: string;
+  version?: {
+    id: string;
+    post_id: string;
+    is_applied: boolean;
+    applied_at?: string | null;
+  };
+  post?: {
+    id: string;
+    logic_score?: number | null;
+    logic_score_reason?: string | null;
+    logic_break_type?: string | null;
+    logic_break_note?: string | null;
+  };
+};
+
 type SummaryComparePayload = {
   thread_id?: string | null;
   summary_text?: string | null;
@@ -425,6 +443,9 @@ export default function ForumAdminBulkRefreshPreviewPage() {
   const [applyConfirm, setApplyConfirm] = useState(false);
   const [applyLoading, setApplyLoading] = useState(false);
   const [applyMessage, setApplyMessage] = useState("");
+  const [logicScoreApplyConfirmId, setLogicScoreApplyConfirmId] = useState("");
+  const [logicScoreApplyLoadingId, setLogicScoreApplyLoadingId] = useState("");
+  const [logicScoreApplyMessage, setLogicScoreApplyMessage] = useState("");
 
   async function runPreview() {
     const requestAdminKey = adminKey.trim();
@@ -724,6 +745,52 @@ export default function ForumAdminBulkRefreshPreviewPage() {
       setRunMessage("logic_scoreテスト実行中に通信エラーが発生しました。");
     } finally {
       setRunLoading(false);
+    }
+  }
+
+  async function applyLogicScoreVersion(version: LogicScoreVersion) {
+    if (
+      version.is_applied ||
+      logicScoreApplyConfirmId !== version.id ||
+      logicScoreApplyLoadingId
+    ) {
+      return;
+    }
+
+    const requestAdminKey = adminKey.trim();
+    setLogicScoreApplyLoadingId(version.id);
+    setLogicScoreApplyMessage("");
+
+    try {
+      const response = await fetch(
+        `/api/forum/admin/bulk-refresh/logic-score-versions/${encodeURIComponent(
+          version.id
+        )}/apply`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(requestAdminKey ? { "x-admin-key": requestAdminKey } : {}),
+          },
+          body: JSON.stringify({
+            confirmApply: true,
+          }),
+        }
+      );
+      const data = (await response.json().catch(() => ({}))) as ApplyLogicScoreVersionResponse;
+
+      if (!response.ok || data.ok !== true) {
+        setLogicScoreApplyMessage(data.error || "logic_score versionを適用できませんでした。");
+        return;
+      }
+
+      setLogicScoreApplyConfirmId("");
+      setLogicScoreApplyMessage("logic_score versionを1件だけ投稿評価に反映しました。");
+      await loadLogicScoreVersions(requestAdminKey);
+    } catch {
+      setLogicScoreApplyMessage("logic_score version適用中に通信エラーが発生しました。");
+    } finally {
+      setLogicScoreApplyLoadingId("");
     }
   }
 
@@ -1228,7 +1295,7 @@ export default function ForumAdminBulkRefreshPreviewPage() {
               <h2 style={{ margin: 0, fontSize: 20 }}>生成済みlogic_score version</h2>
               <p style={{ margin: "8px 0 0", color: "#475569", lineHeight: 1.7 }}>
                 logic_scoreテスト実行で保存された再評価versionの確認用です。
-                まだforum_posts.logic_scoreには反映されていません。適用機能もありません。
+                未適用versionは確認チェック後、1件だけforum_postsへ反映できます。
               </p>
             </div>
             <button
@@ -1255,6 +1322,19 @@ export default function ForumAdminBulkRefreshPreviewPage() {
             </p>
           )}
 
+          {logicScoreApplyMessage && (
+            <p
+              style={{
+                margin: "0 0 12px",
+                color: logicScoreApplyMessage.includes("反映しました") ? "#166534" : "#991b1b",
+                fontWeight: 800,
+                lineHeight: 1.7,
+              }}
+            >
+              {logicScoreApplyMessage}
+            </p>
+          )}
+
           {logicScoreVersions.length === 0 ? (
             <div
               style={{
@@ -1274,7 +1354,7 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                 <article
                   key={version.id}
                   style={{
-                    border: "1px solid #dbe3ef",
+                    border: `1px solid ${version.is_applied ? "#bbf7d0" : "#dbe3ef"}`,
                     borderRadius: 10,
                     background: "#ffffff",
                     padding: 14,
@@ -1295,29 +1375,31 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
                         <span
                           style={{
-                            border: "1px solid #bfdbfe",
+                            border: `1px solid ${version.is_applied ? "#86efac" : "#bfdbfe"}`,
                             borderRadius: 999,
-                            background: "#eff6ff",
-                            color: "#1d4ed8",
+                            background: version.is_applied ? "#dcfce7" : "#eff6ff",
+                            color: version.is_applied ? "#166534" : "#1d4ed8",
                             fontSize: 12,
                             fontWeight: 900,
                             padding: "4px 8px",
                           }}
                         >
-                          未適用
+                          {version.is_applied ? "適用済み" : "未適用"}
                         </span>
                         <span
                           style={{
-                            border: "1px solid #fde68a",
+                            border: `1px solid ${version.is_applied ? "#86efac" : "#fde68a"}`,
                             borderRadius: 999,
-                            background: "#fffbeb",
-                            color: "#92400e",
+                            background: version.is_applied ? "#dcfce7" : "#fffbeb",
+                            color: version.is_applied ? "#166534" : "#92400e",
                             fontSize: 12,
                             fontWeight: 900,
                             padding: "4px 8px",
                           }}
                         >
-                          適用機能なし
+                          {version.is_applied
+                            ? `applied_at: ${formatDate(version.applied_at)}`
+                            : "1件だけ適用候補"}
                         </span>
                       </div>
                       <h3 style={{ margin: 0, fontSize: 17, lineHeight: 1.4 }}>
@@ -1355,6 +1437,142 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                     {shortInlineText(version.logic_score_reason, 180) || "評価理由なし"}
                   </div>
 
+                  <div style={gridStyle}>
+                    <div>
+                      <div style={{ ...labelStyle, marginBottom: 6 }}>current score</div>
+                      <div
+                        style={{
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 8,
+                          background: "#f8fafc",
+                          padding: 12,
+                          fontSize: 22,
+                          fontWeight: 900,
+                        }}
+                      >
+                        {version.current_logic_score ?? "-"}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ ...labelStyle, marginBottom: 6 }}>new score</div>
+                      <div
+                        style={{
+                          border: "1px solid #bfdbfe",
+                          borderRadius: 8,
+                          background: "#eff6ff",
+                          color: "#1d4ed8",
+                          padding: 12,
+                          fontSize: 22,
+                          fontWeight: 900,
+                        }}
+                      >
+                        {version.logic_score ?? "-"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={gridStyle}>
+                    <div>
+                      <div style={{ ...labelStyle, marginBottom: 6 }}>current reason</div>
+                      <div
+                        style={{
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 8,
+                          background: "#f8fafc",
+                          color: "#475569",
+                          lineHeight: 1.7,
+                          padding: 12,
+                          whiteSpace: "pre-wrap",
+                        }}
+                      >
+                        {version.current_logic_score_reason || "現在理由なし"}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ ...labelStyle, marginBottom: 6 }}>new reason</div>
+                      <div
+                        style={{
+                          border: "1px solid #bfdbfe",
+                          borderRadius: 8,
+                          background: "#eff6ff",
+                          color: "#1e3a8a",
+                          lineHeight: 1.7,
+                          padding: 12,
+                          whiteSpace: "pre-wrap",
+                        }}
+                      >
+                        {version.logic_score_reason || "新評価理由なし"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {!version.is_applied ? (
+                    <div
+                      style={{
+                        border: "1px solid #fde68a",
+                        borderRadius: 8,
+                        background: "#fffbeb",
+                        color: "#78350f",
+                        display: "grid",
+                        gap: 10,
+                        lineHeight: 1.7,
+                        padding: 12,
+                      }}
+                    >
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={logicScoreApplyConfirmId === version.id}
+                          onChange={(event) =>
+                            setLogicScoreApplyConfirmId(event.target.checked ? version.id : "")
+                          }
+                        />{" "}
+                        このlogic_score versionを1件だけ現在の投稿評価に反映することを確認しました
+                      </label>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => void applyLogicScoreVersion(version)}
+                          disabled={
+                            logicScoreApplyConfirmId !== version.id ||
+                            Boolean(logicScoreApplyLoadingId)
+                          }
+                          style={{
+                            ...buttonStyle,
+                            opacity:
+                              logicScoreApplyConfirmId === version.id &&
+                              !logicScoreApplyLoadingId
+                                ? 1
+                                : 0.55,
+                            cursor:
+                              logicScoreApplyConfirmId === version.id &&
+                              !logicScoreApplyLoadingId
+                                ? "pointer"
+                                : "not-allowed",
+                          }}
+                        >
+                          {logicScoreApplyLoadingId === version.id
+                            ? "適用中..."
+                            : "このlogic_score versionを1件だけ適用"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        border: "1px solid #bbf7d0",
+                        borderRadius: 8,
+                        background: "#f0fdf4",
+                        color: "#166534",
+                        fontWeight: 800,
+                        lineHeight: 1.7,
+                        padding: 12,
+                      }}
+                    >
+                      このlogic_score versionは適用済みです。再適用はできません。
+                    </div>
+                  )}
+
                   <div
                     style={{
                       display: "grid",
@@ -1379,10 +1597,6 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                       <div>{version.is_applied ? "true" : "false"}</div>
                     </div>
                     <div>
-                      <div style={labelStyle}>current score</div>
-                      <div>{version.current_logic_score ?? "-"}</div>
-                    </div>
-                    <div>
                       <div style={labelStyle}>total_tokens</div>
                       <div>{formatNumber(version.total_tokens)}</div>
                     </div>
@@ -1393,6 +1607,10 @@ export default function ForumAdminBulkRefreshPreviewPage() {
                     <div>
                       <div style={labelStyle}>created_at</div>
                       <div>{formatDate(version.created_at)}</div>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>applied_at</div>
+                      <div>{formatDate(version.applied_at)}</div>
                     </div>
                   </div>
                 </article>
