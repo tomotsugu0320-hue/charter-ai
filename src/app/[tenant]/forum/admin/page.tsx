@@ -122,8 +122,96 @@ type AiOpsPreview = {
   items: AiOpsPreviewItem[];
 };
 
+type AiOpsUsageSummary = {
+  calls: number;
+  success_calls: number;
+  failed_calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  estimated_cost: number;
+};
+
+type AiOpsOverview = {
+  overview: {
+    total_threads: number;
+    classification_waiting_threads: number;
+    classification_waiting_posts: number;
+    classified_threads: number;
+    rebuild_waiting_threads: number;
+    rebuilt_threads: number;
+    no_material_threads: number;
+  };
+  usage: {
+    post_ai_classification: AiOpsUsageSummary;
+    thread_summary_from_classifications: AiOpsUsageSummary;
+    total: AiOpsUsageSummary;
+  };
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function numberFromRecord(record: Record<string, unknown>, key: string) {
+  const numeric = Number(record[key]);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function normalizeUsageSummary(value: unknown): AiOpsUsageSummary {
+  const record = isRecord(value) ? value : {};
+
+  return {
+    calls: numberFromRecord(record, "calls"),
+    success_calls: numberFromRecord(record, "success_calls"),
+    failed_calls: numberFromRecord(record, "failed_calls"),
+    input_tokens: numberFromRecord(record, "input_tokens"),
+    output_tokens: numberFromRecord(record, "output_tokens"),
+    total_tokens: numberFromRecord(record, "total_tokens"),
+    estimated_cost: numberFromRecord(record, "estimated_cost"),
+  };
+}
+
+function normalizeAiOpsOverview(value: unknown): AiOpsOverview | null {
+  if (!isRecord(value) || !isRecord(value.overview) || !isRecord(value.usage)) {
+    return null;
+  }
+
+  return {
+    overview: {
+      total_threads: numberFromRecord(value.overview, "total_threads"),
+      classification_waiting_threads: numberFromRecord(
+        value.overview,
+        "classification_waiting_threads"
+      ),
+      classification_waiting_posts: numberFromRecord(
+        value.overview,
+        "classification_waiting_posts"
+      ),
+      classified_threads: numberFromRecord(value.overview, "classified_threads"),
+      rebuild_waiting_threads: numberFromRecord(
+        value.overview,
+        "rebuild_waiting_threads"
+      ),
+      rebuilt_threads: numberFromRecord(value.overview, "rebuilt_threads"),
+      no_material_threads: numberFromRecord(value.overview, "no_material_threads"),
+    },
+    usage: {
+      post_ai_classification: normalizeUsageSummary(value.usage.post_ai_classification),
+      thread_summary_from_classifications: normalizeUsageSummary(
+        value.usage.thread_summary_from_classifications
+      ),
+      total: normalizeUsageSummary(value.usage.total),
+    },
+  };
+}
+
+function formatCount(value: number) {
+  return Math.round(value).toLocaleString("ja-JP");
+}
+
+function formatCostUsd(value: number) {
+  return `$${value.toFixed(4)}`;
 }
 
 function getThreadId(value: unknown) {
@@ -153,6 +241,9 @@ export default function ForumAdminPage() {
   const [aiOpsLoading, setAiOpsLoading] = useState<AiOpsMode | null>(null);
   const [aiOpsPreviewLoading, setAiOpsPreviewLoading] = useState(false);
   const [aiOpsPreview, setAiOpsPreview] = useState<AiOpsPreview | null>(null);
+  const [aiOpsOverviewLoading, setAiOpsOverviewLoading] = useState(false);
+  const [aiOpsOverview, setAiOpsOverview] = useState<AiOpsOverview | null>(null);
+  const [aiOpsOverviewMessage, setAiOpsOverviewMessage] = useState("");
   const [aiOpsMessage, setAiOpsMessage] = useState("");
   const [aiOpsResult, setAiOpsResult] = useState<AiOpsResult | null>(null);
 
@@ -254,6 +345,45 @@ export default function ForumAdminPage() {
       threadId: getThreadId(thread),
       title: getThreadTitle(thread),
     }));
+  }
+
+  async function loadAiOpsOverview() {
+    if (aiOpsOverviewLoading || aiOpsLoading || aiOpsPreviewLoading) return;
+
+    setAiOpsOverviewLoading(true);
+    setAiOpsOverviewMessage("全体状況を確認しています。");
+
+    try {
+      const response = await fetch("/api/forum/admin/ai-ops-overview", {
+        cache: "no-store",
+      });
+      const result = (await response.json().catch(() => null)) as unknown;
+
+      if (!response.ok || !isRecord(result) || result.ok === false) {
+        throw new Error(
+          isRecord(result) && typeof result.error === "string"
+            ? result.error
+            : "全体状況を取得できませんでした。"
+        );
+      }
+
+      const overview = normalizeAiOpsOverview(result);
+      if (!overview) {
+        throw new Error("全体状況の形式を確認できませんでした。");
+      }
+
+      setAiOpsOverview(overview);
+      setAiOpsOverviewMessage("全体状況を確認しました。OpenAI APIは使用していません。");
+    } catch (overviewError) {
+      setAiOpsOverview(null);
+      setAiOpsOverviewMessage(
+        overviewError instanceof Error
+          ? overviewError.message
+          : "全体状況を取得できませんでした。"
+      );
+    } finally {
+      setAiOpsOverviewLoading(false);
+    }
   }
 
   async function loadAiOpsPreview() {
@@ -756,6 +886,163 @@ export default function ForumAdminPage() {
             >
               状況確認はOpenAI APIを使いません。コメント分類とAI再総括はOpenAI APIを使用します。
             </p>
+
+            <div
+              style={{
+                marginTop: 14,
+                border: "1px solid #dbe3ef",
+                borderRadius: 8,
+                background: "#f8fafc",
+                padding: 12,
+              }}
+            >
+              <div style={{ fontWeight: 900, marginBottom: 8 }}>全体状況</div>
+              <p style={{ ...menuDescriptionStyle, marginTop: 0, fontSize: 13 }}>
+                全体状況の確認はOpenAI APIを使用しません。DBに保存済みの投稿・分類・使用量ログだけを読みます。
+              </p>
+              <button
+                type="button"
+                onClick={() => void loadAiOpsOverview()}
+                disabled={
+                  aiOpsOverviewLoading ||
+                  Boolean(aiOpsLoading) ||
+                  aiOpsPreviewLoading
+                }
+                style={{
+                  ...buttonStyle,
+                  borderColor: "#0f766e",
+                  background: "#0f766e",
+                  opacity:
+                    aiOpsOverviewLoading || aiOpsLoading || aiOpsPreviewLoading
+                      ? 0.65
+                      : 1,
+                  cursor:
+                    aiOpsOverviewLoading || aiOpsLoading || aiOpsPreviewLoading
+                      ? "not-allowed"
+                      : "pointer",
+                }}
+              >
+                {aiOpsOverviewLoading ? "全体状況を確認中..." : "全体状況を確認"}
+              </button>
+
+              {aiOpsOverviewMessage && (
+                <p
+                  style={{
+                    margin: "10px 0 0",
+                    color:
+                      aiOpsOverviewMessage.includes("できません") ||
+                      aiOpsOverviewMessage.includes("失敗")
+                        ? "#991b1b"
+                        : "#334155",
+                    fontWeight: 800,
+                    lineHeight: 1.7,
+                  }}
+                >
+                  {aiOpsOverviewMessage}
+                </p>
+              )}
+
+              {aiOpsOverview && (
+                <div style={{ marginTop: 12 }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+                      gap: 8,
+                      color: "#334155",
+                      fontSize: 13,
+                      fontWeight: 800,
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    <span>
+                      全スレッド: {formatCount(aiOpsOverview.overview.total_threads)}件
+                    </span>
+                    <span>
+                      コメントAI分類待ち投稿:{" "}
+                      {formatCount(
+                        aiOpsOverview.overview.classification_waiting_posts
+                      )}
+                      件
+                    </span>
+                    <span>
+                      コメントAI分類待ちスレッド:{" "}
+                      {formatCount(
+                        aiOpsOverview.overview.classification_waiting_threads
+                      )}
+                      件
+                    </span>
+                    <span>
+                      AI再総括待ち:{" "}
+                      {formatCount(aiOpsOverview.overview.rebuild_waiting_threads)}
+                      件
+                    </span>
+                    <span>
+                      AI再総括済み:{" "}
+                      {formatCount(aiOpsOverview.overview.rebuilt_threads)}件
+                    </span>
+                    <span>
+                      材料なし:{" "}
+                      {formatCount(aiOpsOverview.overview.no_material_threads)}件
+                    </span>
+                  </div>
+
+                  <div style={{ marginTop: 12, fontWeight: 900 }}>
+                    OpenAI使用量
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                      gap: 8,
+                      marginTop: 8,
+                      color: "#475569",
+                      fontSize: 13,
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    <div>
+                      <strong>コメントAI分類</strong>
+                      <br />
+                      {formatCount(aiOpsOverview.usage.post_ai_classification.calls)}
+                      回 /{" "}
+                      {formatCount(
+                        aiOpsOverview.usage.post_ai_classification.total_tokens
+                      )}{" "}
+                      token /{" "}
+                      {formatCostUsd(
+                        aiOpsOverview.usage.post_ai_classification.estimated_cost
+                      )}
+                    </div>
+                    <div>
+                      <strong>AI再総括</strong>
+                      <br />
+                      {formatCount(
+                        aiOpsOverview.usage.thread_summary_from_classifications
+                          .calls
+                      )}
+                      回 /{" "}
+                      {formatCount(
+                        aiOpsOverview.usage.thread_summary_from_classifications
+                          .total_tokens
+                      )}{" "}
+                      token /{" "}
+                      {formatCostUsd(
+                        aiOpsOverview.usage.thread_summary_from_classifications
+                          .estimated_cost
+                      )}
+                    </div>
+                    <div>
+                      <strong>合計</strong>
+                      <br />
+                      {formatCount(aiOpsOverview.usage.total.calls)}回 /{" "}
+                      {formatCount(aiOpsOverview.usage.total.total_tokens)} token /{" "}
+                      {formatCostUsd(aiOpsOverview.usage.total.estimated_cost)}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div style={{ marginTop: 14 }}>
               <div style={{ fontWeight: 900, marginBottom: 8 }}>
