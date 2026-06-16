@@ -287,6 +287,43 @@ function formatCostUsd(value: number) {
   return `$${value.toFixed(4)}`;
 }
 
+function getAiOpsNextAction(
+  overview: AiOpsOverview["overview"],
+  limit: AiOpsLimit
+) {
+  if (overview.rebuild_update_waiting_high_threads > 0) {
+    return `次にやること：AI再総括更新待ち（高）が${formatCount(
+      overview.rebuild_update_waiting_high_threads
+    )}件あります。優先してAI再総括してください。`;
+  }
+
+  if (overview.rebuild_waiting_threads > 0) {
+    return `次にやること：AI再総括待ちが${formatCount(
+      overview.rebuild_waiting_threads
+    )}件あります。「最新${limit}件をAI再総括」を実行してください。`;
+  }
+
+  if (overview.classification_waiting_posts > 0) {
+    return `次にやること：コメントAI分類待ち投稿が${formatCount(
+      overview.classification_waiting_posts
+    )}件あります。「最新${limit}件のコメントをAI分類」を実行してください。`;
+  }
+
+  if (overview.rebuild_update_waiting_medium_threads > 0) {
+    return `次にやること：AI再総括更新待ち（中）が${formatCount(
+      overview.rebuild_update_waiting_medium_threads
+    )}件あります。必要に応じてAI再総括してください。`;
+  }
+
+  if (overview.rebuild_update_waiting_low_threads > 0) {
+    return `次にやること：AI再総括更新待ち（低）が${formatCount(
+      overview.rebuild_update_waiting_low_threads
+    )}件あります。急ぎでなければ後回しでOKです。`;
+  }
+
+  return "次にやること：現在、急ぎのAI処理はありません。";
+}
+
 function getThreadId(value: unknown) {
   if (!isRecord(value)) return "";
 
@@ -944,10 +981,10 @@ export default function ForumAdminPage() {
 
           <section style={{ ...menuCardStyle, marginBottom: 18 }}>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
-              AI管理操作
+              コメント分類・AI再総括
             </h2>
             <p style={menuDescriptionStyle}>
-              選択した最新スレッドだけを対象に、コメント分類やAI再総括を手動実行します。
+              コメントのAI分類、AI再総括、全体状況、OpenAI使用量を確認・実行します。
             </p>
             <p
               style={{
@@ -1087,6 +1124,21 @@ export default function ForumAdminPage() {
                       材料なし:{" "}
                       {formatCount(aiOpsOverview.overview.no_material_threads)}件
                     </span>
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 10,
+                      border: "1px solid #bfdbfe",
+                      borderRadius: 8,
+                      background: "#eff6ff",
+                      color: "#1e3a8a",
+                      fontSize: 13,
+                      fontWeight: 900,
+                      lineHeight: 1.7,
+                      padding: "10px 12px",
+                    }}
+                  >
+                    {getAiOpsNextAction(aiOpsOverview.overview, aiOpsLimit)}
                   </div>
                   <p style={{ ...menuDescriptionStyle, fontSize: 13 }}>
                     AI再総括待ちは、分類済みコメントがあるがまだ一度もAI再総括していないスレッドです。AI再総括更新待ちは、再総括後に新しい分類済みコメントが追加されたスレッドです。AI再総括済みは、最新の分類済みコメントまで反映済みです。
