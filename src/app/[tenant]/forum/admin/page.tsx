@@ -73,6 +73,20 @@ const CLASSIFICATION_TARGET_POST_ROLES = new Set([
   "supplement",
   "explanation",
 ]);
+const AI_OPS_UPDATE_CLASSIFICATION_KEYS = [
+  "agreement",
+  "rebuttal",
+  "premise_addition",
+  "evidence_addition",
+  "case_addition",
+  "metric_suggestion",
+  "topic_shift",
+  "emotional_reaction",
+  "needs_review_or_misinformation_risk",
+] as const;
+
+type AiOpsUpdateClassificationKey =
+  (typeof AI_OPS_UPDATE_CLASSIFICATION_KEYS)[number];
 
 type RecentThreadTarget = {
   threadId: string;
@@ -132,6 +146,16 @@ type AiOpsUsageSummary = {
   estimated_cost: number;
 };
 
+type AiOpsChangedClassifications = Record<AiOpsUpdateClassificationKey, number>;
+
+type AiOpsRebuildUpdateWaiting = {
+  total_threads: number;
+  high_threads: number;
+  medium_threads: number;
+  low_threads: number;
+  changed_classifications: AiOpsChangedClassifications;
+};
+
 type AiOpsOverview = {
   overview: {
     total_threads: number;
@@ -139,9 +163,14 @@ type AiOpsOverview = {
     classification_waiting_posts: number;
     classified_threads: number;
     rebuild_waiting_threads: number;
+    rebuild_update_waiting_threads: number;
+    rebuild_update_waiting_high_threads: number;
+    rebuild_update_waiting_medium_threads: number;
+    rebuild_update_waiting_low_threads: number;
     rebuilt_threads: number;
     no_material_threads: number;
   };
+  rebuild_update_waiting: AiOpsRebuildUpdateWaiting;
   usage: {
     post_ai_classification: AiOpsUsageSummary;
     thread_summary_from_classifications: AiOpsUsageSummary;
@@ -172,6 +201,31 @@ function normalizeUsageSummary(value: unknown): AiOpsUsageSummary {
   };
 }
 
+function normalizeChangedClassifications(value: unknown): AiOpsChangedClassifications {
+  const record = isRecord(value) ? value : {};
+  const counts = {} as AiOpsChangedClassifications;
+
+  for (const key of AI_OPS_UPDATE_CLASSIFICATION_KEYS) {
+    counts[key] = numberFromRecord(record, key);
+  }
+
+  return counts;
+}
+
+function normalizeRebuildUpdateWaiting(value: unknown): AiOpsRebuildUpdateWaiting {
+  const record = isRecord(value) ? value : {};
+
+  return {
+    total_threads: numberFromRecord(record, "total_threads"),
+    high_threads: numberFromRecord(record, "high_threads"),
+    medium_threads: numberFromRecord(record, "medium_threads"),
+    low_threads: numberFromRecord(record, "low_threads"),
+    changed_classifications: normalizeChangedClassifications(
+      record.changed_classifications
+    ),
+  };
+}
+
 function normalizeAiOpsOverview(value: unknown): AiOpsOverview | null {
   if (!isRecord(value) || !isRecord(value.overview) || !isRecord(value.usage)) {
     return null;
@@ -193,9 +247,28 @@ function normalizeAiOpsOverview(value: unknown): AiOpsOverview | null {
         value.overview,
         "rebuild_waiting_threads"
       ),
+      rebuild_update_waiting_threads: numberFromRecord(
+        value.overview,
+        "rebuild_update_waiting_threads"
+      ),
+      rebuild_update_waiting_high_threads: numberFromRecord(
+        value.overview,
+        "rebuild_update_waiting_high_threads"
+      ),
+      rebuild_update_waiting_medium_threads: numberFromRecord(
+        value.overview,
+        "rebuild_update_waiting_medium_threads"
+      ),
+      rebuild_update_waiting_low_threads: numberFromRecord(
+        value.overview,
+        "rebuild_update_waiting_low_threads"
+      ),
       rebuilt_threads: numberFromRecord(value.overview, "rebuilt_threads"),
       no_material_threads: numberFromRecord(value.overview, "no_material_threads"),
     },
+    rebuild_update_waiting: normalizeRebuildUpdateWaiting(
+      value.rebuild_update_waiting
+    ),
     usage: {
       post_ai_classification: normalizeUsageSummary(value.usage.post_ai_classification),
       thread_summary_from_classifications: normalizeUsageSummary(
@@ -978,7 +1051,36 @@ export default function ForumAdminPage() {
                       件
                     </span>
                     <span>
-                      AI再総括済み:{" "}
+                      AI再総括更新待ち:{" "}
+                      {formatCount(
+                        aiOpsOverview.overview.rebuild_update_waiting_threads
+                      )}
+                      件
+                    </span>
+                    <span>
+                      更新待ち 高:{" "}
+                      {formatCount(
+                        aiOpsOverview.overview.rebuild_update_waiting_high_threads
+                      )}
+                      件
+                    </span>
+                    <span>
+                      更新待ち 中:{" "}
+                      {formatCount(
+                        aiOpsOverview.overview
+                          .rebuild_update_waiting_medium_threads
+                      )}
+                      件
+                    </span>
+                    <span>
+                      更新待ち 低:{" "}
+                      {formatCount(
+                        aiOpsOverview.overview.rebuild_update_waiting_low_threads
+                      )}
+                      件
+                    </span>
+                    <span>
+                      AI再総括済み（更新不要）:{" "}
                       {formatCount(aiOpsOverview.overview.rebuilt_threads)}件
                     </span>
                     <span>
@@ -986,6 +1088,12 @@ export default function ForumAdminPage() {
                       {formatCount(aiOpsOverview.overview.no_material_threads)}件
                     </span>
                   </div>
+                  <p style={{ ...menuDescriptionStyle, fontSize: 13 }}>
+                    AI再総括待ちは、分類済みコメントがあるがまだ一度もAI再総括していないスレッドです。AI再総括更新待ちは、再総括後に新しい分類済みコメントが追加されたスレッドです。AI再総括済みは、最新の分類済みコメントまで反映済みです。
+                  </p>
+                  <p style={{ ...menuDescriptionStyle, fontSize: 13 }}>
+                    優先度 高: 反論・前提・根拠・検証指標など、結論が変わる可能性が高い追加あり。中: 事例・同意など、説明を補強する追加あり。低: 感情反応・論点ずれ中心。
+                  </p>
 
                   <div style={{ marginTop: 12, fontWeight: 900 }}>
                     OpenAI使用量

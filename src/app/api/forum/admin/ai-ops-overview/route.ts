@@ -17,9 +17,34 @@ const FEATURE_KEYS = [
   "thread_summary_from_classifications",
 ] as const;
 const CLASSIFICATION_SUMMARY_TYPE = "thread_summary_from_classifications";
+const UPDATE_CLASSIFICATION_KEYS = [
+  "agreement",
+  "rebuttal",
+  "premise_addition",
+  "evidence_addition",
+  "case_addition",
+  "metric_suggestion",
+  "topic_shift",
+  "emotional_reaction",
+  "needs_review_or_misinformation_risk",
+] as const;
+const HIGH_UPDATE_CLASSIFICATIONS = new Set<UpdateClassificationKey>([
+  "rebuttal",
+  "premise_addition",
+  "evidence_addition",
+  "metric_suggestion",
+  "needs_review_or_misinformation_risk",
+]);
+const MEDIUM_UPDATE_CLASSIFICATIONS = new Set<UpdateClassificationKey>([
+  "case_addition",
+  "agreement",
+]);
 const PAGE_SIZE = 1000;
 
 type FeatureKey = (typeof FEATURE_KEYS)[number];
+type UpdateClassificationKey = (typeof UPDATE_CLASSIFICATION_KEYS)[number];
+type UpdatePriority = "high" | "medium" | "low";
+type ChangedClassificationCounts = Record<UpdateClassificationKey, number>;
 
 type ThreadRow = {
   id: string;
@@ -34,10 +59,14 @@ type PostRow = {
 type ClassificationRow = {
   post_id: string | null;
   thread_id: string | null;
+  classification: string | null;
+  created_at: string | null;
 };
 
 type SummaryRow = {
   thread_id: string | null;
+  updated_at: string | null;
+  created_at: string | null;
 };
 
 type UsageLogRow = {
@@ -82,6 +111,69 @@ function toNumber(value: unknown) {
 
 function isFeatureKey(value: string | null): value is FeatureKey {
   return FEATURE_KEYS.includes(value as FeatureKey);
+}
+
+function isUpdateClassificationKey(
+  value: string | null
+): value is UpdateClassificationKey {
+  return UPDATE_CLASSIFICATION_KEYS.includes(value as UpdateClassificationKey);
+}
+
+function emptyChangedClassificationCounts(): ChangedClassificationCounts {
+  const counts = {} as ChangedClassificationCounts;
+  for (const key of UPDATE_CLASSIFICATION_KEYS) {
+    counts[key] = 0;
+  }
+  return counts;
+}
+
+function getTimestampMs(value: string | null | undefined) {
+  if (!value) return null;
+
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function getSummaryTimestampMs(row: SummaryRow) {
+  return getTimestampMs(row.updated_at) ?? getTimestampMs(row.created_at) ?? 0;
+}
+
+function getUpdatePriority(classification: string | null): UpdatePriority {
+  if (
+    isUpdateClassificationKey(classification) &&
+    HIGH_UPDATE_CLASSIFICATIONS.has(classification)
+  ) {
+    return "high";
+  }
+
+  if (
+    isUpdateClassificationKey(classification) &&
+    MEDIUM_UPDATE_CLASSIFICATIONS.has(classification)
+  ) {
+    return "medium";
+  }
+
+  return "low";
+}
+
+function higherPriority(
+  current: UpdatePriority,
+  next: UpdatePriority
+): UpdatePriority {
+  const priorityRank: Record<UpdatePriority, number> = {
+    low: 1,
+    medium: 2,
+    high: 3,
+  };
+
+  return priorityRank[next] > priorityRank[current] ? next : current;
+}
+
+function boostPriorityByCount(priority: UpdatePriority, changedCount: number) {
+  if (changedCount < 10) return priority;
+  if (priority === "low") return "medium";
+  if (priority === "medium") return "high";
+  return priority;
 }
 
 async function fetchAll<T>(
@@ -184,14 +276,14 @@ export async function GET(request: NextRequest) {
         fetchAll<ClassificationRow>((from, to) =>
           supabase
             .from("forum_post_ai_classifications")
-            .select("post_id, thread_id")
+            .select("post_id, thread_id, classification, created_at")
             .eq("is_active", true)
             .range(from, to)
         ),
         fetchAll<SummaryRow>((from, to) =>
           supabase
             .from("thread_ai_structures")
-            .select("thread_id")
+            .select("thread_id, updated_at, created_at")
             .eq("summary_type", CLASSIFICATION_SUMMARY_TYPE)
             .range(from, to)
         ),
@@ -236,14 +328,20 @@ export async function GET(request: NextRequest) {
         .map((row) => row.thread_id)
         .filter((threadId): threadId is string => Boolean(threadId))
     );
-    const rebuiltThreadIds = new Set(
-      rebuiltSummaries
-        .map((row) => row.thread_id)
-        .filter(
-          (threadId): threadId is string =>
-            typeof threadId === "string" && activeThreadIds.has(threadId)
-        )
-    );
+    const latestRebuildAtByThread = new Map<string, number>();
+    for (const row of rebuiltSummaries) {
+      if (!row.thread_id || !activeThreadIds.has(row.thread_id)) {
+        continue;
+      }
+
+      const rebuildAt = getSummaryTimestampMs(row);
+      const currentRebuildAt = latestRebuildAtByThread.get(row.thread_id);
+      if (currentRebuildAt === undefined || rebuildAt > currentRebuildAt) {
+        latestRebuildAtByThread.set(row.thread_id, rebuildAt);
+      }
+    }
+
+    const rebuiltThreadIds = new Set(latestRebuildAtByThread.keys());
     const classificationWaitingPosts = targetPosts.filter(
       (post) => !classifiedPostIds.has(post.id)
     );
@@ -255,6 +353,60 @@ export async function GET(request: NextRequest) {
     const rebuildWaitingThreadIds = new Set(
       Array.from(classifiedThreadIds).filter(
         (threadId) => !rebuiltThreadIds.has(threadId)
+      )
+    );
+    const changedClassifications = emptyChangedClassificationCounts();
+    const updateWaitingByThread = new Map<
+      string,
+      { priority: UpdatePriority; changedCount: number }
+    >();
+
+    for (const row of activeClassifications) {
+      if (!row.thread_id) {
+        continue;
+      }
+
+      const rebuildAt = latestRebuildAtByThread.get(row.thread_id);
+      if (rebuildAt === undefined) {
+        continue;
+      }
+
+      const classifiedAt = getTimestampMs(row.created_at);
+      if (classifiedAt === null || classifiedAt <= rebuildAt) {
+        continue;
+      }
+
+      if (isUpdateClassificationKey(row.classification)) {
+        changedClassifications[row.classification] += 1;
+      }
+
+      const priority = getUpdatePriority(row.classification);
+      const current = updateWaitingByThread.get(row.thread_id);
+      if (current) {
+        current.priority = higherPriority(current.priority, priority);
+        current.changedCount += 1;
+      } else {
+        updateWaitingByThread.set(row.thread_id, {
+          priority,
+          changedCount: 1,
+        });
+      }
+    }
+
+    const updateWaitingPriorityCounts: Record<UpdatePriority, number> = {
+      high: 0,
+      medium: 0,
+      low: 0,
+    };
+    for (const entry of updateWaitingByThread.values()) {
+      const priority = boostPriorityByCount(entry.priority, entry.changedCount);
+      updateWaitingPriorityCounts[priority] += 1;
+    }
+
+    const rebuildUpdateWaitingThreadIds = new Set(updateWaitingByThread.keys());
+    const rebuiltUpToDateThreadIds = new Set(
+      Array.from(rebuiltThreadIds).filter(
+        (threadId) => !rebuildUpdateWaitingThreadIds.has(threadId)
       )
     );
     const usageByFeature = {
@@ -280,11 +432,22 @@ export async function GET(request: NextRequest) {
         classification_waiting_posts: classificationWaitingPosts.length,
         classified_threads: classifiedThreadIds.size,
         rebuild_waiting_threads: rebuildWaitingThreadIds.size,
-        rebuilt_threads: rebuiltThreadIds.size,
+        rebuild_update_waiting_threads: rebuildUpdateWaitingThreadIds.size,
+        rebuild_update_waiting_high_threads: updateWaitingPriorityCounts.high,
+        rebuild_update_waiting_medium_threads: updateWaitingPriorityCounts.medium,
+        rebuild_update_waiting_low_threads: updateWaitingPriorityCounts.low,
+        rebuilt_threads: rebuiltUpToDateThreadIds.size,
         no_material_threads: Math.max(
           0,
           activeThreadIds.size - materialThreadIds.size
         ),
+      },
+      rebuild_update_waiting: {
+        total_threads: rebuildUpdateWaitingThreadIds.size,
+        high_threads: updateWaitingPriorityCounts.high,
+        medium_threads: updateWaitingPriorityCounts.medium,
+        low_threads: updateWaitingPriorityCounts.low,
+        changed_classifications: changedClassifications,
       },
       usage: usageByFeature,
     });
