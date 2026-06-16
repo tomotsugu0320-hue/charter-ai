@@ -482,6 +482,21 @@ export default function ReEvaluateLogicScorePage() {
         ← forum管理トップへ戻る
       </Link>
 
+      <Link
+        href={`/${tenant}/forum`}
+        style={{
+          display: "inline-block",
+          color: "#1d4ed8",
+          fontWeight: 800,
+          marginBottom: 14,
+          marginLeft: 12,
+          padding: "6px 0",
+          textDecoration: "underline",
+        }}
+      >
+        ← Forumトップへ戻る
+      </Link>
+
       <h1 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 800 }}>
         単一投稿AI論理スコア再評価
       </h1>
