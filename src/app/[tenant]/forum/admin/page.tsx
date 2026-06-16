@@ -63,6 +63,47 @@ const buttonStyle: CSSProperties = {
   padding: "10px 14px",
 };
 
+type AiOpsMode = "classify" | "rebuild";
+
+type RecentThreadTarget = {
+  threadId: string;
+  title: string;
+};
+
+type AiOpsItemResult = {
+  threadId: string;
+  title: string;
+  status: "completed" | "skipped" | "failed";
+  message: string;
+};
+
+type AiOpsResult = {
+  label: string;
+  targetCount: number;
+  executedCount: number;
+  successCount: number;
+  skippedCount: number;
+  failedCount: number;
+  items: AiOpsItemResult[];
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function getThreadId(value: unknown) {
+  if (!isRecord(value)) return "";
+
+  return String(value.id ?? value.thread_id ?? "").trim();
+}
+
+function getThreadTitle(value: unknown) {
+  if (!isRecord(value)) return "無題のスレッド";
+
+  const title = String(value.title ?? "").trim();
+  return title || "無題のスレッド";
+}
+
 export default function ForumAdminPage() {
   const params = useParams();
   const tenantParam = params?.tenant;
@@ -73,6 +114,9 @@ export default function ForumAdminPage() {
   const [isVerified, setIsVerified] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState("");
+  const [aiOpsLoading, setAiOpsLoading] = useState<AiOpsMode | null>(null);
+  const [aiOpsMessage, setAiOpsMessage] = useState("");
+  const [aiOpsResult, setAiOpsResult] = useState<AiOpsResult | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -147,6 +191,287 @@ export default function ForumAdminPage() {
       setAdminKey("");
       setIsVerified(false);
       setIsChecking(false);
+    }
+  }
+
+  async function loadRecentThreadTargets() {
+    const response = await fetch("/api/forum/top-summary", {
+      cache: "no-store",
+    });
+    const result = (await response.json().catch(() => null)) as unknown;
+
+    if (!response.ok || !isRecord(result) || result.success === false) {
+      throw new Error(
+        isRecord(result) && typeof result.error === "string"
+          ? result.error
+          : "最新スレッドを取得できませんでした。"
+      );
+    }
+
+    const recentThreads = Array.isArray(result.recentThreads)
+      ? result.recentThreads.slice(0, 5)
+      : [];
+
+    return recentThreads.map((thread) => ({
+      threadId: getThreadId(thread),
+      title: getThreadTitle(thread),
+    }));
+  }
+
+  async function runClassifyLatestThreads() {
+    if (aiOpsLoading) return;
+
+    setAiOpsLoading("classify");
+    setAiOpsMessage("最新5件のコメント分類を実行しています。");
+    setAiOpsResult(null);
+
+    const items: AiOpsItemResult[] = [];
+    let executedCount = 0;
+    let successCount = 0;
+    let skippedCount = 0;
+    let failedCount = 0;
+
+    try {
+      const targets = await loadRecentThreadTargets();
+
+      for (const target of targets) {
+        if (!target.threadId) {
+          skippedCount += 1;
+          items.push({
+            threadId: "",
+            title: target.title,
+            status: "skipped",
+            message: "thread_idなし",
+          });
+          continue;
+        }
+
+        executedCount += 1;
+
+        try {
+          const response = await fetch("/api/forum/admin/classify-posts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              thread_id: target.threadId,
+              max_items: 5,
+              force_reclassify: false,
+            }),
+            cache: "no-store",
+          });
+          const result = (await response.json().catch(() => null)) as unknown;
+
+          if (!response.ok || (isRecord(result) && result.ok === false)) {
+            throw new Error(
+              isRecord(result) && typeof result.error === "string"
+                ? result.error
+                : "コメント分類に失敗しました。"
+            );
+          }
+
+          const processed = isRecord(result) ? Number(result.processed_count ?? 0) : 0;
+          const success = isRecord(result) ? Number(result.success_count ?? 0) : 0;
+          const skipped = isRecord(result) ? Number(result.skipped_count ?? 0) : 0;
+          const failed = isRecord(result) ? Number(result.failed_count ?? 0) : 0;
+
+          successCount += Number.isFinite(success) ? success : 0;
+          skippedCount += Number.isFinite(skipped) ? skipped : 0;
+          failedCount += Number.isFinite(failed) ? failed : 0;
+          items.push({
+            threadId: target.threadId,
+            title: target.title,
+            status: failed > 0 ? "failed" : success > 0 ? "completed" : "skipped",
+            message: `処理 ${processed}件 / 成功 ${success}件 / skip ${skipped}件 / 失敗 ${failed}件`,
+          });
+        } catch (itemError) {
+          failedCount += 1;
+          items.push({
+            threadId: target.threadId,
+            title: target.title,
+            status: "failed",
+            message:
+              itemError instanceof Error
+                ? itemError.message
+                : "コメント分類に失敗しました。",
+          });
+        }
+      }
+
+      setAiOpsResult({
+        label: "最新5件のコメントをAI分類",
+        targetCount: targets.length,
+        executedCount,
+        successCount,
+        skippedCount,
+        failedCount,
+        items,
+      });
+      setAiOpsMessage("コメント分類が完了しました。");
+    } catch (runError) {
+      setAiOpsMessage(
+        runError instanceof Error
+          ? runError.message
+          : "コメント分類を実行できませんでした。"
+      );
+      setAiOpsResult(null);
+    } finally {
+      setAiOpsLoading(null);
+    }
+  }
+
+  async function runRebuildLatestThreads() {
+    if (aiOpsLoading) return;
+
+    setAiOpsLoading("rebuild");
+    setAiOpsMessage("最新5件のAI再総括を確認・実行しています。");
+    setAiOpsResult(null);
+
+    const items: AiOpsItemResult[] = [];
+    let executedCount = 0;
+    let successCount = 0;
+    let skippedCount = 0;
+    let failedCount = 0;
+
+    try {
+      const targets = await loadRecentThreadTargets();
+
+      for (const target of targets) {
+        if (!target.threadId) {
+          skippedCount += 1;
+          items.push({
+            threadId: "",
+            title: target.title,
+            status: "skipped",
+            message: "thread_idなし",
+          });
+          continue;
+        }
+
+        let detail: unknown = null;
+
+        try {
+          const detailResponse = await fetch(
+            `/api/forum/thread-detail?threadId=${encodeURIComponent(target.threadId)}`,
+            { cache: "no-store" }
+          );
+          detail = await detailResponse.json().catch(() => null);
+
+          if (!detailResponse.ok || !isRecord(detail)) {
+            skippedCount += 1;
+            items.push({
+              threadId: target.threadId,
+              title: target.title,
+              status: "skipped",
+              message: "thread-detail取得失敗",
+            });
+            continue;
+          }
+        } catch {
+          skippedCount += 1;
+          items.push({
+            threadId: target.threadId,
+            title: target.title,
+            status: "skipped",
+            message: "thread-detail取得失敗",
+          });
+          continue;
+        }
+
+        const posts = Array.isArray(detail.posts) ? detail.posts : [];
+        const hasClassifiedComment = posts.some(
+          (post) => isRecord(post) && Boolean(post.ai_classification)
+        );
+        const summary = isRecord(detail.summary) ? detail.summary : null;
+        const alreadyRebuilt =
+          summary?.summary_type === "thread_summary_from_classifications";
+
+        if (alreadyRebuilt) {
+          skippedCount += 1;
+          items.push({
+            threadId: target.threadId,
+            title: target.title,
+            status: "skipped",
+            message: "再総括済み",
+          });
+          continue;
+        }
+
+        if (!hasClassifiedComment) {
+          skippedCount += 1;
+          items.push({
+            threadId: target.threadId,
+            title: target.title,
+            status: "skipped",
+            message: "分類済みコメントなし",
+          });
+          continue;
+        }
+
+        executedCount += 1;
+
+        try {
+          const response = await fetch(
+            "/api/forum/admin/thread-summary/rebuild-from-classifications",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ thread_id: target.threadId }),
+              cache: "no-store",
+            }
+          );
+          const result = (await response.json().catch(() => null)) as unknown;
+
+          if (!response.ok || (isRecord(result) && result.ok === false)) {
+            throw new Error(
+              isRecord(result) && typeof result.error === "string"
+                ? result.error
+                : "AI再総括に失敗しました。"
+            );
+          }
+
+          const classifiedCount = isRecord(result)
+            ? Number(result.classified_count ?? 0)
+            : 0;
+          const usedCount = isRecord(result) ? Number(result.used_count ?? 0) : 0;
+
+          successCount += 1;
+          items.push({
+            threadId: target.threadId,
+            title: target.title,
+            status: "completed",
+            message: `再総括済み（分類 ${classifiedCount}件 / 使用 ${usedCount}件）`,
+          });
+        } catch (itemError) {
+          failedCount += 1;
+          items.push({
+            threadId: target.threadId,
+            title: target.title,
+            status: "failed",
+            message:
+              itemError instanceof Error ? itemError.message : "AI再総括に失敗しました。",
+          });
+        }
+      }
+
+      setAiOpsResult({
+        label: "最新5件をAI再総括",
+        targetCount: targets.length,
+        executedCount,
+        successCount,
+        skippedCount,
+        failedCount,
+        items,
+      });
+      setAiOpsMessage("AI再総括の確認・実行が完了しました。");
+    } catch (runError) {
+      setAiOpsMessage(
+        runError instanceof Error
+          ? runError.message
+          : "AI再総括を実行できませんでした。"
+      );
+      setAiOpsResult(null);
+    } finally {
+      setAiOpsLoading(null);
     }
   }
 
@@ -236,6 +561,143 @@ export default function ForumAdminPage() {
             >
               管理セッション解除
             </button>
+          </section>
+
+          <section style={{ ...menuCardStyle, marginBottom: 18 }}>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
+              AI管理操作
+            </h2>
+            <p style={menuDescriptionStyle}>
+              最新5件だけを対象に、コメント分類やAI再総括を手動実行します。
+            </p>
+            <p
+              style={{
+                margin: "8px 0 0",
+                color: "#9a3412",
+                fontWeight: 800,
+                lineHeight: 1.7,
+              }}
+            >
+              OpenAI APIを使用します。実行前に対象件数を確認してください。
+            </p>
+
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 10,
+                marginTop: 14,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => void runClassifyLatestThreads()}
+                disabled={Boolean(aiOpsLoading)}
+                style={{
+                  ...buttonStyle,
+                  opacity: aiOpsLoading ? 0.65 : 1,
+                  cursor: aiOpsLoading ? "not-allowed" : "pointer",
+                }}
+              >
+                {aiOpsLoading === "classify"
+                  ? "コメント分類中..."
+                  : "最新5件のコメントをAI分類"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void runRebuildLatestThreads()}
+                disabled={Boolean(aiOpsLoading)}
+                style={{
+                  ...buttonStyle,
+                  borderColor: "#1e40af",
+                  background: "#1e40af",
+                  opacity: aiOpsLoading ? 0.65 : 1,
+                  cursor: aiOpsLoading ? "not-allowed" : "pointer",
+                }}
+              >
+                {aiOpsLoading === "rebuild"
+                  ? "AI再総括中..."
+                  : "最新5件をAI再総括"}
+              </button>
+            </div>
+
+            <p style={{ ...menuDescriptionStyle, fontSize: 13 }}>
+              将来候補: 「コメント分類 → AI再総括」を順番に実行する操作。今回は安全のため実ボタンは置いていません。
+            </p>
+
+            {aiOpsMessage && (
+              <p
+                style={{
+                  margin: "12px 0 0",
+                  color:
+                    aiOpsMessage.includes("できません") ||
+                    aiOpsMessage.includes("失敗")
+                      ? "#991b1b"
+                      : "#334155",
+                  fontWeight: 800,
+                  lineHeight: 1.7,
+                }}
+              >
+                {aiOpsMessage}
+              </p>
+            )}
+
+            {aiOpsResult && (
+              <div
+                style={{
+                  marginTop: 12,
+                  border: "1px solid #dbe3ef",
+                  borderRadius: 8,
+                  background: "#f8fafc",
+                  padding: 12,
+                }}
+              >
+                <div style={{ fontWeight: 900, marginBottom: 8 }}>
+                  {aiOpsResult.label}
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    color: "#475569",
+                    fontSize: 13,
+                    fontWeight: 800,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  <span>対象 {aiOpsResult.targetCount}件</span>
+                  <span>実行 {aiOpsResult.executedCount}件</span>
+                  <span>成功 {aiOpsResult.successCount}件</span>
+                  <span>skip {aiOpsResult.skippedCount}件</span>
+                  <span>失敗 {aiOpsResult.failedCount}件</span>
+                </div>
+                <ul
+                  style={{
+                    margin: "10px 0 0",
+                    paddingLeft: 18,
+                    color: "#334155",
+                    lineHeight: 1.7,
+                  }}
+                >
+                  {aiOpsResult.items.map((item, index) => (
+                    <li key={`${item.threadId || "no-thread"}-${index}`}>
+                      <span style={{ fontWeight: 800 }}>
+                        {item.status === "completed"
+                          ? "成功"
+                          : item.status === "skipped"
+                          ? "skip"
+                          : "失敗"}
+                      </span>
+                      {" / "}
+                      {item.title}
+                      {" / "}
+                      {item.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </section>
 
           <div style={menuGridStyle}>
