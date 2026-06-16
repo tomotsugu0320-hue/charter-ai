@@ -67,6 +67,12 @@ type AiOpsMode = "classify" | "rebuild";
 type AiOpsLimit = 5 | 10 | 20;
 
 const AI_OPS_LIMIT_OPTIONS: AiOpsLimit[] = [5, 10, 20];
+const CLASSIFICATION_TARGET_POST_ROLES = new Set([
+  "opinion",
+  "rebuttal",
+  "supplement",
+  "explanation",
+]);
 
 type RecentThreadTarget = {
   threadId: string;
@@ -93,7 +99,13 @@ type AiOpsResult = {
 type AiOpsPreviewItem = {
   threadId: string;
   title: string;
-  status: "ready" | "unclassified" | "rebuilt" | "missing_thread_id" | "failed";
+  status:
+    | "classification_waiting"
+    | "rebuild_waiting"
+    | "rebuilt"
+    | "no_material"
+    | "missing_thread_id"
+    | "fetch_failed";
   reason: string;
   hasClassifications: boolean;
   isRebuilt: boolean;
@@ -101,10 +113,10 @@ type AiOpsPreviewItem = {
 
 type AiOpsPreview = {
   targetCount: number;
-  classifiedThreadCount: number;
-  unclassifiedThreadCount: number;
+  classificationWaitingCount: number;
+  rebuildWaitingCount: number;
   rebuiltThreadCount: number;
-  rebuildReadyCount: number;
+  noMaterialCount: number;
   failedCount: number;
   missingThreadIdCount: number;
   items: AiOpsPreviewItem[];
@@ -253,10 +265,10 @@ export default function ForumAdminPage() {
     setAiOpsResult(null);
 
     const items: AiOpsPreviewItem[] = [];
-    let classifiedThreadCount = 0;
-    let unclassifiedThreadCount = 0;
+    let classificationWaitingCount = 0;
+    let rebuildWaitingCount = 0;
     let rebuiltThreadCount = 0;
-    let rebuildReadyCount = 0;
+    let noMaterialCount = 0;
     let failedCount = 0;
     let missingThreadIdCount = 0;
 
@@ -289,7 +301,7 @@ export default function ForumAdminPage() {
             items.push({
               threadId: target.threadId,
               title: target.title,
-              status: "failed",
+              status: "fetch_failed",
               reason: "thread-detail取得失敗",
               hasClassifications: false,
               isRebuilt: false,
@@ -298,36 +310,47 @@ export default function ForumAdminPage() {
           }
 
           const posts = Array.isArray(detail.posts) ? detail.posts : [];
-          const hasClassifications = posts.some(
+          const targetPosts = posts.filter(
+            (post) =>
+              isRecord(post) &&
+              typeof post.post_role === "string" &&
+              CLASSIFICATION_TARGET_POST_ROLES.has(post.post_role)
+          );
+          const hasClassifications = targetPosts.some(
             (post) => isRecord(post) && Boolean(post.ai_classification)
           );
           const summary = isRecord(detail.summary) ? detail.summary : null;
           const isRebuilt =
             summary?.summary_type === "thread_summary_from_classifications";
-
-          if (hasClassifications) {
-            classifiedThreadCount += 1;
-          } else {
-            unclassifiedThreadCount += 1;
-          }
+          const hasMaterial = targetPosts.length > 0;
 
           if (isRebuilt) {
             rebuiltThreadCount += 1;
-          }
-
-          if (hasClassifications && !isRebuilt) {
-            rebuildReadyCount += 1;
+          } else if (!hasMaterial) {
+            noMaterialCount += 1;
+          } else if (hasClassifications) {
+            rebuildWaitingCount += 1;
+          } else {
+            classificationWaitingCount += 1;
           }
 
           items.push({
             threadId: target.threadId,
             title: target.title,
-            status: isRebuilt ? "rebuilt" : hasClassifications ? "ready" : "unclassified",
+            status: isRebuilt
+              ? "rebuilt"
+              : !hasMaterial
+              ? "no_material"
+              : hasClassifications
+              ? "rebuild_waiting"
+              : "classification_waiting",
             reason: isRebuilt
               ? "AI再総括済み"
+              : !hasMaterial
+              ? "分類対象のコメント・補足・反論がありません"
               : hasClassifications
-              ? "AI再総括できます"
-              : "分類済みコメントなし",
+              ? "分類済みコメントがあり、AI再総括できます"
+              : "コメントはありますが、まだAI分類されていません",
             hasClassifications,
             isRebuilt,
           });
@@ -336,7 +359,7 @@ export default function ForumAdminPage() {
           items.push({
             threadId: target.threadId,
             title: target.title,
-            status: "failed",
+            status: "fetch_failed",
             reason: "thread-detail取得失敗",
             hasClassifications: false,
             isRebuilt: false,
@@ -346,10 +369,10 @@ export default function ForumAdminPage() {
 
       setAiOpsPreview({
         targetCount: targets.length,
-        classifiedThreadCount,
-        unclassifiedThreadCount,
+        classificationWaitingCount,
+        rebuildWaitingCount,
         rebuiltThreadCount,
-        rebuildReadyCount,
+        noMaterialCount,
         failedCount,
         missingThreadIdCount,
         items,
@@ -870,19 +893,16 @@ export default function ForumAdminPage() {
                   }}
                 >
                   <span>対象スレッド: {aiOpsPreview.targetCount}件</span>
-                  <span>
-                    分類済みコメントあり: {aiOpsPreview.classifiedThreadCount}件
-                  </span>
-                  <span>
-                    分類済みコメントなし: {aiOpsPreview.unclassifiedThreadCount}件
-                  </span>
+                  <span>分類待ち: {aiOpsPreview.classificationWaitingCount}件</span>
+                  <span>再総括待ち: {aiOpsPreview.rebuildWaitingCount}件</span>
                   <span>AI再総括済み: {aiOpsPreview.rebuiltThreadCount}件</span>
-                  <span>
-                    AI再総括できていない: {aiOpsPreview.rebuildReadyCount}件
-                  </span>
+                  <span>材料なし: {aiOpsPreview.noMaterialCount}件</span>
                   <span>取得失敗: {aiOpsPreview.failedCount}件</span>
                   <span>thread_idなし: {aiOpsPreview.missingThreadIdCount}件</span>
                 </div>
+                <p style={{ ...menuDescriptionStyle, fontSize: 13 }}>
+                  分類待ちが多い場合は「コメントをAI分類」を実行してください。再総括待ちが多い場合は「AI再総括」を実行してください。
+                </p>
                 <ul
                   style={{
                     margin: "10px 0 0",
@@ -894,12 +914,14 @@ export default function ForumAdminPage() {
                   {aiOpsPreview.items.map((item, index) => (
                     <li key={`${item.threadId || "no-thread"}-${index}`}>
                       <span style={{ fontWeight: 800 }}>
-                        {item.status === "ready"
-                          ? "再総括候補"
+                        {item.status === "classification_waiting"
+                          ? "分類待ち"
+                          : item.status === "rebuild_waiting"
+                          ? "再総括待ち"
                           : item.status === "rebuilt"
                           ? "再総括済み"
-                          : item.status === "unclassified"
-                          ? "分類なし"
+                          : item.status === "no_material"
+                          ? "材料なし"
                           : item.status === "missing_thread_id"
                           ? "thread_idなし"
                           : "取得失敗"}
