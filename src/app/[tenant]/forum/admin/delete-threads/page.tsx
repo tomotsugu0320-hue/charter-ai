@@ -240,6 +240,18 @@ export default function DeleteThreadsPage() {
         >
           ← Forumトップへ戻る
         </Link>
+        <Link
+          href={`/${tenant}/forum/admin`}
+          style={{
+            display: "inline-block",
+            color: "#1d4ed8",
+            fontWeight: 800,
+            padding: "6px 0",
+            textDecoration: "underline",
+          }}
+        >
+          ← 管理メニューへ戻る
+        </Link>
         <ForumHamburgerMenu tenant={tenant} />
       </div>
 

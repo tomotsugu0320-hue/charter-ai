@@ -556,6 +556,20 @@ export default function AdminUsersPage() {
         ← forum管理トップへ戻る
       </Link>
 
+      <Link
+        href={`/${tenant}/forum`}
+        style={{
+          display: "inline-block",
+          marginBottom: 14,
+          marginLeft: 12,
+          color: "#2563eb",
+          fontWeight: 800,
+          textDecoration: "none",
+        }}
+      >
+        ← Forumトップへ戻る
+      </Link>
+
       <h1 style={{ margin: "0 0 8px", fontSize: 28, fontWeight: 900 }}>
         登録ユーザー管理
       </h1>

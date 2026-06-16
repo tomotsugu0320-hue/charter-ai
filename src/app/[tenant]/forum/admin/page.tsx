@@ -962,25 +962,6 @@ export default function ForumAdminPage() {
       {isVerified && (
         <>
           <section style={{ ...menuCardStyle, marginBottom: 18 }}>
-            <div style={{ fontWeight: 900, marginBottom: 8 }}>
-              管理者セッションが有効です。
-            </div>
-            <button
-              type="button"
-              onClick={() => void clearAdminSession()}
-              disabled={isChecking}
-              style={{
-                ...buttonStyle,
-                borderColor: "#991b1b",
-                background: "#991b1b",
-                opacity: isChecking ? 0.65 : 1,
-              }}
-            >
-              管理セッション解除
-            </button>
-          </section>
-
-          <section style={{ ...menuCardStyle, marginBottom: 18 }}>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
               コメント分類・AI再総括
             </h2>
@@ -1523,6 +1504,25 @@ export default function ForumAdminPage() {
             </p>
           </Link>
           </div>
+
+          <section style={{ ...menuCardStyle, marginTop: 18 }}>
+            <div style={{ fontWeight: 900, marginBottom: 8 }}>
+              管理者セッションが有効です。
+            </div>
+            <button
+              type="button"
+              onClick={() => void clearAdminSession()}
+              disabled={isChecking}
+              style={{
+                ...buttonStyle,
+                borderColor: "#991b1b",
+                background: "#991b1b",
+                opacity: isChecking ? 0.65 : 1,
+              }}
+            >
+              管理セッション解除
+            </button>
+          </section>
         </>
       )}
     </main>
