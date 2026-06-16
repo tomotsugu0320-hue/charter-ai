@@ -64,6 +64,9 @@ const buttonStyle: CSSProperties = {
 };
 
 type AiOpsMode = "classify" | "rebuild";
+type AiOpsLimit = 5 | 10 | 20;
+
+const AI_OPS_LIMIT_OPTIONS: AiOpsLimit[] = [5, 10, 20];
 
 type RecentThreadTarget = {
   threadId: string;
@@ -85,6 +88,26 @@ type AiOpsResult = {
   skippedCount: number;
   failedCount: number;
   items: AiOpsItemResult[];
+};
+
+type AiOpsPreviewItem = {
+  threadId: string;
+  title: string;
+  status: "ready" | "unclassified" | "rebuilt" | "missing_thread_id" | "failed";
+  reason: string;
+  hasClassifications: boolean;
+  isRebuilt: boolean;
+};
+
+type AiOpsPreview = {
+  targetCount: number;
+  classifiedThreadCount: number;
+  unclassifiedThreadCount: number;
+  rebuiltThreadCount: number;
+  rebuildReadyCount: number;
+  failedCount: number;
+  missingThreadIdCount: number;
+  items: AiOpsPreviewItem[];
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -114,7 +137,10 @@ export default function ForumAdminPage() {
   const [isVerified, setIsVerified] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState("");
+  const [aiOpsLimit, setAiOpsLimit] = useState<AiOpsLimit>(5);
   const [aiOpsLoading, setAiOpsLoading] = useState<AiOpsMode | null>(null);
+  const [aiOpsPreviewLoading, setAiOpsPreviewLoading] = useState(false);
+  const [aiOpsPreview, setAiOpsPreview] = useState<AiOpsPreview | null>(null);
   const [aiOpsMessage, setAiOpsMessage] = useState("");
   const [aiOpsResult, setAiOpsResult] = useState<AiOpsResult | null>(null);
 
@@ -194,7 +220,7 @@ export default function ForumAdminPage() {
     }
   }
 
-  async function loadRecentThreadTargets() {
+  async function loadRecentThreadTargets(limit: AiOpsLimit) {
     const response = await fetch("/api/forum/top-summary", {
       cache: "no-store",
     });
@@ -209,7 +235,7 @@ export default function ForumAdminPage() {
     }
 
     const recentThreads = Array.isArray(result.recentThreads)
-      ? result.recentThreads.slice(0, 5)
+      ? result.recentThreads.slice(0, limit)
       : [];
 
     return recentThreads.map((thread) => ({
@@ -218,11 +244,136 @@ export default function ForumAdminPage() {
     }));
   }
 
+  async function loadAiOpsPreview() {
+    if (aiOpsPreviewLoading || aiOpsLoading) return;
+
+    const selectedLimit = aiOpsLimit;
+    setAiOpsPreviewLoading(true);
+    setAiOpsMessage(`最新${selectedLimit}件の状況を確認しています。`);
+    setAiOpsResult(null);
+
+    const items: AiOpsPreviewItem[] = [];
+    let classifiedThreadCount = 0;
+    let unclassifiedThreadCount = 0;
+    let rebuiltThreadCount = 0;
+    let rebuildReadyCount = 0;
+    let failedCount = 0;
+    let missingThreadIdCount = 0;
+
+    try {
+      const targets = await loadRecentThreadTargets(selectedLimit);
+
+      for (const target of targets) {
+        if (!target.threadId) {
+          missingThreadIdCount += 1;
+          items.push({
+            threadId: "",
+            title: target.title,
+            status: "missing_thread_id",
+            reason: "thread_idなし",
+            hasClassifications: false,
+            isRebuilt: false,
+          });
+          continue;
+        }
+
+        try {
+          const detailResponse = await fetch(
+            `/api/forum/thread-detail?threadId=${encodeURIComponent(target.threadId)}`,
+            { cache: "no-store" }
+          );
+          const detail = (await detailResponse.json().catch(() => null)) as unknown;
+
+          if (!detailResponse.ok || !isRecord(detail)) {
+            failedCount += 1;
+            items.push({
+              threadId: target.threadId,
+              title: target.title,
+              status: "failed",
+              reason: "thread-detail取得失敗",
+              hasClassifications: false,
+              isRebuilt: false,
+            });
+            continue;
+          }
+
+          const posts = Array.isArray(detail.posts) ? detail.posts : [];
+          const hasClassifications = posts.some(
+            (post) => isRecord(post) && Boolean(post.ai_classification)
+          );
+          const summary = isRecord(detail.summary) ? detail.summary : null;
+          const isRebuilt =
+            summary?.summary_type === "thread_summary_from_classifications";
+
+          if (hasClassifications) {
+            classifiedThreadCount += 1;
+          } else {
+            unclassifiedThreadCount += 1;
+          }
+
+          if (isRebuilt) {
+            rebuiltThreadCount += 1;
+          }
+
+          if (hasClassifications && !isRebuilt) {
+            rebuildReadyCount += 1;
+          }
+
+          items.push({
+            threadId: target.threadId,
+            title: target.title,
+            status: isRebuilt ? "rebuilt" : hasClassifications ? "ready" : "unclassified",
+            reason: isRebuilt
+              ? "AI再総括済み"
+              : hasClassifications
+              ? "AI再総括できます"
+              : "分類済みコメントなし",
+            hasClassifications,
+            isRebuilt,
+          });
+        } catch {
+          failedCount += 1;
+          items.push({
+            threadId: target.threadId,
+            title: target.title,
+            status: "failed",
+            reason: "thread-detail取得失敗",
+            hasClassifications: false,
+            isRebuilt: false,
+          });
+        }
+      }
+
+      setAiOpsPreview({
+        targetCount: targets.length,
+        classifiedThreadCount,
+        unclassifiedThreadCount,
+        rebuiltThreadCount,
+        rebuildReadyCount,
+        failedCount,
+        missingThreadIdCount,
+        items,
+      });
+      setAiOpsMessage("状況確認が完了しました。OpenAI APIは使用していません。");
+    } catch (previewError) {
+      setAiOpsPreview(null);
+      setAiOpsMessage(
+        previewError instanceof Error
+          ? previewError.message
+          : "状況を確認できませんでした。"
+      );
+    } finally {
+      setAiOpsPreviewLoading(false);
+    }
+  }
+
   async function runClassifyLatestThreads() {
     if (aiOpsLoading) return;
 
+    const selectedLimit = aiOpsLimit;
     setAiOpsLoading("classify");
-    setAiOpsMessage("最新5件のコメント分類を実行しています。");
+    setAiOpsMessage(`最新${selectedLimit}件のコメント分類を実行しています。`);
+    setAiOpsPreview(null);
     setAiOpsResult(null);
 
     const items: AiOpsItemResult[] = [];
@@ -232,7 +383,7 @@ export default function ForumAdminPage() {
     let failedCount = 0;
 
     try {
-      const targets = await loadRecentThreadTargets();
+      const targets = await loadRecentThreadTargets(selectedLimit);
 
       for (const target of targets) {
         if (!target.threadId) {
@@ -298,7 +449,7 @@ export default function ForumAdminPage() {
       }
 
       setAiOpsResult({
-        label: "最新5件のコメントをAI分類",
+        label: `最新${selectedLimit}件のコメントをAI分類`,
         targetCount: targets.length,
         executedCount,
         successCount,
@@ -322,8 +473,10 @@ export default function ForumAdminPage() {
   async function runRebuildLatestThreads() {
     if (aiOpsLoading) return;
 
+    const selectedLimit = aiOpsLimit;
     setAiOpsLoading("rebuild");
-    setAiOpsMessage("最新5件のAI再総括を確認・実行しています。");
+    setAiOpsMessage(`最新${selectedLimit}件のAI再総括を確認・実行しています。`);
+    setAiOpsPreview(null);
     setAiOpsResult(null);
 
     const items: AiOpsItemResult[] = [];
@@ -333,7 +486,7 @@ export default function ForumAdminPage() {
     let failedCount = 0;
 
     try {
-      const targets = await loadRecentThreadTargets();
+      const targets = await loadRecentThreadTargets(selectedLimit);
 
       for (const target of targets) {
         if (!target.threadId) {
@@ -454,7 +607,7 @@ export default function ForumAdminPage() {
       }
 
       setAiOpsResult({
-        label: "最新5件をAI再総括",
+        label: `最新${selectedLimit}件をAI再総括`,
         targetCount: targets.length,
         executedCount,
         successCount,
@@ -568,7 +721,7 @@ export default function ForumAdminPage() {
               AI管理操作
             </h2>
             <p style={menuDescriptionStyle}>
-              最新5件だけを対象に、コメント分類やAI再総括を手動実行します。
+              選択した最新スレッドだけを対象に、コメント分類やAI再総括を手動実行します。
             </p>
             <p
               style={{
@@ -578,8 +731,41 @@ export default function ForumAdminPage() {
                 lineHeight: 1.7,
               }}
             >
-              OpenAI APIを使用します。実行前に対象件数を確認してください。
+              状況確認はOpenAI APIを使いません。コメント分類とAI再総括はOpenAI APIを使用します。
             </p>
+
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontWeight: 900, marginBottom: 8 }}>
+                対象件数
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {AI_OPS_LIMIT_OPTIONS.map((limit) => (
+                  <button
+                    key={limit}
+                    type="button"
+                    onClick={() => {
+                      setAiOpsLimit(limit);
+                      setAiOpsPreview(null);
+                      setAiOpsResult(null);
+                      setAiOpsMessage("");
+                    }}
+                    disabled={Boolean(aiOpsLoading) || aiOpsPreviewLoading}
+                    style={{
+                      border: "1px solid #cbd5e1",
+                      borderRadius: 999,
+                      background: aiOpsLimit === limit ? "#111827" : "#ffffff",
+                      color: aiOpsLimit === limit ? "#ffffff" : "#111827",
+                      cursor:
+                        aiOpsLoading || aiOpsPreviewLoading ? "not-allowed" : "pointer",
+                      fontWeight: 800,
+                      padding: "8px 12px",
+                    }}
+                  >
+                    最新{limit}件
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div
               style={{
@@ -587,37 +773,54 @@ export default function ForumAdminPage() {
                 flexWrap: "wrap",
                 gap: 10,
                 marginTop: 14,
-              }}
-            >
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => void loadAiOpsPreview()}
+                  disabled={Boolean(aiOpsLoading) || aiOpsPreviewLoading}
+                  style={{
+                    ...buttonStyle,
+                    borderColor: "#475569",
+                    background: "#475569",
+                    opacity: aiOpsLoading || aiOpsPreviewLoading ? 0.65 : 1,
+                    cursor:
+                      aiOpsLoading || aiOpsPreviewLoading ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {aiOpsPreviewLoading ? "状況確認中..." : "状況を確認"}
+                </button>
               <button
                 type="button"
                 onClick={() => void runClassifyLatestThreads()}
-                disabled={Boolean(aiOpsLoading)}
+                disabled={Boolean(aiOpsLoading) || aiOpsPreviewLoading}
                 style={{
                   ...buttonStyle,
-                  opacity: aiOpsLoading ? 0.65 : 1,
-                  cursor: aiOpsLoading ? "not-allowed" : "pointer",
+                  opacity: aiOpsLoading || aiOpsPreviewLoading ? 0.65 : 1,
+                  cursor:
+                    aiOpsLoading || aiOpsPreviewLoading ? "not-allowed" : "pointer",
                 }}
               >
                 {aiOpsLoading === "classify"
                   ? "コメント分類中..."
-                  : "最新5件のコメントをAI分類"}
+                  : `最新${aiOpsLimit}件のコメントをAI分類`}
               </button>
               <button
                 type="button"
                 onClick={() => void runRebuildLatestThreads()}
-                disabled={Boolean(aiOpsLoading)}
+                disabled={Boolean(aiOpsLoading) || aiOpsPreviewLoading}
                 style={{
                   ...buttonStyle,
                   borderColor: "#1e40af",
                   background: "#1e40af",
-                  opacity: aiOpsLoading ? 0.65 : 1,
-                  cursor: aiOpsLoading ? "not-allowed" : "pointer",
+                  opacity: aiOpsLoading || aiOpsPreviewLoading ? 0.65 : 1,
+                  cursor:
+                    aiOpsLoading || aiOpsPreviewLoading ? "not-allowed" : "pointer",
                 }}
               >
                 {aiOpsLoading === "rebuild"
                   ? "AI再総括中..."
-                  : "最新5件をAI再総括"}
+                  : `最新${aiOpsLimit}件をAI再総括`}
               </button>
             </div>
 
@@ -640,6 +843,75 @@ export default function ForumAdminPage() {
               >
                 {aiOpsMessage}
               </p>
+            )}
+
+            {aiOpsPreview && (
+              <div
+                style={{
+                  marginTop: 12,
+                  border: "1px solid #dbe3ef",
+                  borderRadius: 8,
+                  background: "#f8fafc",
+                  padding: 12,
+                }}
+              >
+                <div style={{ fontWeight: 900, marginBottom: 8 }}>
+                  選択対象: 最新{aiOpsLimit}件
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                    gap: 8,
+                    color: "#334155",
+                    fontSize: 13,
+                    fontWeight: 800,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  <span>対象スレッド: {aiOpsPreview.targetCount}件</span>
+                  <span>
+                    分類済みコメントあり: {aiOpsPreview.classifiedThreadCount}件
+                  </span>
+                  <span>
+                    分類済みコメントなし: {aiOpsPreview.unclassifiedThreadCount}件
+                  </span>
+                  <span>AI再総括済み: {aiOpsPreview.rebuiltThreadCount}件</span>
+                  <span>
+                    AI再総括できていない: {aiOpsPreview.rebuildReadyCount}件
+                  </span>
+                  <span>取得失敗: {aiOpsPreview.failedCount}件</span>
+                  <span>thread_idなし: {aiOpsPreview.missingThreadIdCount}件</span>
+                </div>
+                <ul
+                  style={{
+                    margin: "10px 0 0",
+                    paddingLeft: 18,
+                    color: "#475569",
+                    lineHeight: 1.7,
+                  }}
+                >
+                  {aiOpsPreview.items.map((item, index) => (
+                    <li key={`${item.threadId || "no-thread"}-${index}`}>
+                      <span style={{ fontWeight: 800 }}>
+                        {item.status === "ready"
+                          ? "再総括候補"
+                          : item.status === "rebuilt"
+                          ? "再総括済み"
+                          : item.status === "unclassified"
+                          ? "分類なし"
+                          : item.status === "missing_thread_id"
+                          ? "thread_idなし"
+                          : "取得失敗"}
+                      </span>
+                      {" / "}
+                      {item.title}
+                      {" / "}
+                      {item.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             {aiOpsResult && (
