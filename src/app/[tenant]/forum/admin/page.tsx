@@ -347,6 +347,7 @@ export default function ForumAdminPage() {
   const [isVerified, setIsVerified] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState("");
+  const [isAiOpsPanelOpen, setIsAiOpsPanelOpen] = useState(false);
   const [aiOpsLimit, setAiOpsLimit] = useState<AiOpsLimit>(5);
   const [aiOpsLoading, setAiOpsLoading] = useState<AiOpsMode | null>(null);
   const [aiOpsPreviewLoading, setAiOpsPreviewLoading] = useState(false);
@@ -986,6 +987,21 @@ export default function ForumAdminPage() {
             <p style={menuDescriptionStyle}>
               コメントのAI分類、AI再総括、全体状況、OpenAI使用量を確認・実行します。
             </p>
+            <button
+              type="button"
+              onClick={() => setIsAiOpsPanelOpen((current) => !current)}
+              style={{
+                ...buttonStyle,
+                marginTop: 12,
+                borderColor: "#475569",
+                background: isAiOpsPanelOpen ? "#475569" : "#111827",
+              }}
+            >
+              {isAiOpsPanelOpen ? "操作を閉じる" : "操作を表示"}
+            </button>
+
+            {isAiOpsPanelOpen && (
+              <>
             <p
               style={{
                 margin: "8px 0 0",
@@ -1438,6 +1454,8 @@ export default function ForumAdminPage() {
                   ))}
                 </ul>
               </div>
+            )}
+              </>
             )}
           </section>
 
