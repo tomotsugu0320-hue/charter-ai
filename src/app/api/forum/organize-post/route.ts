@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
 import { getErrorMessage, recordForumApiUsageLog } from "@/lib/forum-api-usage";
+import { maskForumPrivacyText } from "@/lib/forum-privacy";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const text = String(body?.text ?? "").trim();
+    const text = maskForumPrivacyText(String(body?.text ?? "").trim());
     const tenantSlug =
       String(body?.tenantSlug ?? body?.tenant_slug ?? "default").trim() ||
       "default";

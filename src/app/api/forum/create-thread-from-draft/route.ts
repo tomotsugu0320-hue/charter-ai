@@ -6,6 +6,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
+import {
+  maskForumPrivacyArray,
+  maskForumPrivacyText,
+} from "@/lib/forum-privacy";
 
 function makeSlug(input: string) {
   const base = input
@@ -488,28 +492,56 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
-    const title = String(body?.title || "").trim();
-    const claim = String(body?.claim || "").trim();
-    const category = String(
-      body?.category || body?.main_category || body?.mainCategory || ""
-    ).trim();
-    const aiAnswerShort = String(body?.ai_answer_short || body?.aiAnswerShort || "").trim();
-    const aiAnswerDetail = String(body?.ai_answer_detail || body?.aiAnswerDetail || "").trim();
-    const aiAnswer = String(body?.ai_answer || body?.aiAnswer || "").trim();
-    const draftSupplements: unknown[] = Array.isArray(body?.supplements)
-      ? body.supplements
+    const title = maskForumPrivacyText(String(body?.title || "").trim());
+    const claim = maskForumPrivacyText(
+      String(body?.claim || body?.question || body?.body || "").trim()
+    );
+    const category = maskForumPrivacyText(
+      String(
+        body?.category || body?.main_category || body?.mainCategory || ""
+      ).trim()
+    );
+    const aiAnswerShort = maskForumPrivacyText(
+      String(body?.ai_answer_short || body?.aiAnswerShort || "").trim()
+    );
+    const aiAnswerDetail = maskForumPrivacyText(
+      String(body?.ai_answer_detail || body?.aiAnswerDetail || "").trim()
+    );
+    const aiAnswer = maskForumPrivacyText(
+      String(body?.ai_answer || body?.aiAnswer || "").trim()
+    );
+    const draftSupplements = maskForumPrivacyArray(
+      Array.isArray(body?.supplements)
+        ? body.supplements.map((value: unknown) => String(value ?? ""))
+        : []
+    );
+    const draftChildTopics = maskForumPrivacyArray(
+      (Array.isArray(body?.child_topics)
+        ? body.child_topics
+        : Array.isArray(body?.childTopics)
+        ? body.childTopics
+        : []
+      ).map((value: unknown) => String(value ?? ""))
+    );
+    const notSplitReason = maskForumPrivacyText(
+      String(body?.not_split_reason || body?.notSplitReason || "").trim()
+    );
+    const premises = maskForumPrivacyArray(
+      Array.isArray(body?.premises)
+        ? body.premises.map((value: unknown) => String(value ?? ""))
+        : []
+    );
+    const reasons = maskForumPrivacyArray(
+      Array.isArray(body?.reasons)
+        ? body.reasons.map((value: unknown) => String(value ?? ""))
+        : []
+    );
+    const conflicts: Conflict[] = Array.isArray(body?.conflicts)
+      ? body.conflicts.map((conflict: Conflict) => ({
+          opinion: maskForumPrivacyText(String(conflict?.opinion || "").trim()),
+          rebuttal: maskForumPrivacyText(String(conflict?.rebuttal || "").trim()),
+        }))
       : [];
-    const draftChildTopics: unknown[] = Array.isArray(body?.child_topics)
-      ? body.child_topics
-      : Array.isArray(body?.childTopics)
-      ? body.childTopics
-      : [];
-    const notSplitReason = String(
-      body?.not_split_reason || body?.notSplitReason || ""
-    ).trim();
-    const premises: unknown[] = Array.isArray(body?.premises) ? body.premises : [];
-    const reasons: unknown[] = Array.isArray(body?.reasons) ? body.reasons : [];
-    const conflicts: Conflict[] = Array.isArray(body?.conflicts) ? body.conflicts : [];
     const postType = body?.postType === "auto" ? "auto" : "human";
 
     if (!title || !claim) {

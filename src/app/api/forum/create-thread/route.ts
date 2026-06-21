@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
+import { maskForumPrivacyText } from "@/lib/forum-privacy";
 
 
 function makeSlug(input: string) {
@@ -60,7 +61,9 @@ export async function POST(req: NextRequest) {
     }
 
 
-const rawText = suggestion.proposed_text;
+const rawText = maskForumPrivacyText(
+  String(suggestion.proposed_text ?? "").trim()
+);
 
 let category = "政治・経済";
 

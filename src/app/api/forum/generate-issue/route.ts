@@ -6,6 +6,7 @@ import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
 import { getErrorMessage, recordForumApiUsageLog } from "@/lib/forum-api-usage";
+import { maskForumPrivacyText } from "@/lib/forum-privacy";
 
 type DbStructure = {
   premises: string[];
@@ -472,7 +473,9 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const inputText = body?.text ?? body?.content ?? body?.input;
-    text = typeof inputText === "string" ? inputText : "";
+    text = maskForumPrivacyText(
+      typeof inputText === "string" ? inputText : ""
+    );
     const tenantSlug =
       String(body?.tenantSlug ?? body?.tenant_slug ?? "default").trim() ||
       "default";
