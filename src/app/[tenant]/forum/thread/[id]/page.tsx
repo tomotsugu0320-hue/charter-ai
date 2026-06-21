@@ -2118,6 +2118,18 @@ const classifiedSummaryConclusions = normalizeClassifiedSummaryItems(
   classifiedSummaryKeyPoints?.current_tentative_conclusion,
   3
 );
+const isClassificationBasedSummary =
+  summary?.summary_type === "thread_summary_from_classifications";
+const storedSummaryLayers = parseLayeredProvisionalAnswer(storedSummaryText);
+const classifiedConclusionText = (
+  classifiedSummaryConclusions[0] ||
+  summary?.provisional_answer?.trim() ||
+  storedSummaryLayers.simple ||
+  storedSummaryText ||
+  provisionalAnswerText
+)
+  .replace(/\s+/g, " ")
+  .trim();
 const classifiedSummaryHighlights = Array.from(
   new Set(
     [
@@ -2179,7 +2191,7 @@ const classifiedSummarySections = [
   }))
   .filter((section) => section.items.length > 0);
 const shouldShowClassifiedSummary =
-  summary?.summary_type === "thread_summary_from_classifications" ||
+  isClassificationBasedSummary ||
   Boolean(classifiedSummaryEasyText) ||
   Boolean(classifiedSummaryDetailFallbackText) ||
   classifiedSummaryConclusions.length > 0 ||
@@ -3170,7 +3182,18 @@ function renderDiscussionCard({
     投稿内容とAI整理をもとにした、現時点での答えです。今後の反論や補足で更新される可能性があります。
   </div>
 
-  {layeredProvisionalAnswer.hasLayers ? (
+  {isClassificationBasedSummary ? (
+    <p
+      style={{
+        margin: "10px 0 0",
+        color: "#333",
+        fontSize: currentFont.base,
+        lineHeight: 1.7,
+      }}
+    >
+      {compactText(classifiedConclusionText, 260)}
+    </p>
+  ) : layeredProvisionalAnswer.hasLayers ? (
     <div
       style={{
         display: "grid",
