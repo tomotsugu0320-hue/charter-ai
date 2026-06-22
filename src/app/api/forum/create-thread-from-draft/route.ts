@@ -496,6 +496,10 @@ export async function POST(req: NextRequest) {
     const claim = maskForumPrivacyText(
       String(body?.claim || body?.question || body?.body || "").trim()
     );
+    const originalText =
+      typeof body?.original_text === "string"
+        ? maskForumPrivacyText(body.original_text.trim())
+        : "";
     const category = maskForumPrivacyText(
       String(
         body?.category || body?.main_category || body?.mainCategory || ""
@@ -567,10 +571,18 @@ export async function POST(req: NextRequest) {
       childTopics: toCleanStringArray(draftChildTopics, 8),
       notSplitReason,
     });
+    const savedOriginalPost = originalText || draftClaim;
 
     if (draftClaim.length > MAX_DRAFT_CLAIM_LENGTH) {
       return NextResponse.json(
         { success: false, error: "投稿候補の本文が長すぎます。短くしてから投稿してください。" },
+        { status: 400 }
+      );
+    }
+
+    if (savedOriginalPost.length > MAX_DRAFT_CLAIM_LENGTH) {
+      return NextResponse.json(
+        { success: false, error: "投稿者の原文が長すぎます。短くしてから投稿してください。" },
         { status: 400 }
       );
     }
@@ -657,7 +669,7 @@ export async function POST(req: NextRequest) {
       .insert({
         title,
         slug,
-        original_post: draftClaim,
+        original_post: savedOriginalPost,
         category: category || null,
         ai_summary: null,
         is_deleted: false,
@@ -685,7 +697,7 @@ export async function POST(req: NextRequest) {
     }[] = [
     {
       thread_id: threadId,
-      content: draftClaim,
+      content: savedOriginalPost,
       source_type: postType === "auto" ? "ai" : "human",
       post_role: "issue_raise",
       trust_status: "trusted",

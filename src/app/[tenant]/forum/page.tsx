@@ -1469,6 +1469,7 @@ export default function ForumPage() {
           tenantSlug: tenant,
           title: draftTitle,
           claim: finalClaim,
+          original_text: text,
           premises: generatedIssue.premises,
           reasons: generatedIssue.reasons,
           conflicts: generatedIssue.conflicts,
