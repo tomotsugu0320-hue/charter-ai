@@ -202,6 +202,19 @@ function buildPrompt(input: {
 - 「どちらにも一理があります」「バランスが重要」だけで終わらず、何を優先するかを選んでください。
 - 出力は文章を長く連ねず、箇条書き用の短い配列を中心にしてください。
 
+出力件数と内容:
+- proposal_items は原則3〜6件。具体的な政策行動を1項目ずつ書いてください。
+- merits は原則2〜5件。誰に、どの経路で、どのような効果があるかを具体化してください。
+- demerits は原則2〜5件。財政負担、インフレ再燃、円安、制度悪用、政策依存など、提言に実際に関係する副作用だけを書いてください。
+- countermeasures は demerits と対応させ、可能な限り各デメリットに1件以上の対策を示してください。どのデメリットへの対策か分かる文にしてください。
+- opposing_views は原則2件以上。単なる感想ではなく政策上の反論を書いてください。
+- priority_judgment.reasons は原則2件以上。優先または条件付きとする理由を明示してください。
+- verification_metrics は原則3〜6件。指標名だけでなく、見る方向、確認時期、見直し条件との関係を可能な範囲で書いてください。
+- review_conditions は原則2〜5件。政策を停止、縮小、変更すべき条件を書いてください。
+- reference_threads は実際に参照した入力済みスレッドだけを最大5件まで入れてください。関連スレッドがない場合は捏造しないでください。
+- 材料が十分にある場合は各配列を1件だけで終わらせないでください。
+- 材料不足の場合は件数を無理に埋めず、不足論点を missing_information に書いてください。
+
 必ず次の順序で判断してください:
 1. 景気局面を確認する。
 2. 需要不足か需要超過かを判定する。
@@ -434,31 +447,32 @@ export async function POST(request: NextRequest) {
               properties: {
                 title: { type: "string" },
                 one_line_proposal: { type: "string" },
-                proposal_items: { type: "array", items: { type: "string" } },
-                merits: { type: "array", items: { type: "string" } },
-                demerits: { type: "array", items: { type: "string" } },
-                countermeasures: { type: "array", items: { type: "string" } },
-                opposing_views: { type: "array", items: { type: "string" } },
+                proposal_items: { type: "array", maxItems: 6, items: { type: "string" } },
+                merits: { type: "array", maxItems: 5, items: { type: "string" } },
+                demerits: { type: "array", maxItems: 5, items: { type: "string" } },
+                countermeasures: { type: "array", maxItems: 5, items: { type: "string" } },
+                opposing_views: { type: "array", maxItems: 5, items: { type: "string" } },
                 priority_judgment: {
                   type: "object",
                   additionalProperties: false,
                   properties: {
                     decision: { type: "string", enum: ["prioritize", "conditional", "do_not_prioritize", "insufficient"] },
                     label: { type: "string" },
-                    reasons: { type: "array", items: { type: "string" } },
+                    reasons: { type: "array", maxItems: 5, items: { type: "string" } },
                   },
                   required: ["decision", "label", "reasons"],
                 },
-                verification_metrics: { type: "array", items: { type: "string" } },
-                review_conditions: { type: "array", items: { type: "string" } },
+                verification_metrics: { type: "array", maxItems: 6, items: { type: "string" } },
+                review_conditions: { type: "array", maxItems: 5, items: { type: "string" } },
                 economic_phase: { type: "string" },
                 demand_balance: { type: "string" },
-                inflation_causes: { type: "array", items: { type: "string" } },
+                inflation_causes: { type: "array", maxItems: 5, items: { type: "string" } },
                 monetary_policy_role: { type: "string" },
                 fiscal_policy_role: { type: "string" },
-                missing_information: { type: "array", items: { type: "string" } },
+                missing_information: { type: "array", maxItems: 12, items: { type: "string" } },
                 reference_threads: {
                   type: "array",
+                  maxItems: 5,
                   items: {
                     type: "object",
                     additionalProperties: false,
