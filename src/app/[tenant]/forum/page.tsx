@@ -272,6 +272,35 @@ const POLICY_DECISION_AREAS = [
   },
 ];
 
+const CURRENT_JAPAN_POLICY_DIRECTIONS = [
+  {
+    key: "fiscal",
+    title: "財政政策",
+    judgment: "引き締め寄り",
+    points: [
+      "財政健全化を重視",
+      "社会保障費や債務費の増加に対応するため、負担増・歳出抑制・給付見直しの議論が起きやすい",
+      "景気下押し局面では、需要不足を長引かせるリスクがある",
+    ],
+  },
+  {
+    key: "monetary",
+    title: "金融政策",
+    judgment: "金利引き上げ・引き締め",
+    points: [
+      "日銀は政策金利を1.0％程度へ引き上げる方向",
+      "円安や物価上昇を抑える狙いがある",
+      "ただし、需要不足や実質所得低下がある局面では、消費・投資・雇用を冷やすリスクがある",
+    ],
+  },
+  {
+    key: "other",
+    title: "その他の政策",
+    judgment: "賃上げ・成長戦略",
+    points: ["賃上げ", "生産性向上", "価格転嫁", "成長投資", "制度改革"],
+  },
+];
+
 function normalizePolicyDecisionCards(value: unknown) {
   if (!Array.isArray(value)) return [];
 
@@ -1891,6 +1920,52 @@ export default function ForumPage() {
           </Link>
           ことができます。
         </p>
+      </section>
+
+      <section
+        style={{
+          ...panelStyle,
+          marginBottom: 16,
+          borderColor: "#cbd5e1",
+          background: "#f8fafc",
+          color: "#0f172a",
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: 22 }}>現在の日本の政策方向</h2>
+        <p style={{ margin: "6px 0 0", color: "#475569", lineHeight: 1.7 }}>
+          現在の政策方向を比較用に簡略化した固定表示です。AIによる推奨ではありません。
+        </p>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
+            gap: 12,
+            marginTop: 14,
+          }}
+        >
+          {CURRENT_JAPAN_POLICY_DIRECTIONS.map((direction) => (
+            <article
+              key={direction.key}
+              style={{
+                border: "1px solid #cbd5e1",
+                borderRadius: 8,
+                background: "#ffffff",
+                padding: 14,
+                minWidth: 0,
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: 19 }}>{direction.title}</h3>
+              <div style={{ marginTop: 10, fontWeight: 900 }}>
+                判断：{direction.judgment}
+              </div>
+              <ul style={{ margin: "8px 0 0", paddingLeft: 20, lineHeight: 1.7 }}>
+                {direction.points.map((point) => (
+                  <li key={`${direction.key}-${point}`}>{point}</li>
+                ))}
+              </ul>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section
