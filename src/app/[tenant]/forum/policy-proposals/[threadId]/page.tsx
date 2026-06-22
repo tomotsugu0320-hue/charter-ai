@@ -70,6 +70,13 @@ type PolicyProposalPreview = {
   }>;
 };
 
+type SavedPolicyProposal = {
+  id: string;
+  status: string;
+  created_at: string;
+  proposal_json: PolicyProposalPreview;
+};
+
 const pageStyle: CSSProperties = {
   maxWidth: 900,
   margin: "0 auto",
@@ -321,6 +328,11 @@ export default function PolicyProposalDetailPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
   const [preview, setPreview] = useState<PolicyProposalPreview | null>(null);
+  const [savedProposal, setSavedProposal] = useState<SavedPolicyProposal | null>(null);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  const [saveMessageIsError, setSaveMessageIsError] = useState(false);
+  const [saveConfirmed, setSaveConfirmed] = useState(false);
 
   useEffect(() => {
     if (!threadId) {
@@ -346,6 +358,7 @@ export default function PolicyProposalDetailPage() {
         }
 
         setProposal(result.proposal ?? null);
+        setSavedProposal(result.saved_proposal ?? null);
       } catch (loadError) {
         if (controller.signal.aborted) return;
         setError(loadError instanceof Error ? loadError.message : "政策提言候補を取得できませんでした。");
@@ -387,6 +400,9 @@ export default function PolicyProposalDetailPage() {
     setPreviewLoading(true);
     setPreviewError("");
     setPreview(null);
+    setSaveMessage("");
+    setSaveMessageIsError(false);
+    setSaveConfirmed(false);
 
     try {
       const response = await fetch("/api/forum/admin/policy-proposals/preview", {
@@ -419,6 +435,62 @@ export default function PolicyProposalDetailPage() {
       setPreviewLoading(false);
     }
   }
+
+  async function handleSavePolicyProposal() {
+    if (!threadId || !preview || !saveConfirmed || saveLoading) return;
+
+    setSaveLoading(true);
+    setSaveMessage("");
+    setSaveMessageIsError(false);
+
+    try {
+      const response = await fetch("/api/forum/admin/policy-proposals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          thread_id: threadId,
+          tenant,
+          confirm_save: true,
+          preview,
+        }),
+      });
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || result?.ok !== true) {
+        throw new Error(
+          response.status === 401
+            ? "管理セッションが切れました。管理トップで再認証してください。"
+            : result?.error || "政策提言候補を保存できませんでした。"
+        );
+      }
+
+      const saved = result.saved_proposal;
+      setSavedProposal({
+        id: String(saved?.id ?? ""),
+        status: String(saved?.status ?? "draft"),
+        created_at: String(saved?.created_at ?? new Date().toISOString()),
+        proposal_json: preview,
+      });
+      setPreview(null);
+      setSaveConfirmed(false);
+      setSaveMessageIsError(false);
+      setSaveMessage(
+        result.duplicate
+          ? "同じ内容はすでに保存済みです。"
+          : "政策提言候補をdraftとして保存しました。"
+      );
+    } catch (saveError) {
+      setSaveMessageIsError(true);
+      setSaveMessage(
+        saveError instanceof Error ? saveError.message : "政策提言候補を保存できませんでした。"
+      );
+    } finally {
+      setSaveLoading(false);
+    }
+  }
+
+  const displayedPreview = preview ?? savedProposal?.proposal_json ?? null;
+  const isUnsavedPreview = Boolean(preview);
 
   return (
     <main style={pageStyle}>
@@ -475,7 +547,7 @@ export default function PolicyProposalDetailPage() {
             >
               <h2 style={{ margin: 0, fontSize: 20 }}>管理者用AIプレビュー</h2>
               <p style={{ margin: "7px 0 12px", color: "#475569", lineHeight: 1.7 }}>
-                OpenAI APIを1回使用します。結果はこの画面に一時表示するだけで、DBや既存AI再総括には保存しません。
+                OpenAI APIを1回使用します。生成後に内容を確認し、政策提言候補としてdraft保存できます。既存AI再総括は更新しません。
               </p>
               <button
                 type="button"
@@ -496,6 +568,17 @@ export default function PolicyProposalDetailPage() {
               {previewError && (
                 <p style={{ margin: "10px 0 0", color: "#b91c1c", lineHeight: 1.7 }}>
                   {previewError}
+                </p>
+              )}
+              {saveMessage && (
+                <p
+                  style={{
+                    margin: "10px 0 0",
+                    color: saveMessageIsError ? "#b91c1c" : "#166534",
+                    lineHeight: 1.7,
+                  }}
+                >
+                  {saveMessage}
                 </p>
               )}
             </section>
@@ -528,7 +611,7 @@ export default function PolicyProposalDetailPage() {
             </section>
           )}
 
-          {preview && (
+          {displayedPreview && (
             <section
               style={{
                 marginTop: 20,
@@ -539,13 +622,19 @@ export default function PolicyProposalDetailPage() {
               }}
             >
               <div style={{ color: "#1d4ed8", fontSize: 13, fontWeight: 900 }}>
-                管理者用・未保存プレビュー
+                {isUnsavedPreview ? "管理者用・未保存プレビュー" : "保存済み政策提言候補"}
               </div>
+              {!isUnsavedPreview && savedProposal && (
+                <div style={{ marginTop: 6, color: "#475569", fontSize: 13 }}>
+                  status: {savedProposal.status}
+                  {savedProposal.status === "draft" ? " / 正式公開前" : ""}
+                </div>
+              )}
               <h2 style={{ margin: "6px 0 0", fontSize: 26, lineHeight: 1.45 }}>
-                {preview.title}
+                {displayedPreview.title}
               </h2>
               <p style={{ margin: "10px 0 0", fontSize: 18, fontWeight: 800, lineHeight: 1.7 }}>
-                {preview.one_line_proposal}
+                {displayedPreview.one_line_proposal}
               </p>
 
               <section
@@ -560,17 +649,17 @@ export default function PolicyProposalDetailPage() {
                 <h3 style={{ margin: 0, fontSize: 20 }}>まず結論</h3>
                 <div style={{ marginTop: 8, fontWeight: 900 }}>
                   優先対象：
-                  {preview.priority_judgment.priority_area
-                    ? PRIORITY_AREA_LABELS[preview.priority_judgment.priority_area] ??
-                      preview.priority_judgment.label
-                    : preview.priority_judgment.label}
+                  {displayedPreview.priority_judgment.priority_area
+                    ? PRIORITY_AREA_LABELS[displayedPreview.priority_judgment.priority_area] ??
+                      displayedPreview.priority_judgment.label
+                    : displayedPreview.priority_judgment.label}
                 </div>
                 <div style={{ marginTop: 6, color: "#334155" }}>
-                  判断：{preview.priority_judgment.label}
+                  判断：{displayedPreview.priority_judgment.label}
                 </div>
-                {preview.priority_judgment.reasons.length > 0 && (
+                {displayedPreview.priority_judgment.reasons.length > 0 && (
                   <ul style={{ margin: "8px 0 0", paddingLeft: 22, lineHeight: 1.8 }}>
-                    {preview.priority_judgment.reasons.map((reason, index) => (
+                    {displayedPreview.priority_judgment.reasons.map((reason, index) => (
                       <li key={`priority-reason-${index}`}>{reason}</li>
                     ))}
                   </ul>
@@ -580,56 +669,56 @@ export default function PolicyProposalDetailPage() {
               <section style={{ marginTop: 16, padding: 14, background: "#f8fafc" }}>
                 <h3 style={{ margin: 0, fontSize: 18 }}>政策判断の前提</h3>
                 <ul style={{ margin: "8px 0 0", paddingLeft: 22, lineHeight: 1.8 }}>
-                  <li>景気局面：{preview.economic_phase || "判断材料不足"}</li>
-                  <li>需要・需給：{preview.demand_balance || "判断材料不足"}</li>
+                  <li>景気局面：{displayedPreview.economic_phase || "判断材料不足"}</li>
+                  <li>需要・需給：{displayedPreview.demand_balance || "判断材料不足"}</li>
                   <li>
                     物価上昇の原因：
-                    {preview.inflation_causes.length > 0
-                      ? preview.inflation_causes.join(" / ")
+                    {displayedPreview.inflation_causes.length > 0
+                      ? displayedPreview.inflation_causes.join(" / ")
                       : "判断材料不足"}
                   </li>
-                  <li>金融政策の役割：{preview.monetary_policy_role || "判断材料不足"}</li>
-                  <li>財政政策の役割：{preview.fiscal_policy_role || "判断材料不足"}</li>
+                  <li>金融政策の役割：{displayedPreview.monetary_policy_role || "判断材料不足"}</li>
+                  <li>財政政策の役割：{displayedPreview.fiscal_policy_role || "判断材料不足"}</li>
                 </ul>
               </section>
 
-              {preview.policy_groups ? (
+              {displayedPreview.policy_groups ? (
                 <>
                   <PolicyGroupPreview
                     title="財政政策"
                     description="政府がお金の取り方・使い方をどうするか"
-                    group={preview.policy_groups.fiscal_policy}
+                    group={displayedPreview.policy_groups.fiscal_policy}
                   />
                   <PolicyGroupPreview
                     title="金融政策"
                     description="日銀が金利やお金の流れをどうするか"
-                    group={preview.policy_groups.monetary_policy}
+                    group={displayedPreview.policy_groups.monetary_policy}
                   />
                   <PolicyGroupPreview
                     title="その他の政策"
                     description="制度・規制・産業・労働市場などをどう直すか"
-                    group={preview.policy_groups.other_policy}
+                    group={displayedPreview.policy_groups.other_policy}
                   />
                 </>
               ) : (
                 <>
-                  <PreviewList title="提言内容" items={preview.proposal_items} />
-                  <PreviewList title="メリット" items={preview.merits} />
-                  <PreviewList title="デメリット" items={preview.demerits} />
-                  <PreviewList title="デメリット対策" items={preview.countermeasures} />
+                  <PreviewList title="提言内容" items={displayedPreview.proposal_items} />
+                  <PreviewList title="メリット" items={displayedPreview.merits} />
+                  <PreviewList title="デメリット" items={displayedPreview.demerits} />
+                  <PreviewList title="デメリット対策" items={displayedPreview.countermeasures} />
                 </>
               )}
 
-              <PreviewList title="反対意見" items={preview.opposing_views} />
+              <PreviewList title="反対意見" items={displayedPreview.opposing_views} />
 
-              <PreviewList title="検証指標" items={preview.verification_metrics} />
-              <PreviewList title="見直し条件" items={preview.review_conditions} />
-              <PreviewList title="不足情報" items={preview.missing_information} />
+              <PreviewList title="検証指標" items={displayedPreview.verification_metrics} />
+              <PreviewList title="見直し条件" items={displayedPreview.review_conditions} />
+              <PreviewList title="不足情報" items={displayedPreview.missing_information} />
 
               <section style={{ padding: "14px 0 0", borderTop: "1px solid #e2e8f0" }}>
                 <h3 style={{ margin: 0, fontSize: 18 }}>参考にした掲示板リンク</h3>
                 <ul style={{ margin: "8px 0 0", paddingLeft: 22, lineHeight: 1.8 }}>
-                  {preview.reference_threads.map((reference) => (
+                  {displayedPreview.reference_threads.map((reference) => (
                     <li key={reference.thread_id}>
                       <Link href={reference.url} style={{ color: "#075985", fontWeight: 800 }}>
                         {reference.title}
@@ -638,6 +727,51 @@ export default function PolicyProposalDetailPage() {
                   ))}
                 </ul>
               </section>
+
+              {isUnsavedPreview && isForumAdmin && (
+                <section
+                  style={{
+                    marginTop: 18,
+                    borderTop: "1px solid #cbd5e1",
+                    paddingTop: 16,
+                  }}
+                >
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 8,
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={saveConfirmed}
+                      onChange={(event) => setSaveConfirmed(event.target.checked)}
+                      disabled={saveLoading}
+                      style={{ marginTop: 5 }}
+                    />
+                    このAIプレビューを政策提言候補として保存します
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void handleSavePolicyProposal()}
+                    disabled={!saveConfirmed || saveLoading}
+                    style={{
+                      marginTop: 10,
+                      border: "1px solid #166534",
+                      borderRadius: 8,
+                      background: !saveConfirmed || saveLoading ? "#cbd5e1" : "#166534",
+                      color: "#ffffff",
+                      cursor: !saveConfirmed || saveLoading ? "not-allowed" : "pointer",
+                      fontWeight: 900,
+                      padding: "10px 14px",
+                    }}
+                  >
+                    {saveLoading ? "保存中..." : "この内容で保存"}
+                  </button>
+                </section>
+              )}
             </section>
           )}
 

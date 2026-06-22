@@ -92,6 +92,24 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     return NextResponse.json({ ok: false, error: "このスレッドは政策提言候補ではありません。" }, { status: 404 });
   }
 
+  const { data: savedProposal, error: savedProposalError } = await supabase
+    .from("forum_policy_proposals")
+    .select(
+      "id, title, one_line_proposal, policy_area, priority_area, priority_decision, proposal_json, prompt_version, model, source_summary_updated_at, status, created_at"
+    )
+    .eq("thread_id", normalizedThreadId)
+    .in("status", ["draft", "review", "published"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (savedProposalError) {
+    return NextResponse.json(
+      { ok: false, error: "保存済み政策提言候補を取得できませんでした。" },
+      { status: 500 }
+    );
+  }
+
   const { data: posts, error: postsError } = await supabase
     .from("forum_posts")
     .select("id, post_role")
@@ -134,6 +152,22 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 
   return NextResponse.json({
     ok: true,
+    saved_proposal: savedProposal
+      ? {
+          id: savedProposal.id,
+          title: savedProposal.title,
+          one_line_proposal: savedProposal.one_line_proposal,
+          policy_area: savedProposal.policy_area,
+          priority_area: savedProposal.priority_area,
+          priority_decision: savedProposal.priority_decision,
+          proposal_json: asRecord(savedProposal.proposal_json),
+          prompt_version: savedProposal.prompt_version,
+          model: savedProposal.model,
+          source_summary_updated_at: savedProposal.source_summary_updated_at,
+          status: savedProposal.status,
+          created_at: savedProposal.created_at,
+        }
+      : null,
     proposal: {
       thread_id: thread.id,
       title: thread.title?.trim() || "無題の議論",
