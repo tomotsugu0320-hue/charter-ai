@@ -28,6 +28,34 @@ type Proposal = {
   classified_comment_count: number;
 };
 
+type PolicyProposalPreview = {
+  title: string;
+  one_line_proposal: string;
+  proposal_items: string[];
+  merits: string[];
+  demerits: string[];
+  countermeasures: string[];
+  opposing_views: string[];
+  priority_judgment: {
+    decision: string;
+    label: string;
+    reasons: string[];
+  };
+  verification_metrics: string[];
+  review_conditions: string[];
+  economic_phase: string;
+  demand_balance: string;
+  inflation_causes: string[];
+  monetary_policy_role: string;
+  fiscal_policy_role: string;
+  missing_information: string[];
+  reference_threads: Array<{
+    thread_id: string;
+    title: string;
+    url: string;
+  }>;
+};
+
 const pageStyle: CSSProperties = {
   maxWidth: 900,
   margin: "0 auto",
@@ -50,6 +78,23 @@ function ListSection({ title, items }: { title: string; items: string[] }) {
           <li key={`${title}-${index}`}>{item}</li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+function PreviewList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <section style={{ padding: "14px 0", borderTop: "1px solid #e2e8f0" }}>
+      <h3 style={{ margin: 0, fontSize: 18 }}>{title}</h3>
+      {items.length > 0 ? (
+        <ul style={{ margin: "8px 0 0", paddingLeft: 22, lineHeight: 1.8 }}>
+          {items.map((item, index) => (
+            <li key={`${title}-${index}`}>{item}</li>
+          ))}
+        </ul>
+      ) : (
+        <p style={{ margin: "8px 0 0", color: "#64748b" }}>判断材料が不足しています。</p>
+      )}
     </section>
   );
 }
@@ -200,6 +245,10 @@ export default function PolicyProposalDetailPage() {
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isForumAdmin, setIsForumAdmin] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
+  const [preview, setPreview] = useState<PolicyProposalPreview | null>(null);
 
   useEffect(() => {
     if (!threadId) {
@@ -236,6 +285,63 @@ export default function PolicyProposalDetailPage() {
     void loadProposal();
     return () => controller.abort();
   }, [threadId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAdminStatus() {
+      try {
+        const response = await fetch("/api/forum/admin/users", { cache: "no-store" });
+        if (!cancelled) setIsForumAdmin(response.ok);
+      } catch {
+        if (!cancelled) setIsForumAdmin(false);
+      }
+    }
+
+    void loadAdminStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleCreatePolicyPreview() {
+    if (!threadId || previewLoading) return;
+
+    setPreviewLoading(true);
+    setPreviewError("");
+    setPreview(null);
+
+    try {
+      const response = await fetch("/api/forum/admin/policy-proposals/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          thread_id: threadId,
+          tenant,
+          max_related_threads: 5,
+        }),
+      });
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || result?.ok !== true) {
+        throw new Error(
+          response.status === 401
+            ? "管理セッションが切れました。管理トップで再認証してください。"
+            : result?.error || "政策提言AIプレビューを作成できませんでした。"
+        );
+      }
+
+      setPreview(result.preview ?? null);
+    } catch (previewLoadError) {
+      setPreviewError(
+        previewLoadError instanceof Error
+          ? previewLoadError.message
+          : "政策提言AIプレビューを作成できませんでした。"
+      );
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
 
   return (
     <main style={pageStyle}>
@@ -279,6 +385,115 @@ export default function PolicyProposalDetailPage() {
               投稿 {proposal.post_count}件 / AI分類済みコメント {proposal.classified_comment_count}件
             </div>
           </header>
+
+          {isForumAdmin && (
+            <section
+              style={{
+                marginTop: 18,
+                border: "1px solid #cbd5e1",
+                borderRadius: 8,
+                background: "#f8fafc",
+                padding: 14,
+              }}
+            >
+              <h2 style={{ margin: 0, fontSize: 20 }}>管理者用AIプレビュー</h2>
+              <p style={{ margin: "7px 0 12px", color: "#475569", lineHeight: 1.7 }}>
+                OpenAI APIを1回使用します。結果はこの画面に一時表示するだけで、DBや既存AI再総括には保存しません。
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleCreatePolicyPreview()}
+                disabled={previewLoading}
+                style={{
+                  border: "1px solid #0f172a",
+                  borderRadius: 8,
+                  background: previewLoading ? "#cbd5e1" : "#0f172a",
+                  color: "#ffffff",
+                  cursor: previewLoading ? "not-allowed" : "pointer",
+                  fontWeight: 900,
+                  padding: "10px 14px",
+                }}
+              >
+                {previewLoading ? "政策提言AIプレビュー作成中..." : "政策提言AIプレビュー作成"}
+              </button>
+              {previewError && (
+                <p style={{ margin: "10px 0 0", color: "#b91c1c", lineHeight: 1.7 }}>
+                  {previewError}
+                </p>
+              )}
+            </section>
+          )}
+
+          {preview && (
+            <section
+              style={{
+                marginTop: 20,
+                border: "2px solid #60a5fa",
+                borderRadius: 8,
+                background: "#ffffff",
+                padding: 16,
+              }}
+            >
+              <div style={{ color: "#1d4ed8", fontSize: 13, fontWeight: 900 }}>
+                管理者用・未保存プレビュー
+              </div>
+              <h2 style={{ margin: "6px 0 0", fontSize: 26, lineHeight: 1.45 }}>
+                {preview.title}
+              </h2>
+              <p style={{ margin: "10px 0 0", fontSize: 18, fontWeight: 800, lineHeight: 1.7 }}>
+                {preview.one_line_proposal}
+              </p>
+
+              <section style={{ marginTop: 16, padding: 14, background: "#f8fafc" }}>
+                <h3 style={{ margin: 0, fontSize: 18 }}>政策判断の前提</h3>
+                <ul style={{ margin: "8px 0 0", paddingLeft: 22, lineHeight: 1.8 }}>
+                  <li>景気局面：{preview.economic_phase || "判断材料不足"}</li>
+                  <li>需要・需給：{preview.demand_balance || "判断材料不足"}</li>
+                  <li>
+                    物価上昇の原因：
+                    {preview.inflation_causes.length > 0
+                      ? preview.inflation_causes.join(" / ")
+                      : "判断材料不足"}
+                  </li>
+                  <li>金融政策の役割：{preview.monetary_policy_role || "判断材料不足"}</li>
+                  <li>財政政策の役割：{preview.fiscal_policy_role || "判断材料不足"}</li>
+                </ul>
+              </section>
+
+              <PreviewList title="提言内容" items={preview.proposal_items} />
+              <PreviewList title="メリット" items={preview.merits} />
+              <PreviewList title="デメリット" items={preview.demerits} />
+              <PreviewList title="デメリット対策" items={preview.countermeasures} />
+              <PreviewList title="反対意見" items={preview.opposing_views} />
+
+              <section style={{ padding: "14px 0", borderTop: "1px solid #e2e8f0" }}>
+                <h3 style={{ margin: 0, fontSize: 18 }}>優先判断</h3>
+                <div style={{ marginTop: 8, fontWeight: 900 }}>{preview.priority_judgment.label}</div>
+                <ul style={{ margin: "8px 0 0", paddingLeft: 22, lineHeight: 1.8 }}>
+                  {preview.priority_judgment.reasons.map((reason, index) => (
+                    <li key={`priority-reason-${index}`}>{reason}</li>
+                  ))}
+                </ul>
+              </section>
+
+              <PreviewList title="検証指標" items={preview.verification_metrics} />
+              <PreviewList title="見直し条件" items={preview.review_conditions} />
+              <PreviewList title="不足情報" items={preview.missing_information} />
+
+              <section style={{ padding: "14px 0 0", borderTop: "1px solid #e2e8f0" }}>
+                <h3 style={{ margin: 0, fontSize: 18 }}>参考にした掲示板リンク</h3>
+                <ul style={{ margin: "8px 0 0", paddingLeft: 22, lineHeight: 1.8 }}>
+                  {preview.reference_threads.map((reference) => (
+                    <li key={reference.thread_id}>
+                      <Link href={reference.url} style={{ color: "#075985", fontWeight: 800 }}>
+                        {reference.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </section>
+          )}
 
           <section style={{ marginTop: 24 }}>
             <h2 style={{ margin: 0, fontSize: 24 }}>掲示板から得られた議論材料</h2>
