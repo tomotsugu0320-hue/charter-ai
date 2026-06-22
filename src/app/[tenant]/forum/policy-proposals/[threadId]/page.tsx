@@ -29,11 +29,20 @@ type Proposal = {
 };
 
 type PolicyGroup = {
+  decision?: string;
+  decision_label?: string;
   summary: string;
   proposal_items: string[];
   merits: string[];
   demerits: string[];
   countermeasures: string[];
+};
+
+type EconomicTheoryCheck = {
+  area: string;
+  concepts: string[];
+  judgment: string;
+  caveat: string;
 };
 
 type PolicyProposalPreview = {
@@ -62,6 +71,7 @@ type PolicyProposalPreview = {
   inflation_causes: string[];
   monetary_policy_role: string;
   fiscal_policy_role: string;
+  economic_theory_checks?: EconomicTheoryCheck[];
   missing_information: string[];
   reference_threads: Array<{
     thread_id: string;
@@ -167,6 +177,127 @@ function PolicyGroupPreview({
     </section>
   );
 }
+
+const ECONOMIC_THEORY_DESCRIPTIONS: Record<string, string> = {
+  有効需要: "需要不足なら、政府支出で売上と雇用を支えやすいかを見る",
+  乗数効果: "最初の支出が所得と消費を通じてどこまで広がるかを見る",
+  "GDPギャップ": "需要が供給力に対して足りているかを見る",
+  需要インフレ: "需要が供給を上回って物価が上がっているかを見る",
+  コストプッシュ: "輸入価格や原材料費による物価上昇かを見る",
+  供給制約: "供給力不足で、増えた需要が物価上昇に回らないかを見る",
+  フィリップス曲線: "雇用の逼迫と賃金・物価上昇の関係を見る",
+  労働需給: "働き手と求人のバランスを見る",
+  労働分配率: "企業の利益が賃金へどれだけ回っているかを見る",
+  "テイラー・ルール": "物価と景気から政策金利の目安を考える",
+  実質金利: "名目金利から期待インフレを引いて、実際の引き締め度を見る",
+  期待インフレ: "将来の物価予想が消費や賃金に与える影響を見る",
+  財政乗数: "政府支出がGDPをどれだけ押し上げるかを見る",
+  クラウディングアウト: "政府支出が民間投資を押しのけないかを見る",
+  将来増税予想: "将来の増税不安が現在の消費を抑えないかを見る",
+};
+
+function PolicyDecisionCard({
+  title,
+  description,
+  group,
+  decisionLabels,
+}: {
+  title: string;
+  description: string;
+  group: PolicyGroup;
+  decisionLabels: Record<string, string>;
+}) {
+  const decisionLabel =
+    group.decision_label ||
+    (group.decision ? decisionLabels[group.decision] : "") ||
+    "判断材料不足";
+  const cautions = [
+    ...group.demerits.slice(0, 3).map((item) => `注意: ${item}`),
+    ...group.countermeasures.slice(0, 3).map((item) => `対策: ${item}`),
+  ];
+
+  return (
+    <section
+      style={{
+        marginTop: 16,
+        border: "1px solid #cbd5e1",
+        borderRadius: 8,
+        padding: 14,
+        minWidth: 0,
+      }}
+    >
+      <h3 style={{ margin: 0, fontSize: 20 }}>{title}</h3>
+      <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 13 }}>{description}</p>
+      <div style={{ marginTop: 10, fontWeight: 900 }}>判断: {decisionLabel}</div>
+      <div style={{ marginTop: 10, color: "#334155", lineHeight: 1.8 }}>
+        <strong>理由:</strong> {group.summary || "判断理由は未整理です。"}
+      </div>
+      <PreviewList title="方法" items={group.proposal_items} />
+      <PreviewList title="注意点" items={cautions} />
+    </section>
+  );
+}
+
+function EconomicTheoryChecks({ checks }: { checks: EconomicTheoryCheck[] }) {
+  if (checks.length === 0) return null;
+
+  return (
+    <section style={{ marginTop: 18, borderTop: "1px solid #e2e8f0", paddingTop: 16 }}>
+      <h3 style={{ margin: 0, fontSize: 20 }}>使った経済理論</h3>
+      <div style={{ display: "grid", gap: 12, marginTop: 10 }}>
+        {checks.map((check, index) => (
+          <section
+            key={`${check.area}-${index}`}
+            style={{ border: "1px solid #dbe3ef", borderRadius: 8, padding: 12 }}
+          >
+            <h4 style={{ margin: 0, fontSize: 17 }}>{check.area || "判断項目"}</h4>
+            {check.concepts.length > 0 && (
+              <ul style={{ margin: "8px 0 0", paddingLeft: 20, lineHeight: 1.75 }}>
+                {check.concepts.map((concept) => (
+                  <li key={`${check.area}-${concept}`}>
+                    <strong>{concept}</strong>: {ECONOMIC_THEORY_DESCRIPTIONS[concept] || "政策判断の確認に使う考え方"}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {check.judgment && (
+              <p style={{ margin: "8px 0 0", lineHeight: 1.75 }}>
+                <strong>この議論での判断:</strong> {check.judgment}
+              </p>
+            )}
+            {check.caveat && (
+              <p style={{ margin: "6px 0 0", color: "#475569", lineHeight: 1.75 }}>
+                <strong>注意:</strong> {check.caveat}
+              </p>
+            )}
+          </section>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+const FISCAL_DECISION_LABELS: Record<string, string> = {
+  spend: "支出する",
+  do_not_spend: "支出しない",
+  conditional: "条件付きで支出する",
+  insufficient: "判断材料不足",
+};
+
+const MONETARY_DECISION_LABELS: Record<string, string> = {
+  ease: "緩和する",
+  tighten: "引き締める",
+  hold: "据え置く",
+  conditional: "条件付き",
+  insufficient: "判断材料不足",
+};
+
+const OTHER_DECISION_LABELS: Record<string, string> = {
+  do: "実施する",
+  do_not_do: "実施しない",
+  conditional: "条件付き",
+  insufficient: "判断材料不足",
+};
 
 const PRIORITY_AREA_LABELS: Record<string, string> = {
   fiscal: "財政政策を優先",
@@ -491,6 +622,14 @@ export default function PolicyProposalDetailPage() {
 
   const displayedPreview = preview ?? savedProposal?.proposal_json ?? null;
   const isUnsavedPreview = Boolean(preview);
+  const hasStructuredPolicyDecisions = Boolean(
+    displayedPreview?.policy_groups &&
+      [
+        displayedPreview.policy_groups.fiscal_policy,
+        displayedPreview.policy_groups.monetary_policy,
+        displayedPreview.policy_groups.other_policy,
+      ].some((group) => group.decision || group.decision_label)
+  );
 
   return (
     <main style={pageStyle}>
@@ -666,46 +805,80 @@ export default function PolicyProposalDetailPage() {
                 )}
               </section>
 
-              <section style={{ marginTop: 16, padding: 14, background: "#f8fafc" }}>
-                <h3 style={{ margin: 0, fontSize: 18 }}>政策判断の前提</h3>
-                <ul style={{ margin: "8px 0 0", paddingLeft: 22, lineHeight: 1.8 }}>
-                  <li>景気局面：{displayedPreview.economic_phase || "判断材料不足"}</li>
-                  <li>需要・需給：{displayedPreview.demand_balance || "判断材料不足"}</li>
-                  <li>
-                    物価上昇の原因：
-                    {displayedPreview.inflation_causes.length > 0
-                      ? displayedPreview.inflation_causes.join(" / ")
-                      : "判断材料不足"}
-                  </li>
-                  <li>金融政策の役割：{displayedPreview.monetary_policy_role || "判断材料不足"}</li>
-                  <li>財政政策の役割：{displayedPreview.fiscal_policy_role || "判断材料不足"}</li>
-                </ul>
-              </section>
-
-              {displayedPreview.policy_groups ? (
+              {hasStructuredPolicyDecisions && displayedPreview.policy_groups ? (
                 <>
-                  <PolicyGroupPreview
+                  <PolicyDecisionCard
                     title="財政政策"
-                    description="政府がお金の取り方・使い方をどうするか"
+                    description="政府のお金の出し方"
                     group={displayedPreview.policy_groups.fiscal_policy}
+                    decisionLabels={FISCAL_DECISION_LABELS}
                   />
-                  <PolicyGroupPreview
+                  <PolicyDecisionCard
                     title="金融政策"
-                    description="日銀が金利やお金の流れをどうするか"
+                    description="日銀のお金の流れ"
                     group={displayedPreview.policy_groups.monetary_policy}
+                    decisionLabels={MONETARY_DECISION_LABELS}
                   />
-                  <PolicyGroupPreview
+                  <PolicyDecisionCard
                     title="その他の政策"
-                    description="制度・規制・産業・労働市場などをどう直すか"
+                    description="制度・働き方・価格転嫁"
                     group={displayedPreview.policy_groups.other_policy}
+                    decisionLabels={OTHER_DECISION_LABELS}
+                  />
+                  <EconomicTheoryChecks
+                    checks={displayedPreview.economic_theory_checks ?? []}
                   />
                 </>
               ) : (
                 <>
-                  <PreviewList title="提言内容" items={displayedPreview.proposal_items} />
-                  <PreviewList title="メリット" items={displayedPreview.merits} />
-                  <PreviewList title="デメリット" items={displayedPreview.demerits} />
-                  <PreviewList title="デメリット対策" items={displayedPreview.countermeasures} />
+                  <section style={{ marginTop: 16, padding: 14, background: "#f8fafc" }}>
+                    <h3 style={{ margin: 0, fontSize: 18 }}>政策判断の前提</h3>
+                    <ul style={{ margin: "8px 0 0", paddingLeft: 22, lineHeight: 1.8 }}>
+                      <li>景気局面：{displayedPreview.economic_phase || "判断材料不足"}</li>
+                      <li>需要・需給：{displayedPreview.demand_balance || "判断材料不足"}</li>
+                      <li>
+                        物価上昇の原因：
+                        {displayedPreview.inflation_causes.length > 0
+                          ? displayedPreview.inflation_causes.join(" / ")
+                          : "判断材料不足"}
+                      </li>
+                      <li>
+                        金融政策の役割：
+                        {displayedPreview.monetary_policy_role || "判断材料不足"}
+                      </li>
+                      <li>
+                        財政政策の役割：
+                        {displayedPreview.fiscal_policy_role || "判断材料不足"}
+                      </li>
+                    </ul>
+                  </section>
+
+                  {displayedPreview.policy_groups ? (
+                    <>
+                      <PolicyGroupPreview
+                        title="財政政策"
+                        description="政府がお金の取り方・使い方をどうするか"
+                        group={displayedPreview.policy_groups.fiscal_policy}
+                      />
+                      <PolicyGroupPreview
+                        title="金融政策"
+                        description="日銀が金利やお金の流れをどうするか"
+                        group={displayedPreview.policy_groups.monetary_policy}
+                      />
+                      <PolicyGroupPreview
+                        title="その他の政策"
+                        description="制度・規制・産業・労働市場などをどう直すか"
+                        group={displayedPreview.policy_groups.other_policy}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <PreviewList title="提言内容" items={displayedPreview.proposal_items} />
+                      <PreviewList title="メリット" items={displayedPreview.merits} />
+                      <PreviewList title="デメリット" items={displayedPreview.demerits} />
+                      <PreviewList title="デメリット対策" items={displayedPreview.countermeasures} />
+                    </>
+                  )}
                 </>
               )}
 
