@@ -140,6 +140,54 @@ function buildCardItems(sources: unknown[], maxItems: number, maxLength = 160) {
   return items;
 }
 
+function buildDirectDecisionLabel(input: {
+  policyArea: PrimaryPolicyArea;
+  decision: string;
+  decisionLabel: string;
+  sourceText: string;
+}) {
+  const text = `${input.decisionLabel} ${input.sourceText}`;
+
+  if (input.policyArea === "fiscal") {
+    if (input.decision === "do_not_spend" || includesAny(text, ["支出しない", "歳出削減", "財政緊縮", "財政引き締め"])) {
+      return "財政引き締めする";
+    }
+    if (input.decision === "conditional" || text.includes("条件付き")) {
+      return "条件付きで財政支出する";
+    }
+    if (input.decision === "spend" || includesAny(text, ["財政支出", "政府支出", "給付", "公共投資", "減税"])) {
+      return "財政支出する";
+    }
+  }
+
+  if (input.policyArea === "monetary") {
+    if (text.includes("利下げ")) return "金利引き下げ";
+    if (input.decision === "tighten" || includesAny(text, ["利上げ", "金融引き締め"])) {
+      return "金利引き上げ";
+    }
+    if (input.decision === "hold" || includesAny(text, ["据え置き", "金利維持", "維持する"])) {
+      return "金利維持";
+    }
+    if (input.decision === "conditional" || text.includes("条件付き")) return "条件付き";
+    if (input.decision === "ease" || includesAny(text, ["金融緩和", "緩和する"])) {
+      return "金融緩和する";
+    }
+  }
+
+  if (input.policyArea === "other") {
+    if (input.decision === "do_not_do" || includesAny(text, ["実施しない", "見送る"])) {
+      return "実施しない";
+    }
+    if (input.decision === "conditional" || text.includes("条件付き")) return "条件付きで実施する";
+    if (includesAny(text, ["価格転嫁"])) return "価格転嫁を進める";
+    if (includesAny(text, ["賃上げ", "賃金"])) return "賃上げを支援する";
+    if (includesAny(text, ["制度改革", "制度見直し", "規制改革"])) return "制度改革を進める";
+    if (input.decision === "do") return "制度改善を実施する";
+  }
+
+  return input.decision === "insufficient" ? "判断材料不足" : input.decisionLabel || "判断材料不足";
+}
+
 function getSavedPolicyJudgment(value: unknown, policyArea: PolicyArea) {
   if (!value || policyArea === "combined" || policyArea === "unclassified") return null;
 
@@ -160,11 +208,23 @@ function getSavedPolicyJudgment(value: unknown, policyArea: PolicyArea) {
   const reason = String(group.summary ?? "").trim();
   const oneLineProposal = String(proposal.one_line_proposal ?? "").trim();
   const fallbackLabel = priorityArea === policyArea ? String(priority.label ?? "").trim() : "";
+  const groupMethods = asStringArray(group.proposal_items);
+  const methodItems = (groupMethods.length > 0
+    ? groupMethods
+    : asStringArray(proposal.proposal_items)
+  ).slice(0, 4);
+  const directDecisionLabel = buildDirectDecisionLabel({
+    policyArea,
+    decision,
+    decisionLabel: decisionLabel || fallbackLabel,
+    sourceText: [reason, oneLineProposal, ...methodItems].join(" "),
+  });
 
   return {
     decision,
-    decision_label: decisionLabel || fallbackLabel,
+    decision_label: directDecisionLabel,
     reason: reason || priorityReasons[0] || oneLineProposal,
+    method_items: methodItems,
   };
 }
 

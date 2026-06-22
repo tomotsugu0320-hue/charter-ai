@@ -75,6 +75,7 @@ type PolicyDecisionCard = {
   decision: string;
   decision_label: string;
   reason: string;
+  method_items: string[];
 };
 
 const ALL_CATEGORIES = "すべて";
@@ -291,6 +292,7 @@ function normalizePolicyDecisionCards(value: unknown) {
       decision: toText(judgment.decision),
       decision_label: toText(judgment.decision_label),
       reason: toText(judgment.reason),
+      method_items: toStringArray(judgment.method_items).slice(0, 4),
     });
   }
 
@@ -298,6 +300,8 @@ function normalizePolicyDecisionCards(value: unknown) {
 }
 
 function getPolicyDecisionLabel(card: PolicyDecisionCard) {
+  if (card.decision_label) return card.decision_label;
+
   if (card.policy_area === "fiscal") {
     const label = {
       spend: "財政支出すべき",
@@ -305,7 +309,7 @@ function getPolicyDecisionLabel(card: PolicyDecisionCard) {
       conditional: "条件付きで財政支出",
       insufficient: "判断材料不足",
     }[card.decision];
-    return (label ?? card.decision_label) || "詳細で判断を確認";
+    return label || "判断材料不足";
   }
 
   if (card.policy_area === "monetary") {
@@ -317,7 +321,7 @@ function getPolicyDecisionLabel(card: PolicyDecisionCard) {
       conditional: "条件付き",
       insufficient: "判断材料不足",
     }[card.decision];
-    return (label ?? card.decision_label) || "詳細で判断を確認";
+    return label || "判断材料不足";
   }
 
   const description = `${card.title} ${card.reason}`;
@@ -334,7 +338,7 @@ function getPolicyDecisionLabel(card: PolicyDecisionCard) {
     conditional: "条件付き",
     insufficient: "判断材料不足",
   }[card.decision];
-  return (label ?? card.decision_label) || "詳細で判断を確認";
+  return label || "判断材料不足";
 }
 
 function compactPolicyReason(value: string) {
@@ -1924,6 +1928,18 @@ export default function ForumPage() {
                     ? compactPolicyReason(card.reason) || "理由は詳細ページで確認できます。"
                     : "保存済みの提言候補ができると、ここに理由を表示します。"}
                 </p>
+                {card && card.method_items.length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ color: "#475569", fontSize: 13, fontWeight: 900 }}>
+                      方法
+                    </div>
+                    <ul style={{ margin: "5px 0 0", paddingLeft: 20, lineHeight: 1.7 }}>
+                      {card.method_items.slice(0, 4).map((method, index) => (
+                        <li key={`${card.thread_id}-method-${index}`}>{method}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <Link
                   href={
                     card
