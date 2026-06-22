@@ -134,7 +134,7 @@ function CardBulletSection({
 
 function ProposalCard({ proposal, tenant }: { proposal: Proposal; tenant: string }) {
   const cardMainPoints = proposal.card_key_points?.main_points ?? [];
-  const fallbackConclusions = proposal.current_tentative_conclusion.slice(0, 3);
+  const fallbackConclusions = proposal.current_tentative_conclusion.slice(0, 2);
   const summaryFallback = firstSentence(proposal.easy_summary_text || proposal.summary_text);
   const mainPoints = cardMainPoints.length > 0
     ? cardMainPoints
@@ -143,7 +143,6 @@ function ProposalCard({ proposal, tenant }: { proposal: Proposal; tenant: string
       : summaryFallback
         ? [summaryFallback]
         : [];
-  const premises = proposal.card_key_points?.premises ?? [];
   const cautions = proposal.card_key_points?.cautions ?? [];
 
   return (
@@ -188,10 +187,9 @@ function ProposalCard({ proposal, tenant }: { proposal: Proposal; tenant: string
         カテゴリ: {proposal.category}
       </div>
       <h2 style={{ margin: "10px 0 0", fontSize: 20, lineHeight: 1.5 }}>{proposal.title}</h2>
-      <CardBulletSection title="要点" items={mainPoints} maxItems={3} />
-      <CardBulletSection title="前提" items={premises} maxItems={2} />
-      <CardBulletSection title="注意点" items={cautions} maxItems={2} />
-      <CardBulletSection title="検証指標" items={proposal.verification_metrics} maxItems={3} />
+      <CardBulletSection title="要点" items={mainPoints} maxItems={2} />
+      <CardBulletSection title="注意点" items={cautions} maxItems={1} />
+      <CardBulletSection title="検証指標" items={proposal.verification_metrics} maxItems={2} />
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 16 }}>
         <Link
           href={`/${tenant}/forum/policy-proposals/${proposal.thread_id}`}
