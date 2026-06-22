@@ -246,6 +246,7 @@ export default function PolicyProposalDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isForumAdmin, setIsForumAdmin] = useState(false);
+  const [isAdminStatusChecked, setIsAdminStatusChecked] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
   const [preview, setPreview] = useState<PolicyProposalPreview | null>(null);
@@ -291,10 +292,15 @@ export default function PolicyProposalDetailPage() {
 
     async function loadAdminStatus() {
       try {
-        const response = await fetch("/api/forum/admin/users", { cache: "no-store" });
-        if (!cancelled) setIsForumAdmin(response.ok);
+        const response = await fetch("/api/forum/admin/session", { cache: "no-store" });
+        const result = await response.json().catch(() => null);
+        if (!cancelled) {
+          setIsForumAdmin(response.ok && result?.is_admin === true);
+        }
       } catch {
         if (!cancelled) setIsForumAdmin(false);
+      } finally {
+        if (!cancelled) setIsAdminStatusChecked(true);
       }
     }
 
@@ -386,7 +392,7 @@ export default function PolicyProposalDetailPage() {
             </div>
           </header>
 
-          {isForumAdmin && (
+          {isAdminStatusChecked && isForumAdmin && (
             <section
               style={{
                 marginTop: 18,
@@ -421,6 +427,33 @@ export default function PolicyProposalDetailPage() {
                   {previewError}
                 </p>
               )}
+            </section>
+          )}
+
+          {isAdminStatusChecked && !isForumAdmin && (
+            <section
+              style={{
+                marginTop: 18,
+                border: "1px solid #dbe3ef",
+                borderRadius: 8,
+                background: "#f8fafc",
+                padding: 14,
+              }}
+            >
+              <div style={{ color: "#475569", lineHeight: 1.7 }}>
+                政策提言AIプレビューは管理者認証後に利用できます。
+              </div>
+              <Link
+                href={`/${tenant}/forum/admin`}
+                style={{
+                  display: "inline-block",
+                  marginTop: 8,
+                  color: "#075985",
+                  fontWeight: 900,
+                }}
+              >
+                管理トップで認証
+              </Link>
             </section>
           )}
 

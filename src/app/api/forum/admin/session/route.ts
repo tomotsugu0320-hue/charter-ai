@@ -5,6 +5,7 @@ import {
   getForumAdminSessionClearCookieOptions,
   getForumAdminSessionCookieOptions,
   isForumAdminKeyValueValid,
+  isForumAdminSessionValid,
 } from "@/lib/forum-auth";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,13 @@ async function readRequestAdminKey(request: NextRequest) {
     toStringValue(body?.admin_key) ||
     toStringValue(body?.key)
   );
+}
+
+export async function GET(request: NextRequest) {
+  return NextResponse.json({
+    ok: true,
+    is_admin: isForumAdminSessionValid(request),
+  });
 }
 
 export async function POST(request: NextRequest) {
