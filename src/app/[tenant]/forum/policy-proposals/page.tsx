@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 
 type PolicyArea = "fiscal" | "monetary" | "other" | "combined" | "unclassified";
 
@@ -19,6 +19,21 @@ type Proposal = {
   has_saved_proposal: boolean;
   latest_saved_proposal_status: string | null;
   latest_saved_proposal_created_at: string | null;
+};
+
+type BulkResult = {
+  thread_id: string;
+  title: string;
+  status: "success" | "failed" | "skipped";
+  message: string;
+};
+
+type BulkProgress = {
+  current: number;
+  total: number;
+  success: number;
+  failed: number;
+  skipped: number;
 };
 
 const pageStyle: CSSProperties = {
@@ -171,17 +186,20 @@ export default function PolicyProposalsPage() {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isForumAdmin, setIsForumAdmin] = useState(false);
+  const [isAdminStatusChecked, setIsAdminStatusChecked] = useState(false);
+  const [bulkConfirmed, setBulkConfirmed] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<BulkProgress | null>(null);
+  const [bulkResults, setBulkResults] = useState<BulkResult[]>([]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function loadProposals() {
+  const loadProposals = useCallback(async (signal?: AbortSignal) => {
       try {
         setLoading(true);
         setError("");
         const response = await fetch("/api/forum/policy-proposals", {
           cache: "no-store",
-          signal: controller.signal,
+          signal,
         });
         const result = await response.json();
 
@@ -191,16 +209,171 @@ export default function PolicyProposalsPage() {
 
         setProposals(Array.isArray(result.proposals) ? result.proposals : []);
       } catch (loadError) {
-        if (controller.signal.aborted) return;
+        if (signal?.aborted) return;
         setError(loadError instanceof Error ? loadError.message : "政策提言候補を取得できませんでした。");
       } finally {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!signal?.aborted) setLoading(false);
+      }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    void loadProposals(controller.signal);
+    return () => controller.abort();
+  }, [loadProposals]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAdminStatus() {
+      try {
+        const response = await fetch("/api/forum/admin/session", { cache: "no-store" });
+        const result = await response.json().catch(() => null);
+        if (!cancelled) setIsForumAdmin(response.ok && result?.is_admin === true);
+      } catch {
+        if (!cancelled) setIsForumAdmin(false);
+      } finally {
+        if (!cancelled) setIsAdminStatusChecked(true);
       }
     }
 
-    void loadProposals();
-    return () => controller.abort();
+    void loadAdminStatus();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  const proposalsInDisplayOrder = POLICY_AREA_SECTIONS.flatMap((section) =>
+    proposals.filter((proposal) => proposal.policy_area === section.key)
+  );
+  const bulkCandidates = proposalsInDisplayOrder
+    .filter((proposal) => !proposal.has_saved_proposal)
+    .slice(0, 5);
+
+  async function handleBulkGenerateAndSave() {
+    if (bulkLoading || !bulkConfirmed || bulkCandidates.length === 0) return;
+
+    const targets = [...bulkCandidates];
+    const results: BulkResult[] = [];
+    let success = 0;
+    let failed = 0;
+    let skipped = 0;
+
+    setBulkLoading(true);
+    setBulkResults([]);
+    setBulkProgress({ current: 0, total: targets.length, success, failed, skipped });
+
+    try {
+      for (let index = 0; index < targets.length; index += 1) {
+        const target = targets[index];
+        setBulkProgress({
+          current: index + 1,
+          total: targets.length,
+          success,
+          failed,
+          skipped,
+        });
+
+        try {
+          const detailResponse = await fetch(
+            `/api/forum/policy-proposals/${encodeURIComponent(target.thread_id)}`,
+            { cache: "no-store" }
+          );
+          const detailResult = await detailResponse.json().catch(() => null);
+          if (!detailResponse.ok || detailResult?.ok !== true) {
+            throw new Error(detailResult?.error || "候補の最新状態を確認できませんでした。");
+          }
+
+          if (detailResult.saved_proposal) {
+            skipped += 1;
+            results.push({
+              thread_id: target.thread_id,
+              title: target.title,
+              status: "skipped",
+              message: "すでに保存済みです。",
+            });
+          } else {
+            const previewResponse = await fetch("/api/forum/admin/policy-proposals/preview", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                tenant,
+                thread_id: target.thread_id,
+                max_related_threads: 5,
+              }),
+            });
+            const previewResult = await previewResponse.json().catch(() => null);
+            if (!previewResponse.ok || previewResult?.ok !== true || !previewResult.preview) {
+              throw new Error(
+                previewResponse.status === 401
+                  ? "管理セッションが切れています。"
+                  : previewResult?.error || "AIプレビューを生成できませんでした。"
+              );
+            }
+
+            const saveResponse = await fetch("/api/forum/admin/policy-proposals", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                tenant,
+                thread_id: target.thread_id,
+                confirm_save: true,
+                preview: previewResult.preview,
+              }),
+            });
+            const saveResult = await saveResponse.json().catch(() => null);
+            if (!saveResponse.ok || saveResult?.ok !== true) {
+              throw new Error(
+                saveResponse.status === 401
+                  ? "管理セッションが切れています。"
+                  : saveResult?.error || "draft保存できませんでした。"
+              );
+            }
+
+            if (saveResult.duplicate) {
+              skipped += 1;
+              results.push({
+                thread_id: target.thread_id,
+                title: target.title,
+                status: "skipped",
+                message: "同じ内容が保存済みです。",
+              });
+            } else {
+              success += 1;
+              results.push({
+                thread_id: target.thread_id,
+                title: target.title,
+                status: "success",
+                message: "draft保存しました。",
+              });
+            }
+          }
+        } catch (itemError) {
+          failed += 1;
+          results.push({
+            thread_id: target.thread_id,
+            title: target.title,
+            status: "failed",
+            message: itemError instanceof Error ? itemError.message : "処理に失敗しました。",
+          });
+        }
+
+        setBulkResults([...results]);
+        setBulkProgress({
+          current: index + 1,
+          total: targets.length,
+          success,
+          failed,
+          skipped,
+        });
+      }
+    } finally {
+      await loadProposals();
+      setBulkConfirmed(false);
+      setBulkLoading(false);
+    }
+  }
 
   return (
     <main style={pageStyle}>
@@ -214,6 +387,129 @@ export default function PolicyProposalsPage() {
           AI再総括済みの議論をもとにした提言候補です。正式な政策提言ではありません。
         </p>
       </header>
+
+      {isAdminStatusChecked && isForumAdmin && (
+        <section
+          style={{
+            marginBottom: 24,
+            border: "1px solid #cbd5e1",
+            borderRadius: 8,
+            background: "#f8fafc",
+            padding: 16,
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: 21 }}>管理者用一括生成</h2>
+          <p style={{ margin: "7px 0 0", color: "#475569", lineHeight: 1.7 }}>
+            未保存候補を最大5件まで順番にAI生成し、draft保存します。
+            OpenAI APIは候補数ぶん使用します。既存AI再総括は更新しません。
+          </p>
+
+          {!loading && !error && (
+            <div style={{ marginTop: 10, fontWeight: 800 }}>
+              今回の対象：{bulkCandidates.length}件
+            </div>
+          )}
+          {!loading && !error && bulkCandidates.length === 0 && (
+            <p style={{ margin: "8px 0 0", color: "#166534" }}>未保存候補はありません。</p>
+          )}
+
+          <label
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 8,
+              marginTop: 12,
+              lineHeight: 1.7,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={bulkConfirmed}
+              onChange={(event) => setBulkConfirmed(event.target.checked)}
+              disabled={bulkLoading || loading || bulkCandidates.length === 0}
+              style={{ marginTop: 5 }}
+            />
+            未保存候補を最大5件までAI生成してdraft保存します
+          </label>
+
+          <button
+            type="button"
+            onClick={() => void handleBulkGenerateAndSave()}
+            disabled={bulkLoading || !bulkConfirmed || loading || bulkCandidates.length === 0}
+            style={{
+              marginTop: 10,
+              border: "1px solid #0f172a",
+              borderRadius: 8,
+              background:
+                bulkLoading || !bulkConfirmed || loading || bulkCandidates.length === 0
+                  ? "#cbd5e1"
+                  : "#0f172a",
+              color: "#ffffff",
+              cursor:
+                bulkLoading || !bulkConfirmed || loading || bulkCandidates.length === 0
+                  ? "not-allowed"
+                  : "pointer",
+              fontWeight: 900,
+              padding: "10px 14px",
+            }}
+          >
+            {bulkLoading
+              ? "AI生成・保存を実行中..."
+              : "未保存候補を最大5件AI生成して保存"}
+          </button>
+
+          {bulkProgress && (
+            <div
+              style={{
+                marginTop: 14,
+                borderTop: "1px solid #dbe3ef",
+                paddingTop: 12,
+                lineHeight: 1.8,
+              }}
+            >
+              <div style={{ fontWeight: 900 }}>
+                {bulkLoading ? "実行中" : "実行結果"}：{bulkProgress.current} / {bulkProgress.total}件
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 14, color: "#334155" }}>
+                <span>成功：{bulkProgress.success}件</span>
+                <span>失敗：{bulkProgress.failed}件</span>
+                <span>スキップ：{bulkProgress.skipped}件</span>
+              </div>
+            </div>
+          )}
+
+          {bulkResults.length > 0 && (
+            <ul style={{ margin: "12px 0 0", paddingLeft: 20, lineHeight: 1.8 }}>
+              {bulkResults.map((result) => {
+                const statusLabel =
+                  result.status === "success"
+                    ? "成功"
+                    : result.status === "skipped"
+                      ? "スキップ"
+                      : "失敗";
+                return (
+                  <li key={result.thread_id}>
+                    <span
+                      style={{
+                        fontWeight: 900,
+                        color:
+                          result.status === "success"
+                            ? "#166534"
+                            : result.status === "failed"
+                              ? "#b91c1c"
+                              : "#475569",
+                      }}
+                    >
+                      {statusLabel}：
+                    </span>
+                    {result.title}（{result.message}）
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      )}
 
       {loading && <p>政策提言候補を読み込んでいます...</p>}
       {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
