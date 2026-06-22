@@ -36,14 +36,65 @@ const POLICY_THEME_RULES = [
   { tag: "雇用・賃金", area: "other", keywords: ["賃金", "実質賃金", "給料", "賃上げ"] },
   { tag: "雇用・労働市場", area: "other", keywords: ["雇用", "失業率", "有効求人倍率", "人手不足", "労働市場"] },
   { tag: "財政規律", area: "fiscal", keywords: ["財政規律", "財政健全化", "pb", "プライマリーバランス"] },
-  { tag: "国債・財政", area: "fiscal", keywords: ["国債", "債務", "償還", "60年償還", "財政政策"] },
+  { tag: "国債・財政", area: "fiscal", keywords: ["国債", "債務", "償還", "60年償還", "財政政策", "財政出動", "政府支出"] },
   { tag: "日銀・金融政策", area: "monetary", keywords: ["日銀", "政策金利", "利上げ", "利下げ", "金融政策", "金融緩和"] },
-  { tag: "物価・インフレ", area: "monetary", keywords: ["物価", "インフレ", "cpi", "円安", "輸入物価"] },
+  { tag: "物価・インフレ", area: null, keywords: ["物価", "インフレ", "cpi", "円安", "輸入物価"] },
   { tag: "社会保険料", area: "fiscal", keywords: ["社会保険料", "社保"] },
   { tag: "需要不足・デフレ", area: null, keywords: ["需要不足", "需給ギャップ", "デフレ"] },
   { tag: "価格転嫁・生産性", area: "other", keywords: ["価格転嫁", "生産性", "省力化"] },
   { tag: "制度改革", area: "other", keywords: ["制度改革", "制度見直し", "規制改革", "情報公開", "社会制度"] },
 ] as const;
+
+const FISCAL_PRIMARY_KEYWORDS = [
+  "消費税", "減税", "増税", "給付", "社会保険料", "国債", "償還",
+  "財政規律", "公共投資", "政府支出", "財政出動",
+];
+const MONETARY_PRIMARY_KEYWORDS = [
+  "日銀", "政策金利", "利上げ", "利下げ", "金融緩和", "金融引き締め",
+  "金利据え置き", "量的緩和", "金融政策",
+];
+const MONETARY_ACTION_KEYWORDS = [
+  "政策金利", "利上げ", "利下げ", "金融緩和", "金融引き締め",
+  "金利据え置き", "量的緩和",
+];
+const OTHER_PRIMARY_KEYWORDS = [
+  "賃金", "雇用", "価格転嫁", "生産性", "労働市場", "制度改革",
+  "労働分配率", "人手不足",
+];
+
+function includesAny(text: string, keywords: readonly string[]) {
+  const normalized = text.toLowerCase();
+  return keywords.some((keyword) => normalized.includes(keyword.toLowerCase()));
+}
+
+function classifyExplicitPolicyArea(text: string): PolicyArea | null {
+  const hasFiscal = includesAny(text, FISCAL_PRIMARY_KEYWORDS);
+  const hasMonetary = includesAny(text, MONETARY_PRIMARY_KEYWORDS);
+  const hasMonetaryAction = includesAny(text, MONETARY_ACTION_KEYWORDS);
+  const hasOther = includesAny(text, OTHER_PRIMARY_KEYWORDS);
+
+  if (hasFiscal && hasMonetaryAction) return "combined";
+  if (hasFiscal) return "fiscal";
+  if (hasMonetary) return "monetary";
+  if (hasOther) return "other";
+  return null;
+}
+
+function classifyConclusions(conclusions: string[]) {
+  const areas = conclusions
+    .map(classifyExplicitPolicyArea)
+    .filter((area): area is PolicyArea => area !== null);
+  if (areas.includes("combined")) return "combined";
+  if (areas.length === 0) return null;
+
+  const counts = areas.reduce<Record<string, number>>((result, area) => {
+    result[area] = (result[area] ?? 0) + 1;
+    return result;
+  }, {});
+  return areas.reduce((selected, area) =>
+    (counts[area] ?? 0) > (counts[selected] ?? 0) ? area : selected
+  );
+}
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -115,32 +166,19 @@ function buildPolicyThemeAnalysis(input: {
     if (theme.area) areaScores[theme.area] += theme.score;
   }
 
-  const rankedAreas = (Object.entries(areaScores) as Array<[PrimaryPolicyArea, number]>)
+  const [firstArea] = (Object.entries(areaScores) as Array<[PrimaryPolicyArea, number]>)
     .sort((a, b) => b[1] - a[1]);
-  const [firstArea, secondArea] = rankedAreas;
-  const demandScore = scoredThemes.find((item) => item.tag === "需要不足・デフレ")?.score ?? 0;
-  const highSignalText = `${input.title}\n${input.easySummary}\n${input.conclusions.join("\n")}`.toLowerCase();
-  const hasFiscalSignal = ["政府", "財政政策", "減税", "給付", "社会保険料", "公共投資"]
-    .some((keyword) => highSignalText.includes(keyword));
-  const hasMonetarySignal = ["日銀", "金融政策", "政策金利", "利上げ", "利下げ", "金融緩和"]
-    .some((keyword) => highSignalText.includes(keyword));
-  const hasComparableStrongAreas =
-    firstArea[1] >= 6 && secondArea[1] >= 6 && secondArea[1] >= firstArea[1] * 0.7;
-  const hasDemandDrivenCombination =
-    demandScore > 0 && areaScores.fiscal >= 4 && areaScores.monetary >= 4;
-  const hasExplicitFiscalMonetaryCombination =
-    hasFiscalSignal && hasMonetarySignal && areaScores.fiscal > 0 && areaScores.monetary > 0;
+  const titlePolicyArea = classifyExplicitPolicyArea(input.title);
+  const conclusionPolicyArea = classifyConclusions(input.conclusions);
   const isClearlyOutsideEconomicPolicy =
     Boolean(input.category) && input.category !== "未設定" && input.category !== "経済・政策";
 
   let policyArea: PolicyArea = "unclassified";
   if (!isClearlyOutsideEconomicPolicy) {
-    if (
-      hasComparableStrongAreas ||
-      hasDemandDrivenCombination ||
-      hasExplicitFiscalMonetaryCombination
-    ) {
-      policyArea = "combined";
+    if (titlePolicyArea) {
+      policyArea = titlePolicyArea;
+    } else if (conclusionPolicyArea) {
+      policyArea = conclusionPolicyArea;
     } else if (firstArea[1] > 0) {
       policyArea = firstArea[0];
     }
