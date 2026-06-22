@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const MODEL = "gpt-5.4-mini";
-const PROMPT_VERSION = "policy_proposal_preview_v1";
+const PROMPT_VERSION = "policy_proposal_preview_v2";
 const SUMMARY_TYPE = "thread_summary_from_classifications";
 const MAX_POSTS = 30;
 
@@ -107,6 +107,24 @@ function parseJsonObject(value: string) {
   }
 }
 
+function normalizePolicyGroup(value: unknown) {
+  const group = isRecord(value) ? value : {};
+  return {
+    summary: asString(group.summary, 1200),
+    proposal_items: asStringArray(group.proposal_items, 5),
+    merits: asStringArray(group.merits, 5),
+    demerits: asStringArray(group.demerits, 5),
+    countermeasures: asStringArray(group.countermeasures, 5),
+  };
+}
+
+function mergePolicyGroupItems(
+  groups: ReturnType<typeof normalizePolicyGroup>[],
+  key: "proposal_items" | "merits" | "demerits" | "countermeasures"
+) {
+  return Array.from(new Set(groups.flatMap((group) => group[key]))).slice(0, 12);
+}
+
 function normalizePreview(outputText: string, references: ReferenceThread[]) {
   const parsed = parseJsonObject(outputText);
   if (!parsed) throw new Error("政策提言AIプレビューのJSONを解析できませんでした。");
@@ -123,17 +141,30 @@ function normalizePreview(outputText: string, references: ReferenceThread[]) {
     do_not_prioritize: "優先しない",
     insufficient: "判断材料不足",
   };
+  const priorityAreas = ["fiscal", "monetary", "other", "combined", "hold", "insufficient"];
+  const priorityArea = priorityAreas.includes(String(priority.priority_area ?? ""))
+    ? String(priority.priority_area)
+    : "insufficient";
+  const policyGroupsRecord = isRecord(parsed.policy_groups) ? parsed.policy_groups : {};
+  const policyGroups = {
+    fiscal_policy: normalizePolicyGroup(policyGroupsRecord.fiscal_policy),
+    monetary_policy: normalizePolicyGroup(policyGroupsRecord.monetary_policy),
+    other_policy: normalizePolicyGroup(policyGroupsRecord.other_policy),
+  };
+  const policyGroupValues = Object.values(policyGroups);
 
   return {
     title: asString(parsed.title, 240) || "政策提言候補",
     one_line_proposal: asString(parsed.one_line_proposal, 500),
-    proposal_items: asStringArray(parsed.proposal_items),
-    merits: asStringArray(parsed.merits),
-    demerits: asStringArray(parsed.demerits),
-    countermeasures: asStringArray(parsed.countermeasures),
+    policy_groups: policyGroups,
+    proposal_items: mergePolicyGroupItems(policyGroupValues, "proposal_items"),
+    merits: mergePolicyGroupItems(policyGroupValues, "merits"),
+    demerits: mergePolicyGroupItems(policyGroupValues, "demerits"),
+    countermeasures: mergePolicyGroupItems(policyGroupValues, "countermeasures"),
     opposing_views: asStringArray(parsed.opposing_views),
     priority_judgment: {
       decision,
+      priority_area: priorityArea,
       label: asString(priority.label, 120) || defaultLabels[decision],
       reasons: asStringArray(priority.reasons),
     },
@@ -202,13 +233,21 @@ function buildPrompt(input: {
 - 「どちらにも一理があります」「バランスが重要」だけで終わらず、何を優先するかを選んでください。
 - 出力は文章を長く連ねず、箇条書き用の短い配列を中心にしてください。
 
+政策の3分類:
+- fiscal_policy は、政府がお金の取り方・使い方をどうするかを扱います。減税、給付、社会保険料軽減、公共投資、中小企業支援、雇用支援などを含みます。
+- monetary_policy は、日銀が金利やお金の流れをどうするかを扱います。利上げ、利下げ、金利据え置き、円安・物価への対応などを含みます。
+- other_policy は、制度・規制・産業・労働市場・情報公開などをどう直すかを扱います。価格転嫁、賃上げ、社会保障、省力化、制度設計などを含みます。
+- 同じ政策行動を複数分類へ重複させず、主となる分類を1つ選んでください。
+- 材料がない分類は無理に埋めず、summary は空文字、各配列は空配列にしてください。
+
 出力件数と内容:
-- proposal_items は原則3〜6件。具体的な政策行動を1項目ずつ書いてください。
-- merits は原則2〜5件。誰に、どの経路で、どのような効果があるかを具体化してください。
-- demerits は原則2〜5件。財政負担、インフレ再燃、円安、制度悪用、政策依存など、提言に実際に関係する副作用だけを書いてください。
-- countermeasures は demerits と対応させ、可能な限り各デメリットに1件以上の対策を示してください。どのデメリットへの対策か分かる文にしてください。
+- 各分類の proposal_items は、材料がある場合は原則1〜4件。具体的な政策行動を1項目ずつ書いてください。
+- 各分類の merits は原則1〜4件。誰に、どの経路で、どのような効果があるかを具体化してください。
+- 各分類の demerits は原則1〜4件。財政負担、インフレ再燃、円安、制度悪用、政策依存など、その分類の提言に実際に関係する副作用だけを書いてください。
+- 各分類の countermeasures は demerits と対応させ、可能な限り各デメリットに1件以上の対策を示してください。どのデメリットへの対策か分かる文にしてください。
 - opposing_views は原則2件以上。単なる感想ではなく政策上の反論を書いてください。
-- priority_judgment.reasons は原則2件以上。優先または条件付きとする理由を明示してください。
+- priority_judgment.priority_area は fiscal、monetary、other、combined、hold、insufficient のいずれかを選んでください。
+- priority_judgment.reasons は原則2件以上。どの政策分類を優先するのか、または条件付き・見送り・判断材料不足とする理由を明示してください。
 - verification_metrics は原則3〜6件。指標名だけでなく、見る方向、確認時期、見直し条件との関係を可能な範囲で書いてください。
 - review_conditions は原則2〜5件。政策を停止、縮小、変更すべき条件を書いてください。
 - reference_threads は実際に参照した入力済みスレッドだけを最大5件まで入れてください。関連スレッドがない場合は捏造しないでください。
@@ -219,12 +258,12 @@ function buildPrompt(input: {
 1. 景気局面を確認する。
 2. 需要不足か需要超過かを判定する。
 3. 物価上昇が需要過熱、円安・輸入物価、供給制約などのどれによるかを分ける。
-4. 日銀の金融政策と政府の財政政策の役割を分ける。
-5. 政策案の因果経路を整理する。
-6. メリットとデメリットを対応付ける。
-7. デメリットごとの対策を示す。
+4. 財政政策でできることを整理する。
+5. 金融政策でできることを整理する。
+6. その他の政策でできることを整理する。
+7. 各分類のメリット、デメリット、デメリット対策を対応付ける。
 8. 反対意見を検討する。
-9. 優先、条件付き優先、非優先、判断材料不足から選ぶ。
+9. 財政、金融、その他、複合、見送り、判断材料不足のどれを優先判断とするか選ぶ。
 10. 検証指標と見直し条件を設定する。
 
 主スレッド材料:
@@ -447,20 +486,60 @@ export async function POST(request: NextRequest) {
               properties: {
                 title: { type: "string" },
                 one_line_proposal: { type: "string" },
-                proposal_items: { type: "array", maxItems: 6, items: { type: "string" } },
-                merits: { type: "array", maxItems: 5, items: { type: "string" } },
-                demerits: { type: "array", maxItems: 5, items: { type: "string" } },
-                countermeasures: { type: "array", maxItems: 5, items: { type: "string" } },
+                policy_groups: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    fiscal_policy: {
+                      type: "object",
+                      additionalProperties: false,
+                      properties: {
+                        summary: { type: "string" },
+                        proposal_items: { type: "array", maxItems: 5, items: { type: "string" } },
+                        merits: { type: "array", maxItems: 5, items: { type: "string" } },
+                        demerits: { type: "array", maxItems: 5, items: { type: "string" } },
+                        countermeasures: { type: "array", maxItems: 5, items: { type: "string" } },
+                      },
+                      required: ["summary", "proposal_items", "merits", "demerits", "countermeasures"],
+                    },
+                    monetary_policy: {
+                      type: "object",
+                      additionalProperties: false,
+                      properties: {
+                        summary: { type: "string" },
+                        proposal_items: { type: "array", maxItems: 5, items: { type: "string" } },
+                        merits: { type: "array", maxItems: 5, items: { type: "string" } },
+                        demerits: { type: "array", maxItems: 5, items: { type: "string" } },
+                        countermeasures: { type: "array", maxItems: 5, items: { type: "string" } },
+                      },
+                      required: ["summary", "proposal_items", "merits", "demerits", "countermeasures"],
+                    },
+                    other_policy: {
+                      type: "object",
+                      additionalProperties: false,
+                      properties: {
+                        summary: { type: "string" },
+                        proposal_items: { type: "array", maxItems: 5, items: { type: "string" } },
+                        merits: { type: "array", maxItems: 5, items: { type: "string" } },
+                        demerits: { type: "array", maxItems: 5, items: { type: "string" } },
+                        countermeasures: { type: "array", maxItems: 5, items: { type: "string" } },
+                      },
+                      required: ["summary", "proposal_items", "merits", "demerits", "countermeasures"],
+                    },
+                  },
+                  required: ["fiscal_policy", "monetary_policy", "other_policy"],
+                },
                 opposing_views: { type: "array", maxItems: 5, items: { type: "string" } },
                 priority_judgment: {
                   type: "object",
                   additionalProperties: false,
                   properties: {
                     decision: { type: "string", enum: ["prioritize", "conditional", "do_not_prioritize", "insufficient"] },
+                    priority_area: { type: "string", enum: ["fiscal", "monetary", "other", "combined", "hold", "insufficient"] },
                     label: { type: "string" },
                     reasons: { type: "array", maxItems: 5, items: { type: "string" } },
                   },
-                  required: ["decision", "label", "reasons"],
+                  required: ["decision", "priority_area", "label", "reasons"],
                 },
                 verification_metrics: { type: "array", maxItems: 6, items: { type: "string" } },
                 review_conditions: { type: "array", maxItems: 5, items: { type: "string" } },
@@ -486,8 +565,7 @@ export async function POST(request: NextRequest) {
                 },
               },
               required: [
-                "title", "one_line_proposal", "proposal_items", "merits", "demerits",
-                "countermeasures", "opposing_views", "priority_judgment",
+                "title", "one_line_proposal", "policy_groups", "opposing_views", "priority_judgment",
                 "verification_metrics", "review_conditions", "economic_phase",
                 "demand_balance", "inflation_causes", "monetary_policy_role",
                 "fiscal_policy_role", "missing_information", "reference_threads"

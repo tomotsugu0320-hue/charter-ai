@@ -28,9 +28,22 @@ type Proposal = {
   classified_comment_count: number;
 };
 
+type PolicyGroup = {
+  summary: string;
+  proposal_items: string[];
+  merits: string[];
+  demerits: string[];
+  countermeasures: string[];
+};
+
 type PolicyProposalPreview = {
   title: string;
   one_line_proposal: string;
+  policy_groups?: {
+    fiscal_policy: PolicyGroup;
+    monetary_policy: PolicyGroup;
+    other_policy: PolicyGroup;
+  };
   proposal_items: string[];
   merits: string[];
   demerits: string[];
@@ -38,6 +51,7 @@ type PolicyProposalPreview = {
   opposing_views: string[];
   priority_judgment: {
     decision: string;
+    priority_area?: string;
     label: string;
     reasons: string[];
   };
@@ -98,6 +112,63 @@ function PreviewList({ title, items }: { title: string; items: string[] }) {
     </section>
   );
 }
+
+function PolicyGroupPreview({
+  title,
+  description,
+  group,
+}: {
+  title: string;
+  description: string;
+  group: PolicyGroup;
+}) {
+  const hasProposal = Boolean(
+    group.summary ||
+      group.proposal_items.length ||
+      group.merits.length ||
+      group.demerits.length ||
+      group.countermeasures.length
+  );
+
+  return (
+    <section
+      style={{
+        marginTop: 16,
+        border: "1px solid #cbd5e1",
+        borderRadius: 8,
+        padding: 14,
+        minWidth: 0,
+      }}
+    >
+      <h3 style={{ margin: 0, fontSize: 20 }}>{title}</h3>
+      <p style={{ margin: "6px 0 0", color: "#475569", lineHeight: 1.7 }}>{description}</p>
+      {hasProposal ? (
+        <>
+          {group.summary && (
+            <p style={{ margin: "12px 0 0", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>
+              {group.summary}
+            </p>
+          )}
+          <PreviewList title="実施案" items={group.proposal_items} />
+          <PreviewList title="メリット" items={group.merits} />
+          <PreviewList title="デメリット" items={group.demerits} />
+          <PreviewList title="デメリット対策" items={group.countermeasures} />
+        </>
+      ) : (
+        <p style={{ margin: "12px 0 0", color: "#64748b" }}>この分類の提案は未整理です。</p>
+      )}
+    </section>
+  );
+}
+
+const PRIORITY_AREA_LABELS: Record<string, string> = {
+  fiscal: "財政政策を優先",
+  monetary: "金融政策を優先",
+  other: "その他の政策を優先",
+  combined: "複合政策を優先",
+  hold: "現時点では見送り",
+  insufficient: "判断材料不足",
+};
 
 type PolicyJudgmentItem = {
   key: string;
@@ -477,6 +548,35 @@ export default function PolicyProposalDetailPage() {
                 {preview.one_line_proposal}
               </p>
 
+              <section
+                style={{
+                  marginTop: 16,
+                  border: "1px solid #bfdbfe",
+                  borderRadius: 8,
+                  background: "#eff6ff",
+                  padding: 14,
+                }}
+              >
+                <h3 style={{ margin: 0, fontSize: 20 }}>まず結論</h3>
+                <div style={{ marginTop: 8, fontWeight: 900 }}>
+                  優先対象：
+                  {preview.priority_judgment.priority_area
+                    ? PRIORITY_AREA_LABELS[preview.priority_judgment.priority_area] ??
+                      preview.priority_judgment.label
+                    : preview.priority_judgment.label}
+                </div>
+                <div style={{ marginTop: 6, color: "#334155" }}>
+                  判断：{preview.priority_judgment.label}
+                </div>
+                {preview.priority_judgment.reasons.length > 0 && (
+                  <ul style={{ margin: "8px 0 0", paddingLeft: 22, lineHeight: 1.8 }}>
+                    {preview.priority_judgment.reasons.map((reason, index) => (
+                      <li key={`priority-reason-${index}`}>{reason}</li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
               <section style={{ marginTop: 16, padding: 14, background: "#f8fafc" }}>
                 <h3 style={{ margin: 0, fontSize: 18 }}>政策判断の前提</h3>
                 <ul style={{ margin: "8px 0 0", paddingLeft: 22, lineHeight: 1.8 }}>
@@ -493,21 +593,34 @@ export default function PolicyProposalDetailPage() {
                 </ul>
               </section>
 
-              <PreviewList title="提言内容" items={preview.proposal_items} />
-              <PreviewList title="メリット" items={preview.merits} />
-              <PreviewList title="デメリット" items={preview.demerits} />
-              <PreviewList title="デメリット対策" items={preview.countermeasures} />
-              <PreviewList title="反対意見" items={preview.opposing_views} />
+              {preview.policy_groups ? (
+                <>
+                  <PolicyGroupPreview
+                    title="財政政策"
+                    description="政府がお金の取り方・使い方をどうするか"
+                    group={preview.policy_groups.fiscal_policy}
+                  />
+                  <PolicyGroupPreview
+                    title="金融政策"
+                    description="日銀が金利やお金の流れをどうするか"
+                    group={preview.policy_groups.monetary_policy}
+                  />
+                  <PolicyGroupPreview
+                    title="その他の政策"
+                    description="制度・規制・産業・労働市場などをどう直すか"
+                    group={preview.policy_groups.other_policy}
+                  />
+                </>
+              ) : (
+                <>
+                  <PreviewList title="提言内容" items={preview.proposal_items} />
+                  <PreviewList title="メリット" items={preview.merits} />
+                  <PreviewList title="デメリット" items={preview.demerits} />
+                  <PreviewList title="デメリット対策" items={preview.countermeasures} />
+                </>
+              )}
 
-              <section style={{ padding: "14px 0", borderTop: "1px solid #e2e8f0" }}>
-                <h3 style={{ margin: 0, fontSize: 18 }}>優先判断</h3>
-                <div style={{ marginTop: 8, fontWeight: 900 }}>{preview.priority_judgment.label}</div>
-                <ul style={{ margin: "8px 0 0", paddingLeft: 22, lineHeight: 1.8 }}>
-                  {preview.priority_judgment.reasons.map((reason, index) => (
-                    <li key={`priority-reason-${index}`}>{reason}</li>
-                  ))}
-                </ul>
-              </section>
+              <PreviewList title="反対意見" items={preview.opposing_views} />
 
               <PreviewList title="検証指標" items={preview.verification_metrics} />
               <PreviewList title="見直し条件" items={preview.review_conditions} />
