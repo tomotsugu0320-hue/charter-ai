@@ -1492,6 +1492,15 @@ export default function ForumAdminPage() {
             </p>
           </Link>
 
+          <Link href={`/${tenant}/forum/policy-proposals`} style={menuCardStyle}>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
+              政策提言候補
+            </h2>
+            <p style={menuDescriptionStyle}>
+              AI再総括済みの議論を、読み取り専用の政策提言候補として確認します。
+            </p>
+          </Link>
+
           <Link
             href={`/${tenant}/forum/admin/rebuild-discussion-map`}
             style={menuCardStyle}

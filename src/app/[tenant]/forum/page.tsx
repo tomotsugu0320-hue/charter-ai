@@ -1719,6 +1719,24 @@ export default function ForumPage() {
         </p>
       </section>
 
+      <Link
+        href={`/${tenant}/forum/policy-proposals`}
+        style={{
+          ...panelStyle,
+          display: "block",
+          marginBottom: 22,
+          borderColor: "#bfdbfe",
+          background: "#f8fbff",
+          color: "#0f172a",
+          textDecoration: "none",
+        }}
+      >
+        <div style={{ fontSize: 20, fontWeight: 900 }}>政策提言候補を見る</div>
+        <div style={{ marginTop: 6, color: "#475569", lineHeight: 1.7 }}>
+          AI再総括済みの議論から、現時点の提言候補と検証すべき指標を確認できます。
+        </div>
+      </Link>
+
       <section
         style={{
           ...panelStyle,
