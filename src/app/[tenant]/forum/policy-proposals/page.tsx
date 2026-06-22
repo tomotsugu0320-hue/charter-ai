@@ -431,6 +431,28 @@ export default function PolicyProposalsPage() {
             未保存候補を最大5件まで順番にAI生成し、draft保存します。
             OpenAI APIは候補数ぶん使用します。既存AI再総括は更新しません。
           </p>
+          <div
+            style={{
+              marginTop: 10,
+              border: "1px solid #dbe3ef",
+              borderRadius: 8,
+              background: "#ffffff",
+              padding: "10px 12px",
+              color: "#475569",
+              fontSize: 13,
+              lineHeight: 1.7,
+            }}
+          >
+            現在の日本の政策方向は手動更新です。日銀会合・予算案・税制改正・経済対策の後に、必要なら見直してください。
+            <div style={{ marginTop: 4 }}>
+              <Link
+                href={`/${tenant}/forum#current-japan-policy-direction`}
+                style={{ color: "#075985", fontWeight: 900 }}
+              >
+                現在の政策方向を確認・見直す
+              </Link>
+            </div>
+          </div>
 
           {!loading && !error && (
             <div style={{ marginTop: 10, fontWeight: 800 }}>

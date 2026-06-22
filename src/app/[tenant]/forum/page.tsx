@@ -1141,6 +1141,7 @@ export default function ForumPage() {
   const [recentThreads, setRecentThreads] = useState<ThreadRow[]>([]);
   const [policyDecisionCards, setPolicyDecisionCards] = useState<PolicyDecisionCard[]>([]);
   const [policyDecisionsLoading, setPolicyDecisionsLoading] = useState(true);
+  const [isForumAdminForPolicyReview, setIsForumAdminForPolicyReview] = useState(false);
   const [rankingMode, setRankingMode] = useState<RankingMode>("score");
   const [fontSizeMode, setFontSizeMode] =
     useState<"small" | "medium" | "large">("medium");
@@ -1487,6 +1488,27 @@ export default function ForumPage() {
     }
 
     void loadPolicyDecisions();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPolicyReviewAdminStatus() {
+      try {
+        const response = await fetch("/api/forum/admin/session", { cache: "no-store" });
+        const result = await response.json().catch(() => null);
+        if (!cancelled) {
+          setIsForumAdminForPolicyReview(response.ok && result?.is_admin === true);
+        }
+      } catch {
+        if (!cancelled) setIsForumAdminForPolicyReview(false);
+      }
+    }
+
+    void loadPolicyReviewAdminStatus();
     return () => {
       cancelled = true;
     };
@@ -1923,6 +1945,7 @@ export default function ForumPage() {
       </section>
 
       <section
+        id="current-japan-policy-direction"
         style={{
           ...panelStyle,
           marginBottom: 16,
@@ -1935,6 +1958,29 @@ export default function ForumPage() {
         <p style={{ margin: "6px 0 0", color: "#475569", lineHeight: 1.7 }}>
           現在の政策方向を比較用に簡略化した固定表示です。AIによる推奨ではありません。
         </p>
+        {isForumAdminForPolicyReview && (
+          <div
+            style={{
+              marginTop: 10,
+              border: "1px solid #cbd5e1",
+              borderRadius: 8,
+              background: "#ffffff",
+              padding: "9px 11px",
+              color: "#475569",
+              fontSize: 13,
+              lineHeight: 1.7,
+            }}
+          >
+            この表示は手動更新です。日銀会合・予算案・税制改正・経済対策の後は、
+            <Link
+              href={`/${tenant}/forum/policy-proposals`}
+              style={{ color: "#075985", fontWeight: 900 }}
+            >
+              政策提言候補ページ
+            </Link>
+            で見直し時期を確認してください。
+          </div>
+        )}
         <div
           style={{
             display: "grid",
