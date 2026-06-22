@@ -14,6 +14,11 @@ type Proposal = {
   summary_text: string;
   current_tentative_conclusion: string[];
   verification_metrics: string[];
+  card_key_points?: {
+    main_points: string[];
+    premises: string[];
+    cautions: string[];
+  };
   policy_theme_tags: string[];
   policy_area: PolicyArea;
   has_saved_proposal: boolean;
@@ -96,8 +101,50 @@ function compactText(value: string, max = 220) {
   return text.length > max ? `${text.slice(0, max)}...` : text;
 }
 
+function firstSentence(value: string, max = 150) {
+  const text = value.replace(/\s+/g, " ").trim();
+  const endIndex = text.search(/[。！？!?]/);
+  const sentence = endIndex >= 0 ? text.slice(0, endIndex + 1) : text;
+  return compactText(sentence, max);
+}
+
+function CardBulletSection({
+  title,
+  items,
+  maxItems,
+}: {
+  title: string;
+  items: string[];
+  maxItems: number;
+}) {
+  const visibleItems = items.filter(Boolean).slice(0, maxItems);
+  if (visibleItems.length === 0) return null;
+
+  return (
+    <section style={{ marginTop: 12, borderTop: "1px solid #e2e8f0", paddingTop: 10 }}>
+      <div style={{ fontSize: 13, fontWeight: 900, color: "#334155" }}>{title}</div>
+      <ul style={{ margin: "6px 0 0", paddingLeft: 20, lineHeight: 1.7 }}>
+        {visibleItems.map((item, index) => (
+          <li key={`${title}-${index}`}>{compactText(item, 150)}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function ProposalCard({ proposal, tenant }: { proposal: Proposal; tenant: string }) {
-  const conclusion = proposal.current_tentative_conclusion[0] || proposal.summary_text;
+  const cardMainPoints = proposal.card_key_points?.main_points ?? [];
+  const fallbackConclusions = proposal.current_tentative_conclusion.slice(0, 3);
+  const summaryFallback = firstSentence(proposal.easy_summary_text || proposal.summary_text);
+  const mainPoints = cardMainPoints.length > 0
+    ? cardMainPoints
+    : fallbackConclusions.length > 0
+      ? fallbackConclusions
+      : summaryFallback
+        ? [summaryFallback]
+        : [];
+  const premises = proposal.card_key_points?.premises ?? [];
+  const cautions = proposal.card_key_points?.cautions ?? [];
 
   return (
     <article style={cardStyle}>
@@ -141,27 +188,10 @@ function ProposalCard({ proposal, tenant }: { proposal: Proposal; tenant: string
         カテゴリ: {proposal.category}
       </div>
       <h2 style={{ margin: "10px 0 0", fontSize: 20, lineHeight: 1.5 }}>{proposal.title}</h2>
-      <p style={{ color: "#475569", lineHeight: 1.75 }}>
-        {compactText(proposal.easy_summary_text || proposal.summary_text)}
-      </p>
-      {conclusion && (
-        <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 10 }}>
-          <div style={{ fontSize: 13, fontWeight: 900, color: "#334155" }}>
-            現時点の結論候補
-          </div>
-          <p style={{ margin: "5px 0 0", lineHeight: 1.7 }}>{compactText(conclusion, 180)}</p>
-        </div>
-      )}
-      {proposal.verification_metrics.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 900, color: "#334155" }}>検証指標</div>
-          <ul style={{ margin: "5px 0 0", paddingLeft: 20, lineHeight: 1.7 }}>
-            {proposal.verification_metrics.slice(0, 2).map((item, index) => (
-              <li key={`${proposal.thread_id}-metric-${index}`}>{compactText(item, 100)}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <CardBulletSection title="要点" items={mainPoints} maxItems={3} />
+      <CardBulletSection title="前提" items={premises} maxItems={2} />
+      <CardBulletSection title="注意点" items={cautions} maxItems={2} />
+      <CardBulletSection title="検証指標" items={proposal.verification_metrics} maxItems={3} />
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 16 }}>
         <Link
           href={`/${tenant}/forum/policy-proposals/${proposal.thread_id}`}

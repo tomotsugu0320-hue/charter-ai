@@ -122,6 +122,23 @@ function asStringArray(value: unknown) {
     : [];
 }
 
+function buildCardItems(sources: unknown[], maxItems: number, maxLength = 160) {
+  const items: string[] = [];
+  const seen = new Set<string>();
+
+  for (const source of sources) {
+    for (const value of asStringArray(source)) {
+      const compact = value.replace(/\s+/g, " ").trim();
+      if (!compact || seen.has(compact)) continue;
+      seen.add(compact);
+      items.push(compact.length > maxLength ? `${compact.slice(0, maxLength)}...` : compact);
+      if (items.length >= maxItems) return items;
+    }
+  }
+
+  return items;
+}
+
 function buildPolicyThemeAnalysis(input: {
   title: string;
   category: string;
@@ -273,6 +290,14 @@ export async function GET() {
       const summary = structure.summary_text?.trim() || "";
       const conclusions = asStringArray(keyPoints.current_tentative_conclusion);
       const metrics = asStringArray(keyPoints.verification_metrics);
+      const cardKeyPoints = {
+        main_points: buildCardItems(
+          [keyPoints.current_tentative_conclusion, keyPoints.discussion_position],
+          3
+        ),
+        premises: buildCardItems([keyPoints.added_premises], 2),
+        cautions: buildCardItems([keyPoints.main_rebuttals, keyPoints.needs_review], 2),
+      };
       const latestSavedProposal = latestSavedProposalMap.get(thread.id);
       const policyThemeAnalysis = buildPolicyThemeAnalysis({
         title,
@@ -293,6 +318,7 @@ export async function GET() {
         summary_text: summary,
         current_tentative_conclusion: conclusions,
         verification_metrics: metrics,
+        card_key_points: cardKeyPoints,
         policy_theme_tags: policyThemeAnalysis.policy_theme_tags,
         policy_area: policyThemeAnalysis.policy_area,
         has_saved_proposal: Boolean(latestSavedProposal),
