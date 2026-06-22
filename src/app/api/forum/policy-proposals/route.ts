@@ -18,8 +18,21 @@ type ThreadRow = {
   id: string;
   title: string | null;
   category: string | null;
+  original_post: string | null;
   created_at: string | null;
 };
+
+const POLICY_THEME_RULES = [
+  { tag: "消費税・減税", keywords: ["消費税", "減税", "増税"] },
+  { tag: "雇用・賃金", keywords: ["賃金", "実質賃金", "給料"] },
+  { tag: "雇用・労働市場", keywords: ["雇用", "失業率", "有効求人倍率", "人手不足"] },
+  { tag: "財政規律", keywords: ["財政規律", "財政健全化", "pb", "プライマリーバランス"] },
+  { tag: "国債・財政", keywords: ["国債", "債務", "償還", "60年償還"] },
+  { tag: "日銀・金融政策", keywords: ["日銀", "政策金利", "利上げ", "金融政策"] },
+  { tag: "物価・インフレ", keywords: ["物価", "インフレ", "cpi", "円安", "輸入物価"] },
+  { tag: "社会保険料", keywords: ["社会保険料", "社保"] },
+  { tag: "需要不足・デフレ", keywords: ["需要不足", "需給ギャップ", "デフレ"] },
+] as const;
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -45,6 +58,43 @@ function asStringArray(value: unknown) {
         .map((item) => item.trim())
         .filter(Boolean)
     : [];
+}
+
+function buildPolicyThemeTags(input: {
+  title: string;
+  category: string;
+  originalPost: string;
+  easySummary: string;
+  summary: string;
+  conclusions: string[];
+  metrics: string[];
+}) {
+  const weightedSources = [
+    { text: input.title, weight: 4 },
+    { text: input.category, weight: 1 },
+    { text: input.originalPost, weight: 2 },
+    { text: input.easySummary, weight: 3 },
+    { text: input.summary, weight: 2 },
+    { text: input.conclusions.join("\n"), weight: 3 },
+    { text: input.metrics.join("\n"), weight: 1 },
+  ].map((source) => ({ ...source, text: source.text.toLowerCase() }));
+
+  const tags = POLICY_THEME_RULES.map((rule, index) => {
+    const score = weightedSources.reduce((total, source) => {
+      const matchedKeywordCount = rule.keywords.filter((keyword) =>
+        source.text.includes(keyword.toLowerCase())
+      ).length;
+      return total + matchedKeywordCount * source.weight;
+    }, 0);
+
+    return { tag: rule.tag, score, index };
+  })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .slice(0, 3)
+    .map((item) => item.tag);
+
+  return tags.length > 0 ? tags : ["テーマ未分類"];
 }
 
 export async function GET() {
@@ -83,7 +133,7 @@ export async function GET() {
 
   const { data: threads, error: threadsError } = await supabase
     .from("forum_threads")
-    .select("id, title, category, created_at")
+    .select("id, title, category, original_post, created_at")
     .eq("is_deleted", false)
     .in("id", threadIds);
 
@@ -104,18 +154,31 @@ export async function GET() {
       if (!thread) return null;
 
       const keyPoints = asRecord(structure.key_points);
+      const title = thread.title?.trim() || "無題の議論";
+      const category = thread.category?.trim() || "未設定";
+      const easySummary = structure.easy_summary_text?.trim() || "";
+      const summary = structure.summary_text?.trim() || "";
+      const conclusions = asStringArray(keyPoints.current_tentative_conclusion);
+      const metrics = asStringArray(keyPoints.verification_metrics);
       return {
         thread_id: thread.id,
-        title: thread.title?.trim() || "無題の議論",
-        category: thread.category?.trim() || "未設定",
+        title,
+        category,
         created_at: thread.created_at,
         summary_updated_at: structure.updated_at,
-        easy_summary_text: structure.easy_summary_text?.trim() || "",
-        summary_text: structure.summary_text?.trim() || "",
-        current_tentative_conclusion: asStringArray(
-          keyPoints.current_tentative_conclusion
-        ),
-        verification_metrics: asStringArray(keyPoints.verification_metrics),
+        easy_summary_text: easySummary,
+        summary_text: summary,
+        current_tentative_conclusion: conclusions,
+        verification_metrics: metrics,
+        policy_theme_tags: buildPolicyThemeTags({
+          title,
+          category,
+          originalPost: thread.original_post?.trim() || "",
+          easySummary,
+          summary,
+          conclusions,
+          metrics,
+        }),
       };
     })
     .filter((proposal): proposal is NonNullable<typeof proposal> => proposal !== null)

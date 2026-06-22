@@ -12,6 +12,7 @@ type Proposal = {
   summary_text: string;
   current_tentative_conclusion: string[];
   verification_metrics: string[];
+  policy_theme_tags: string[];
 };
 
 const pageStyle: CSSProperties = {
@@ -107,16 +108,33 @@ export default function PolicyProposalsPage() {
             <article key={proposal.thread_id} style={cardStyle}>
               <div
                 style={{
-                  display: "inline-block",
-                  padding: "3px 8px",
-                  borderRadius: 999,
-                  background: proposal.category === "経済・政策" ? "#e0f2fe" : "#f1f5f9",
-                  color: "#334155",
-                  fontSize: 12,
-                  fontWeight: 800,
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 6,
                 }}
               >
-                {proposal.category}
+                {(proposal.policy_theme_tags.length > 0
+                  ? proposal.policy_theme_tags
+                  : ["テーマ未分類"]
+                ).slice(0, 3).map((tag) => (
+                  <span
+                    key={`${proposal.thread_id}-${tag}`}
+                    style={{
+                      display: "inline-block",
+                      padding: "3px 8px",
+                      borderRadius: 999,
+                      background: tag === "テーマ未分類" ? "#f1f5f9" : "#e0f2fe",
+                      color: "#334155",
+                      fontSize: 12,
+                      fontWeight: 800,
+                    }}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+              <div style={{ marginTop: 7, color: "#64748b", fontSize: 12 }}>
+                カテゴリ: {proposal.category}
               </div>
               <h2 style={{ margin: "10px 0 0", fontSize: 20, lineHeight: 1.5 }}>
                 {proposal.title}
