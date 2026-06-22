@@ -68,6 +68,15 @@ type DiscussionMapNode = {
   children?: DiscussionMapNode[];
 };
 
+type PolicyDecisionCard = {
+  thread_id: string;
+  title: string;
+  policy_area: "fiscal" | "monetary" | "other";
+  decision: string;
+  decision_label: string;
+  reason: string;
+};
+
 const ALL_CATEGORIES = "すべて";
 const TOP_CARD_LIMIT = 9;
 const SEARCH_RESULTS_PER_PAGE = 9;
@@ -242,6 +251,97 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function toText(value: unknown, fallback = "") {
   return typeof value === "string" ? value : fallback;
+}
+
+const POLICY_DECISION_AREAS = [
+  {
+    key: "fiscal" as const,
+    title: "財政政策",
+    description: "政府のお金の出し方",
+  },
+  {
+    key: "monetary" as const,
+    title: "金融政策",
+    description: "日銀のお金の流れ",
+  },
+  {
+    key: "other" as const,
+    title: "その他の政策",
+    description: "制度・働き方・価格転嫁",
+  },
+];
+
+function normalizePolicyDecisionCards(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  const cards = new Map<PolicyDecisionCard["policy_area"], PolicyDecisionCard>();
+  for (const item of value) {
+    if (!isRecord(item) || item.has_saved_proposal !== true) continue;
+    const policyArea = String(item.policy_area ?? "");
+    if (policyArea !== "fiscal" && policyArea !== "monetary" && policyArea !== "other") {
+      continue;
+    }
+    if (cards.has(policyArea)) continue;
+
+    const judgment = isRecord(item.policy_judgment) ? item.policy_judgment : {};
+    cards.set(policyArea, {
+      thread_id: toText(item.thread_id),
+      title: toText(item.title, "政策提言候補"),
+      policy_area: policyArea,
+      decision: toText(judgment.decision),
+      decision_label: toText(judgment.decision_label),
+      reason: toText(judgment.reason),
+    });
+  }
+
+  return Array.from(cards.values());
+}
+
+function getPolicyDecisionLabel(card: PolicyDecisionCard) {
+  if (card.policy_area === "fiscal") {
+    const label = {
+      spend: "財政支出すべき",
+      do_not_spend: "財政支出すべきでない",
+      conditional: "条件付きで財政支出",
+      insufficient: "判断材料不足",
+    }[card.decision];
+    return (label ?? card.decision_label) || "詳細で判断を確認";
+  }
+
+  if (card.policy_area === "monetary") {
+    const isRateCut = `${card.title} ${card.reason}`.includes("利下げ");
+    const label = {
+      ease: isRateCut ? "金利引き下げ" : "金融緩和",
+      tighten: "金利引き上げ",
+      hold: "据え置き",
+      conditional: "条件付き",
+      insufficient: "判断材料不足",
+    }[card.decision];
+    return (label ?? card.decision_label) || "詳細で判断を確認";
+  }
+
+  const description = `${card.title} ${card.reason}`;
+  const actionLabel = description.includes("価格転嫁")
+    ? "価格転嫁を進める"
+    : description.includes("賃上げ") || description.includes("賃金")
+      ? "賃上げを支援する"
+      : description.includes("制度")
+        ? "制度改革を進める"
+        : "制度改善を実施";
+  const label = {
+    do: actionLabel,
+    do_not_do: "実施しない",
+    conditional: "条件付き",
+    insufficient: "判断材料不足",
+  }[card.decision];
+  return (label ?? card.decision_label) || "詳細で判断を確認";
+}
+
+function compactPolicyReason(value: string) {
+  const text = value.replace(/\s+/g, " ").trim();
+  const sentences = text.match(/[^。！？!?]+[。！？!?]?/g) ?? [];
+  const compact = sentences.slice(0, 2).join("").trim() || text;
+  return compact.length > 180 ? `${compact.slice(0, 180)}...` : compact;
 }
 
 function toNumber(value: unknown) {
@@ -965,6 +1065,8 @@ export default function ForumPage() {
   const [popularThreads, setPopularThreads] = useState<ThreadRow[]>([]);
   const [activeThreads, setActiveThreads] = useState<ThreadRow[]>([]);
   const [recentThreads, setRecentThreads] = useState<ThreadRow[]>([]);
+  const [policyDecisionCards, setPolicyDecisionCards] = useState<PolicyDecisionCard[]>([]);
+  const [policyDecisionsLoading, setPolicyDecisionsLoading] = useState(true);
   const [rankingMode, setRankingMode] = useState<RankingMode>("score");
   const [fontSizeMode, setFontSizeMode] =
     useState<"small" | "medium" | "large">("medium");
@@ -1288,6 +1390,33 @@ export default function ForumPage() {
       cancelled = true;
     };
   }, [tenant]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPolicyDecisions() {
+      try {
+        setPolicyDecisionsLoading(true);
+        const response = await fetch("/api/forum/policy-proposals", {
+          cache: "no-store",
+        });
+        const result: unknown = await response.json();
+        if (!response.ok || !isRecord(result)) return;
+        if (!cancelled) {
+          setPolicyDecisionCards(normalizePolicyDecisionCards(result.proposals));
+        }
+      } catch (error) {
+        console.warn("政策判断カードを取得できませんでした。", error);
+      } finally {
+        if (!cancelled) setPolicyDecisionsLoading(false);
+      }
+    }
+
+    void loadPolicyDecisions();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!analyzeScrollKey) return;
@@ -1719,23 +1848,102 @@ export default function ForumPage() {
         </p>
       </section>
 
-      <Link
-        href={`/${tenant}/forum/policy-proposals`}
+      <section
         style={{
           ...panelStyle,
-          display: "block",
           marginBottom: 22,
           borderColor: "#bfdbfe",
           background: "#f8fbff",
           color: "#0f172a",
-          textDecoration: "none",
         }}
       >
-        <div style={{ fontSize: 20, fontWeight: 900 }}>政策提言候補を見る</div>
-        <div style={{ marginTop: 6, color: "#475569", lineHeight: 1.7 }}>
-          AI再総括済みの議論から、現時点の提言候補と検証すべき指標を確認できます。
+        <div
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 8,
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: 22 }}>AIの政策判断</h2>
+          <Link
+            href={`/${tenant}/forum/policy-proposals`}
+            style={{ color: "#075985", fontWeight: 900 }}
+          >
+            政策提言候補をすべて見る
+          </Link>
         </div>
-      </Link>
+        <p style={{ margin: "6px 0 0", color: "#475569", lineHeight: 1.7 }}>
+          保存済みの政策提言候補から、財政・金融・その他の判断を1件ずつ表示します。
+        </p>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
+            gap: 12,
+            marginTop: 14,
+          }}
+        >
+          {POLICY_DECISION_AREAS.map((area) => {
+            const card = policyDecisionCards.find(
+              (item) => item.policy_area === area.key
+            );
+            return (
+              <article
+                key={area.key}
+                style={{
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  background: "#ffffff",
+                  padding: 14,
+                  minWidth: 0,
+                }}
+              >
+                <h3 style={{ margin: 0, fontSize: 19 }}>{area.title}</h3>
+                <div style={{ marginTop: 3, color: "#64748b", fontSize: 12 }}>
+                  {area.description}
+                </div>
+                <div style={{ marginTop: 10, fontWeight: 900 }}>
+                  判断：
+                  {card
+                    ? getPolicyDecisionLabel(card)
+                    : policyDecisionsLoading
+                      ? "確認中..."
+                      : "判断はまだありません"}
+                </div>
+                <p
+                  style={{
+                    margin: "8px 0 0",
+                    color: "#334155",
+                    lineHeight: 1.7,
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {card
+                    ? compactPolicyReason(card.reason) || "理由は詳細ページで確認できます。"
+                    : "保存済みの提言候補ができると、ここに理由を表示します。"}
+                </p>
+                <Link
+                  href={
+                    card
+                      ? `/${tenant}/forum/policy-proposals/${card.thread_id}`
+                      : `/${tenant}/forum/policy-proposals`
+                  }
+                  style={{
+                    display: "inline-block",
+                    marginTop: 10,
+                    color: "#075985",
+                    fontWeight: 900,
+                  }}
+                >
+                  {card ? "詳細を見る" : "候補一覧を見る"}
+                </Link>
+              </article>
+            );
+          })}
+        </div>
+      </section>
 
       <section
         style={{

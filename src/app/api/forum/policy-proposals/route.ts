@@ -26,6 +26,7 @@ type SavedProposalRow = {
   thread_id: string;
   status: string;
   created_at: string;
+  proposal_json: unknown;
 };
 
 type PolicyArea = "fiscal" | "monetary" | "other" | "combined" | "unclassified";
@@ -137,6 +138,34 @@ function buildCardItems(sources: unknown[], maxItems: number, maxLength = 160) {
   }
 
   return items;
+}
+
+function getSavedPolicyJudgment(value: unknown, policyArea: PolicyArea) {
+  if (!value || policyArea === "combined" || policyArea === "unclassified") return null;
+
+  const proposal = asRecord(value);
+  const groups = asRecord(proposal.policy_groups);
+  const groupKey =
+    policyArea === "fiscal"
+      ? "fiscal_policy"
+      : policyArea === "monetary"
+        ? "monetary_policy"
+        : "other_policy";
+  const group = asRecord(groups[groupKey]);
+  const priority = asRecord(proposal.priority_judgment);
+  const priorityArea = String(priority.priority_area ?? "");
+  const priorityReasons = asStringArray(priority.reasons);
+  const decision = String(group.decision ?? "").trim();
+  const decisionLabel = String(group.decision_label ?? "").trim();
+  const reason = String(group.summary ?? "").trim();
+  const oneLineProposal = String(proposal.one_line_proposal ?? "").trim();
+  const fallbackLabel = priorityArea === policyArea ? String(priority.label ?? "").trim() : "";
+
+  return {
+    decision,
+    decision_label: decisionLabel || fallbackLabel,
+    reason: reason || priorityReasons[0] || oneLineProposal,
+  };
 }
 
 function buildPolicyThemeAnalysis(input: {
@@ -256,7 +285,7 @@ export async function GET() {
 
   const { data: savedProposals, error: savedProposalsError } = await supabase
     .from("forum_policy_proposals")
-    .select("thread_id, status, created_at")
+    .select("thread_id, status, created_at, proposal_json")
     .in("thread_id", threadIds)
     .in("status", ["draft", "review", "published"])
     .order("created_at", { ascending: false });
@@ -308,6 +337,12 @@ export async function GET() {
         conclusions,
         metrics,
       });
+      const policyJudgment = latestSavedProposal
+        ? getSavedPolicyJudgment(
+            latestSavedProposal.proposal_json,
+            policyThemeAnalysis.policy_area
+          )
+        : null;
       return {
         thread_id: thread.id,
         title,
@@ -324,6 +359,7 @@ export async function GET() {
         has_saved_proposal: Boolean(latestSavedProposal),
         latest_saved_proposal_status: latestSavedProposal?.status ?? null,
         latest_saved_proposal_created_at: latestSavedProposal?.created_at ?? null,
+        policy_judgment: policyJudgment,
       };
     })
     .filter((proposal): proposal is NonNullable<typeof proposal> => proposal !== null)
