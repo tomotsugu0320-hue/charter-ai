@@ -300,28 +300,69 @@ function normalizePolicyDecisionCards(value: unknown) {
 }
 
 function getPolicyDecisionLabel(card: PolicyDecisionCard) {
-  if (card.decision_label) return card.decision_label;
+  if (card.decision_label && card.decision_label !== "判断材料不足") {
+    return card.decision_label;
+  }
 
   if (card.policy_area === "fiscal") {
-    const label = {
+    const decisionLabel = {
       spend: "財政支出すべき",
       do_not_spend: "財政支出すべきでない",
       conditional: "条件付きで財政支出",
-      insufficient: "判断材料不足",
     }[card.decision];
-    return label || "判断材料不足";
+    if (decisionLabel) return decisionLabel;
+
+    const description = `${card.title} ${card.reason} ${
+      Array.isArray(card.method_items) ? card.method_items.join(" ") : ""
+    }`;
+    const hasSpendingSignal = [
+      "財政支出", "政府支出", "支出する", "支出を増や", "給付", "減税",
+      "社会保険料軽減", "財源余地を使う", "財源余地", "乗数が高い分野",
+      "民間資金を吸収しない", "過度に吸収しない", "景気下押しを避ける",
+      "償還削減", "償還費を抑える", "財政引き締めを緩める",
+    ].some((term) => description.includes(term));
+    const hasTighteningSignal = [
+      "支出削減", "歳出削減", "増税", "償還増加", "財政規律を優先",
+      "歳出抑制", "財政緊縮", "財政引き締め",
+    ].some((term) => description.includes(term));
+    const hasConditionalSignal = [
+      "景気局面に応じて", "需要不足局面", "限定して", "条件付き",
+      "弾力化", "見直す", "調整する",
+    ].some((term) => description.includes(term));
+
+    if (hasSpendingSignal && hasConditionalSignal) return "条件付きで財政支出";
+    if (hasTighteningSignal && !hasSpendingSignal) return "財政引き締めする";
+    if (hasSpendingSignal) return "財政支出する";
+    if (hasConditionalSignal) return "景気に応じて財政支出";
+    return "判断材料不足";
   }
 
   if (card.policy_area === "monetary") {
-    const isRateCut = `${card.title} ${card.reason}`.includes("利下げ");
-    const label = {
-      ease: isRateCut ? "金利引き下げ" : "金融緩和",
+    const description = `${card.title} ${card.reason} ${
+      Array.isArray(card.method_items) ? card.method_items.join(" ") : ""
+    }`;
+    const decisionLabel = {
+      ease: description.includes("利下げ") ? "金利引き下げ" : "金融緩和",
       tighten: "金利引き上げ",
-      hold: "据え置き",
+      hold: "金利維持",
       conditional: "条件付き",
       insufficient: "判断材料不足",
     }[card.decision];
-    return label || "判断材料不足";
+    if (decisionLabel) return decisionLabel;
+
+    if (["見送る", "見送り", "避ける", "上げない", "利上げしない", "引き上げない", "判断しない"].some((term) => description.includes(term))) {
+      return "利上げ見送り";
+    }
+    if (["慎重", "限定的", "とどめる", "とどめ", "条件付き"].some((term) => description.includes(term))) {
+      return "条件付き";
+    }
+    if (description.includes("緩和維持") || description.includes("金融緩和を維持")) return "金融緩和";
+    if (["据え置き", "金利維持", "維持する"].some((term) => description.includes(term))) return "金利維持";
+    if (description.includes("引き下げ") || description.includes("利下げ")) return "金利引き下げ";
+    if (description.includes("金融緩和") || description.includes("緩和する")) return "金融緩和";
+    if (description.includes("引き上げ") || description.includes("利上げ")) return "金利引き上げ";
+    if (description.includes("金融引き締め")) return "金融引き締め";
+    return "判断材料不足";
   }
 
   const description = `${card.title} ${card.reason}`;
@@ -1928,15 +1969,17 @@ export default function ForumPage() {
                     ? compactPolicyReason(card.reason) || "理由は詳細ページで確認できます。"
                     : "保存済みの提言候補ができると、ここに理由を表示します。"}
                 </p>
-                {card && card.method_items.length > 0 && (
+                {card && Array.isArray(card.method_items) && card.method_items.length > 0 && (
                   <div style={{ marginTop: 10 }}>
                     <div style={{ color: "#475569", fontSize: 13, fontWeight: 900 }}>
                       方法
                     </div>
                     <ul style={{ margin: "5px 0 0", paddingLeft: 20, lineHeight: 1.7 }}>
-                      {card.method_items.slice(0, 4).map((method, index) => (
-                        <li key={`${card.thread_id}-method-${index}`}>{method}</li>
-                      ))}
+                      {(Array.isArray(card.method_items) ? card.method_items : [])
+                        .slice(0, 4)
+                        .map((method, index) => (
+                          <li key={`${card.thread_id}-method-${index}`}>{method}</li>
+                        ))}
                     </ul>
                   </div>
                 )}

@@ -146,46 +146,71 @@ function buildDirectDecisionLabel(input: {
   decisionLabel: string;
   sourceText: string;
 }) {
-  const text = `${input.decisionLabel} ${input.sourceText}`;
+  if (input.decisionLabel && input.decisionLabel !== "判断材料不足") {
+    return input.decisionLabel;
+  }
+
+  const text = input.sourceText;
 
   if (input.policyArea === "fiscal") {
-    if (input.decision === "do_not_spend" || includesAny(text, ["支出しない", "歳出削減", "財政緊縮", "財政引き締め"])) {
-      return "財政引き締めする";
-    }
-    if (input.decision === "conditional" || text.includes("条件付き")) {
-      return "条件付きで財政支出する";
-    }
-    if (input.decision === "spend" || includesAny(text, ["財政支出", "政府支出", "給付", "公共投資", "減税"])) {
-      return "財政支出する";
-    }
+    if (input.decision === "do_not_spend") return "財政引き締めする";
+    if (input.decision === "conditional") return "条件付きで財政支出する";
+    if (input.decision === "spend") return "財政支出する";
+
+    const hasSpendingSignal = includesAny(text, [
+      "財政支出", "政府支出", "支出する", "支出を増や", "給付", "減税",
+      "社会保険料軽減", "財源余地を使う",
+      "財源余地", "乗数が高い分野", "民間資金を吸収しない",
+      "過度に吸収しない", "景気下押しを避ける", "償還削減",
+      "償還費を抑える", "財政引き締めを緩める",
+    ]);
+    const hasTighteningSignal = includesAny(text, [
+      "支出削減", "歳出削減", "増税", "償還増加", "財政規律を優先",
+      "歳出抑制", "財政緊縮", "財政引き締め",
+    ]);
+    const hasConditionalSignal = includesAny(text, [
+      "景気局面に応じて", "需要不足局面", "限定して", "条件付き",
+      "弾力化", "見直す", "調整する",
+    ]);
+
+    if (hasSpendingSignal && hasConditionalSignal) return "条件付きで財政支出する";
+    if (hasTighteningSignal && !hasSpendingSignal) return "財政引き締めする";
+    if (hasSpendingSignal) return "財政支出する";
+    if (hasConditionalSignal) return "景気に応じて財政支出する";
   }
 
   if (input.policyArea === "monetary") {
-    if (text.includes("利下げ")) return "金利引き下げ";
-    if (input.decision === "tighten" || includesAny(text, ["利上げ", "金融引き締め"])) {
-      return "金利引き上げ";
+    if (input.decision === "ease") return text.includes("利下げ") ? "金利引き下げ" : "金融緩和する";
+    if (input.decision === "tighten") return "金利引き上げ";
+    if (input.decision === "hold") return "金利維持";
+    if (input.decision === "conditional") return "条件付き";
+    if (input.decision === "insufficient") return "判断材料不足";
+
+    if (includesAny(text, ["見送る", "見送り", "避ける", "上げない", "利上げしない", "引き上げない", "判断しない"])) {
+      return "利上げ見送り";
     }
-    if (input.decision === "hold" || includesAny(text, ["据え置き", "金利維持", "維持する"])) {
-      return "金利維持";
-    }
-    if (input.decision === "conditional" || text.includes("条件付き")) return "条件付き";
-    if (input.decision === "ease" || includesAny(text, ["金融緩和", "緩和する"])) {
-      return "金融緩和する";
-    }
+    if (includesAny(text, ["慎重", "限定的", "とどめる", "とどめ", "条件付き"])) return "条件付き";
+    if (includesAny(text, ["緩和維持", "金融緩和を維持"])) return "金融緩和する";
+    if (includesAny(text, ["据え置き", "金利維持", "維持する"])) return "金利維持";
+    if (includesAny(text, ["引き下げ", "利下げ"])) return "金利引き下げ";
+    if (includesAny(text, ["金融緩和", "緩和する"])) return "金融緩和する";
+    if (includesAny(text, ["引き上げ", "利上げ"])) return "金利引き上げ";
+    if (text.includes("金融引き締め")) return "金融引き締め";
   }
 
   if (input.policyArea === "other") {
-    if (input.decision === "do_not_do" || includesAny(text, ["実施しない", "見送る"])) {
-      return "実施しない";
-    }
-    if (input.decision === "conditional" || text.includes("条件付き")) return "条件付きで実施する";
+    if (input.decision === "do_not_do") return "実施しない";
+    if (input.decision === "conditional") return "条件付きで実施する";
+    if (input.decision === "insufficient") return "判断材料不足";
+    if (includesAny(text, ["実施しない", "見送る"])) return "実施しない";
+    if (text.includes("条件付き")) return "条件付きで実施する";
     if (includesAny(text, ["価格転嫁"])) return "価格転嫁を進める";
     if (includesAny(text, ["賃上げ", "賃金"])) return "賃上げを支援する";
     if (includesAny(text, ["制度改革", "制度見直し", "規制改革"])) return "制度改革を進める";
     if (input.decision === "do") return "制度改善を実施する";
   }
 
-  return input.decision === "insufficient" ? "判断材料不足" : input.decisionLabel || "判断材料不足";
+  return "判断材料不足";
 }
 
 function getSavedPolicyJudgment(value: unknown, policyArea: PolicyArea) {
@@ -216,15 +241,15 @@ function getSavedPolicyJudgment(value: unknown, policyArea: PolicyArea) {
   const directDecisionLabel = buildDirectDecisionLabel({
     policyArea,
     decision,
-    decisionLabel: decisionLabel || fallbackLabel,
-    sourceText: [reason, oneLineProposal, ...methodItems].join(" "),
+    decisionLabel,
+    sourceText: [fallbackLabel, reason, oneLineProposal, ...methodItems].join(" "),
   });
 
   return {
     decision,
     decision_label: directDecisionLabel,
     reason: reason || priorityReasons[0] || oneLineProposal,
-    method_items: methodItems,
+    method_items: Array.isArray(methodItems) ? methodItems : [],
   };
 }
 
