@@ -59,6 +59,20 @@ type PolicyJudgmentItem = {
   title: string;
   items: string[];
   source: string;
+  dataType: "direct" | "proxy" | "keyword";
+};
+
+const BASIC_POLICY_JUDGMENT_KEYS = new Set([
+  "economic-situation",
+  "demand-balance",
+  "inflation-causes",
+  "policy-roles",
+]);
+
+const DATA_TYPE_LABELS: Record<PolicyJudgmentItem["dataType"], string> = {
+  direct: "直接整理済み",
+  proxy: "代理データ",
+  keyword: "キーワード検出",
 };
 
 function uniqueItems(...groups: string[][]) {
@@ -162,17 +176,17 @@ function buildPolicyJudgmentItems(proposal: Proposal): PolicyJudgmentItem[] {
   ).slice(0, 4);
 
   return [
-    { key: "economic-situation", title: "景気局面", items: economicSituation, source: "再総括全体から景気・局面に関する記述を抽出" },
-    { key: "demand-balance", title: "需要不足 / 需要超過", items: demandBalance, source: "再総括全体から需要・需給に関する記述を抽出" },
-    { key: "inflation-causes", title: "物価上昇の原因", items: inflationCauses, source: "再総括全体から物価・円安・供給制約に関する記述を抽出" },
-    { key: "policy-roles", title: "金融政策と財政政策の役割分担", items: policyRoles, source: "再総括全体から日銀・政府・金融・財政に関する記述を抽出" },
-    { key: "benefits", title: "メリット", items: points.main_agreements.slice(0, 4), source: "主な同意をメリット候補として配置" },
-    { key: "drawbacks", title: "デメリット", items: uniqueItems(points.main_rebuttals, points.needs_review).slice(0, 4), source: "主な反論・要確認事項をデメリット候補として配置" },
-    { key: "countermeasures", title: "デメリット対策", items: countermeasures, source: "再総括全体から対策・緩和策に関する記述を抽出" },
-    { key: "rebuttals", title: "反論", items: points.main_rebuttals.slice(0, 4), source: "AI再総括の主な反論" },
-    { key: "metrics", title: "検証指標", items: points.verification_metrics.slice(0, 4), source: "AI再総括の検証すべき指標" },
-    { key: "tentative-decision", title: "暫定判断", items: points.current_tentative_conclusion.slice(0, 4), source: "AI再総括の現時点の暫定結論" },
-    { key: "review-conditions", title: "見直し条件", items: reviewConditions, source: "要確認事項と条件付き前提を配置" },
+    { key: "economic-situation", title: "景気局面", items: economicSituation, source: "再総括全体から景気・局面に関する記述を抽出", dataType: "keyword" },
+    { key: "demand-balance", title: "需要不足 / 需要超過", items: demandBalance, source: "再総括全体から需要・需給に関する記述を抽出", dataType: "keyword" },
+    { key: "inflation-causes", title: "物価上昇の原因", items: inflationCauses, source: "再総括全体から物価・円安・供給制約に関する記述を抽出", dataType: "keyword" },
+    { key: "policy-roles", title: "金融政策と財政政策の役割分担", items: policyRoles, source: "再総括全体から日銀・政府・金融・財政に関する記述を抽出", dataType: "keyword" },
+    { key: "benefits", title: "賛成材料・メリット候補", items: points.main_agreements.slice(0, 4), source: "主な同意をメリット候補として配置", dataType: "proxy" },
+    { key: "drawbacks", title: "反論・リスク候補", items: uniqueItems(points.main_rebuttals, points.needs_review).slice(0, 4), source: "主な反論・要確認事項をリスク候補として配置", dataType: "proxy" },
+    { key: "countermeasures", title: "対策候補", items: countermeasures, source: "再総括全体から対策・緩和策に関する記述を抽出", dataType: "keyword" },
+    { key: "rebuttals", title: "反論", items: points.main_rebuttals.slice(0, 4), source: "AI再総括の主な反論", dataType: "direct" },
+    { key: "metrics", title: "検証指標", items: points.verification_metrics.slice(0, 4), source: "AI再総括の検証すべき指標", dataType: "direct" },
+    { key: "tentative-decision", title: "暫定判断候補", items: points.current_tentative_conclusion.slice(0, 4), source: "AI再総括の現時点の暫定結論", dataType: "direct" },
+    { key: "review-conditions", title: "見直し条件", items: reviewConditions, source: "要確認事項と条件付き前提を配置", dataType: "proxy" },
   ];
 }
 
@@ -240,6 +254,14 @@ export default function PolicyProposalDetailPage() {
         const organizedJudgmentCount = policyJudgmentItems.filter(
           (item) => item.items.length > 0
         ).length;
+        const basicJudgmentItems = policyJudgmentItems.filter((item) =>
+          BASIC_POLICY_JUDGMENT_KEYS.has(item.key)
+        );
+        const organizedBasicJudgmentCount = basicJudgmentItems.filter(
+          (item) => item.items.length > 0
+        ).length;
+        const hasMissingBasicJudgments =
+          organizedBasicJudgmentCount < basicJudgmentItems.length;
 
         return (
         <article style={{ marginTop: 22 }}>
@@ -326,7 +348,11 @@ export default function PolicyProposalDetailPage() {
                 fontWeight: 800,
               }}
             >
-              判断材料の整理状況：{organizedJudgmentCount} / {policyJudgmentItems.length}項目
+              既存データが見つかった項目：{organizedJudgmentCount} / {policyJudgmentItems.length}項目
+              <div style={{ marginTop: 4, color: "#475569", fontWeight: 700 }}>
+                基礎判断条件：{basicJudgmentItems.length}項目中
+                {organizedBasicJudgmentCount}項目整理済み
+              </div>
             </div>
 
             <div
@@ -348,7 +374,33 @@ export default function PolicyProposalDetailPage() {
                     minWidth: 0,
                   }}
                 >
-                  <h3 style={{ margin: 0, fontSize: 18, lineHeight: 1.5 }}>{item.title}</h3>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
+                    }}
+                  >
+                    <h3 style={{ margin: 0, fontSize: 18, lineHeight: 1.5 }}>{item.title}</h3>
+                    <span
+                      style={{
+                        border: "1px solid #cbd5e1",
+                        borderRadius: 999,
+                        background: item.items.length > 0 ? "#f8fafc" : "#f1f5f9",
+                        color: "#475569",
+                        fontSize: 12,
+                        fontWeight: 800,
+                        padding: "3px 8px",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {item.items.length > 0
+                        ? DATA_TYPE_LABELS[item.dataType]
+                        : "未整理"}
+                    </span>
+                  </div>
                   {item.items.length > 0 ? (
                     <ul style={{ margin: "8px 0 0", paddingLeft: 20, lineHeight: 1.75 }}>
                       {item.items.map((value, index) => (
@@ -363,6 +415,22 @@ export default function PolicyProposalDetailPage() {
                   <div style={{ marginTop: 10, color: "#64748b", fontSize: 12, lineHeight: 1.6 }}>
                     {item.source}
                   </div>
+                  {item.key === "tentative-decision" && hasMissingBasicJudgments && (
+                    <div
+                      style={{
+                        marginTop: 10,
+                        border: "1px solid #fde68a",
+                        borderRadius: 8,
+                        background: "#fffbeb",
+                        color: "#78350f",
+                        padding: "9px 10px",
+                        fontSize: 13,
+                        lineHeight: 1.7,
+                      }}
+                    >
+                      景気局面・需給・物価原因・政策の役割分担の確認が不足しています。この暫定判断は、政策提言としてはまだ前提確認中の候補です。
+                    </div>
+                  )}
                 </section>
               ))}
             </div>
