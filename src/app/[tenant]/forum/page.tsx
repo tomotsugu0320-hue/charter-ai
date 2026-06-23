@@ -78,6 +78,16 @@ type PolicyDecisionCard = {
   method_items: string[];
 };
 
+type PublishedPolicyCard = {
+  id: string;
+  title: string;
+  one_line_proposal: string;
+  policy_area: string;
+  priority_decision: string;
+  priority_label: string;
+  published_at: string;
+};
+
 const ALL_CATEGORIES = "すべて";
 const TOP_CARD_LIMIT = 9;
 const SEARCH_RESULTS_PER_PAGE = 9;
@@ -252,6 +262,52 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function toText(value: unknown, fallback = "") {
   return typeof value === "string" ? value : fallback;
+}
+
+function normalizePublishedPolicyCards(value: unknown): PublishedPolicyCard[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (!isRecord(item)) return null;
+      const id = toText(item.id).trim();
+      if (!id) return null;
+
+      const proposalJson = isRecord(item.proposal_json) ? item.proposal_json : {};
+      const priorityJudgment = isRecord(proposalJson.priority_judgment)
+        ? proposalJson.priority_judgment
+        : {};
+      const priorityLabel =
+        toText(priorityJudgment.label).trim() ||
+        toText(item.priority_decision).trim() ||
+        "未記載";
+
+      return {
+        id,
+        title: toText(item.title, "政策提言").trim() || "政策提言",
+        one_line_proposal:
+          toText(item.one_line_proposal).trim() ||
+          toText(proposalJson.one_line_proposal).trim(),
+        policy_area: toText(item.policy_area, "unclassified").trim() || "unclassified",
+        priority_decision: toText(item.priority_decision).trim(),
+        priority_label: priorityLabel,
+        published_at: toText(item.published_at).trim(),
+      };
+    })
+    .filter((item): item is PublishedPolicyCard => item !== null)
+    .slice(0, 3);
+}
+
+function getPublishedPolicyAreaLabel(policyArea: string) {
+  const labels: Record<string, string> = {
+    fiscal: "財政政策",
+    monetary: "金融政策",
+    other: "その他政策",
+    combined: "複合政策",
+    unclassified: "未分類",
+  };
+
+  return labels[policyArea] ?? "未分類";
 }
 
 const POLICY_DECISION_AREAS = [
@@ -1141,6 +1197,8 @@ export default function ForumPage() {
   const [recentThreads, setRecentThreads] = useState<ThreadRow[]>([]);
   const [policyDecisionCards, setPolicyDecisionCards] = useState<PolicyDecisionCard[]>([]);
   const [policyDecisionsLoading, setPolicyDecisionsLoading] = useState(true);
+  const [publishedPolicyCards, setPublishedPolicyCards] = useState<PublishedPolicyCard[]>([]);
+  const [publishedPoliciesLoading, setPublishedPoliciesLoading] = useState(true);
   const [isForumAdminForPolicyReview, setIsForumAdminForPolicyReview] = useState(false);
   const [rankingMode, setRankingMode] = useState<RankingMode>("score");
   const [fontSizeMode, setFontSizeMode] =
@@ -1492,6 +1550,36 @@ export default function ForumPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPublishedPolicies() {
+      if (!tenant) return;
+
+      try {
+        setPublishedPoliciesLoading(true);
+        const response = await fetch(
+          `/api/forum/policies?tenant=${encodeURIComponent(tenant)}`,
+          { cache: "no-store" }
+        );
+        const result: unknown = await response.json();
+        if (!response.ok || !isRecord(result)) return;
+        if (!cancelled) {
+          setPublishedPolicyCards(normalizePublishedPolicyCards(result.policies));
+        }
+      } catch (error) {
+        console.warn("公開済み政策提言を取得できませんでした。", error);
+      } finally {
+        if (!cancelled) setPublishedPoliciesLoading(false);
+      }
+    }
+
+    void loadPublishedPolicies();
+    return () => {
+      cancelled = true;
+    };
+  }, [tenant]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2011,6 +2099,151 @@ export default function ForumPage() {
               </ul>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section
+        style={{
+          ...panelStyle,
+          marginBottom: 22,
+          borderColor: "#bbf7d0",
+          background: "#f7fee7",
+          color: "#0f172a",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 8,
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: 22 }}>公開済みAI政策提言</h2>
+          <Link
+            href={`/${tenant}/forum/policies`}
+            style={{ color: "#166534", fontWeight: 900 }}
+          >
+            公開済み政策提言をすべて見る
+          </Link>
+        </div>
+        <p style={{ margin: "6px 0 0", color: "#475569", lineHeight: 1.7 }}>
+          AI再総括をもとに作成された政策提言です。財政・金融・その他政策ごとに整理されています。
+        </p>
+
+        {publishedPoliciesLoading && (
+          <p style={{ margin: "12px 0 0", color: "#475569" }}>
+            公開済み政策提言を読み込んでいます...
+          </p>
+        )}
+
+        {!publishedPoliciesLoading && publishedPolicyCards.length === 0 && (
+          <div
+            style={{
+              marginTop: 14,
+              border: "1px solid #d9f99d",
+              borderRadius: 8,
+              background: "#ffffff",
+              padding: 14,
+              color: "#475569",
+            }}
+          >
+            現在、公開済み政策提言はありません。
+          </div>
+        )}
+
+        {!publishedPoliciesLoading && publishedPolicyCards.length > 0 && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
+              gap: 12,
+              marginTop: 14,
+            }}
+          >
+            {publishedPolicyCards.map((policy) => (
+              <article
+                key={policy.id}
+                style={{
+                  border: "1px solid #bbf7d0",
+                  borderRadius: 8,
+                  background: "#ffffff",
+                  padding: 14,
+                  minWidth: 0,
+                }}
+              >
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      padding: "3px 8px",
+                      borderRadius: 999,
+                      background: "#dcfce7",
+                      color: "#166534",
+                      fontSize: 12,
+                      fontWeight: 900,
+                    }}
+                  >
+                    {getPublishedPolicyAreaLabel(policy.policy_area)}
+                  </span>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      padding: "3px 8px",
+                      borderRadius: 999,
+                      background: "#e0f2fe",
+                      color: "#075985",
+                      fontSize: 12,
+                      fontWeight: 900,
+                    }}
+                  >
+                    公開済み
+                  </span>
+                </div>
+
+                <div style={{ marginTop: 10, fontWeight: 900 }}>
+                  判断：{policy.priority_label}
+                </div>
+                <h3 style={{ margin: "8px 0 0", fontSize: 18, lineHeight: 1.45 }}>
+                  {policy.title}
+                </h3>
+                <p
+                  style={{
+                    margin: "8px 0 0",
+                    color: "#334155",
+                    lineHeight: 1.7,
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {truncate(policy.one_line_proposal, 120) || "詳細ページで確認できます。"}
+                </p>
+                <div style={{ marginTop: 8, color: "#64748b", fontSize: 13 }}>
+                  公開日: {formatDate(policy.published_at) || "未記載"}
+                </div>
+                <Link
+                  href={`/${tenant}/forum/policies/${policy.id}`}
+                  style={{
+                    display: "inline-block",
+                    marginTop: 10,
+                    color: "#166534",
+                    fontWeight: 900,
+                  }}
+                >
+                  詳細を見る
+                </Link>
+              </article>
+            ))}
+          </div>
+        )}
+
+        <div style={{ marginTop: 14 }}>
+          <Link
+            href={`/${tenant}/forum/policies`}
+            style={{ color: "#166534", fontWeight: 900 }}
+          >
+            公開済み政策提言をすべて見る
+          </Link>
         </div>
       </section>
 
