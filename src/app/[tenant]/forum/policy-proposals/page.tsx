@@ -122,6 +122,12 @@ function formatProposalStatus(status?: string | null) {
   return "未確認";
 }
 
+function formatProposalCardStatus(hasSavedProposal: boolean, status?: string | null) {
+  if (!hasSavedProposal) return "未保存";
+  if (status === "published") return "公開済み";
+  return "未公開";
+}
+
 function CardBulletSection({
   title,
   items,
@@ -192,9 +198,10 @@ function ProposalCard({ proposal, tenant }: { proposal: Proposal; tenant: string
             fontWeight: 800,
           }}
         >
-          {proposal.has_saved_proposal
-            ? `保存済み / ${formatProposalStatus(proposal.latest_saved_proposal_status)}`
-            : "未保存"}
+          {formatProposalCardStatus(
+            proposal.has_saved_proposal,
+            proposal.latest_saved_proposal_status
+          )}
         </span>
       </div>
       <div style={{ marginTop: 7, color: "#64748b", fontSize: 12 }}>
