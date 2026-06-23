@@ -2106,6 +2106,125 @@ export default function ForumPage() {
         style={{
           ...panelStyle,
           marginBottom: 22,
+          borderColor: "#bfdbfe",
+          background: "#f8fbff",
+          color: "#0f172a",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 8,
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: 22 }}>AIの政策判断</h2>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+            <Link
+              href={`/${tenant}/forum/policies`}
+              style={{ color: "#075985", fontWeight: 900 }}
+            >
+              公開済み政策提言を見る
+            </Link>
+            <Link
+              href={`/${tenant}/forum/policy-proposals`}
+              style={{ color: "#475569", fontWeight: 800 }}
+            >
+              政策提言候補をすべて見る
+            </Link>
+          </div>
+        </div>
+        <p style={{ margin: "6px 0 0", color: "#475569", lineHeight: 1.7 }}>
+          現在の政策方向をもとに、AIが財政・金融・その他政策の方向性を整理したものです。
+        </p>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
+            gap: 12,
+            marginTop: 14,
+          }}
+        >
+          {POLICY_DECISION_AREAS.map((area) => {
+            const card = policyDecisionCards.find(
+              (item) => item.policy_area === area.key
+            );
+            return (
+              <article
+                key={area.key}
+                style={{
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  background: "#ffffff",
+                  padding: 14,
+                  minWidth: 0,
+                }}
+              >
+                <h3 style={{ margin: 0, fontSize: 19 }}>{area.title}</h3>
+                <div style={{ marginTop: 3, color: "#64748b", fontSize: 12 }}>
+                  {area.description}
+                </div>
+                <div style={{ marginTop: 10, fontWeight: 900 }}>
+                  判断：
+                  {card
+                    ? getPolicyDecisionLabel(card)
+                    : policyDecisionsLoading
+                      ? "確認中..."
+                      : "判断はまだありません"}
+                </div>
+                <p
+                  style={{
+                    margin: "8px 0 0",
+                    color: "#334155",
+                    lineHeight: 1.7,
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {card
+                    ? compactPolicyReason(card.reason) || "理由は詳細ページで確認できます。"
+                    : "保存済みの提言候補ができると、ここに理由を表示します。"}
+                </p>
+                {card && Array.isArray(card.method_items) && card.method_items.length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ color: "#475569", fontSize: 13, fontWeight: 900 }}>
+                      方法
+                    </div>
+                    <ul style={{ margin: "5px 0 0", paddingLeft: 20, lineHeight: 1.7 }}>
+                      {(Array.isArray(card.method_items) ? card.method_items : [])
+                        .slice(0, 4)
+                        .map((method, index) => (
+                          <li key={`${card.thread_id}-method-${index}`}>{method}</li>
+                        ))}
+                    </ul>
+                  </div>
+                )}
+                <Link
+                  href={
+                    card
+                      ? `/${tenant}/forum/policy-proposals/${card.thread_id}`
+                      : `/${tenant}/forum/policy-proposals`
+                  }
+                  style={{
+                    display: "inline-block",
+                    marginTop: 10,
+                    color: "#075985",
+                    fontWeight: 900,
+                  }}
+                >
+                  {card ? "詳細を見る" : "候補一覧を見る"}
+                </Link>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section
+        style={{
+          ...panelStyle,
+          marginBottom: 22,
           borderColor: "#bbf7d0",
           background: "#f7fee7",
           color: "#0f172a",
@@ -2129,7 +2248,7 @@ export default function ForumPage() {
           </Link>
         </div>
         <p style={{ margin: "6px 0 0", color: "#475569", lineHeight: 1.7 }}>
-          AI再総括をもとに作成された政策提言です。財政・金融・その他政策ごとに整理されています。
+          AI再総括をもとに作成・保存された公開済み政策提言です。詳細ページで根拠や確認指標まで確認できます。
         </p>
 
         {publishedPoliciesLoading && (
@@ -2244,125 +2363,6 @@ export default function ForumPage() {
           >
             公開済み政策提言をすべて見る
           </Link>
-        </div>
-      </section>
-
-      <section
-        style={{
-          ...panelStyle,
-          marginBottom: 22,
-          borderColor: "#bfdbfe",
-          background: "#f8fbff",
-          color: "#0f172a",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "baseline",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 8,
-          }}
-        >
-          <h2 style={{ margin: 0, fontSize: 22 }}>AIの政策判断</h2>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-            <Link
-              href={`/${tenant}/forum/policies`}
-              style={{ color: "#075985", fontWeight: 900 }}
-            >
-              公開済み政策提言を見る
-            </Link>
-            <Link
-              href={`/${tenant}/forum/policy-proposals`}
-              style={{ color: "#475569", fontWeight: 800 }}
-            >
-              政策提言候補をすべて見る
-            </Link>
-          </div>
-        </div>
-        <p style={{ margin: "6px 0 0", color: "#475569", lineHeight: 1.7 }}>
-          保存済みの政策提言候補から、財政・金融・その他の判断を1件ずつ表示します。
-        </p>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
-            gap: 12,
-            marginTop: 14,
-          }}
-        >
-          {POLICY_DECISION_AREAS.map((area) => {
-            const card = policyDecisionCards.find(
-              (item) => item.policy_area === area.key
-            );
-            return (
-              <article
-                key={area.key}
-                style={{
-                  border: "1px solid #cbd5e1",
-                  borderRadius: 8,
-                  background: "#ffffff",
-                  padding: 14,
-                  minWidth: 0,
-                }}
-              >
-                <h3 style={{ margin: 0, fontSize: 19 }}>{area.title}</h3>
-                <div style={{ marginTop: 3, color: "#64748b", fontSize: 12 }}>
-                  {area.description}
-                </div>
-                <div style={{ marginTop: 10, fontWeight: 900 }}>
-                  判断：
-                  {card
-                    ? getPolicyDecisionLabel(card)
-                    : policyDecisionsLoading
-                      ? "確認中..."
-                      : "判断はまだありません"}
-                </div>
-                <p
-                  style={{
-                    margin: "8px 0 0",
-                    color: "#334155",
-                    lineHeight: 1.7,
-                    overflowWrap: "anywhere",
-                  }}
-                >
-                  {card
-                    ? compactPolicyReason(card.reason) || "理由は詳細ページで確認できます。"
-                    : "保存済みの提言候補ができると、ここに理由を表示します。"}
-                </p>
-                {card && Array.isArray(card.method_items) && card.method_items.length > 0 && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ color: "#475569", fontSize: 13, fontWeight: 900 }}>
-                      方法
-                    </div>
-                    <ul style={{ margin: "5px 0 0", paddingLeft: 20, lineHeight: 1.7 }}>
-                      {(Array.isArray(card.method_items) ? card.method_items : [])
-                        .slice(0, 4)
-                        .map((method, index) => (
-                          <li key={`${card.thread_id}-method-${index}`}>{method}</li>
-                        ))}
-                    </ul>
-                  </div>
-                )}
-                <Link
-                  href={
-                    card
-                      ? `/${tenant}/forum/policy-proposals/${card.thread_id}`
-                      : `/${tenant}/forum/policy-proposals`
-                  }
-                  style={{
-                    display: "inline-block",
-                    marginTop: 10,
-                    color: "#075985",
-                    fontWeight: 900,
-                  }}
-                >
-                  {card ? "詳細を見る" : "候補一覧を見る"}
-                </Link>
-              </article>
-            );
-          })}
         </div>
       </section>
 
