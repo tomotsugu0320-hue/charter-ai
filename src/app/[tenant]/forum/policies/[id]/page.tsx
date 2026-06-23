@@ -164,7 +164,7 @@ function formatProposalStatus(status?: string | null) {
 function getDecisionLabel(group: PolicyGroup | undefined, labels: Record<string, string>) {
   if (group?.decision_label) return group.decision_label;
   if (group?.decision && labels[group.decision]) return labels[group.decision];
-  return "未記載";
+  return null;
 }
 
 function ListSection({
@@ -237,14 +237,17 @@ function PolicyGroupSection({
   const proposalItems = asStringArray(group?.proposal_items);
   const demerits = asStringArray(group?.demerits);
   const countermeasures = asStringArray(group?.countermeasures);
+  const decisionLabel = getDecisionLabel(group, labels);
 
   return (
     <section style={{ marginTop: 18, ...sectionStyle }}>
       <h2 style={{ margin: 0, fontSize: 22 }}>{title}</h2>
       <p style={{ margin: "6px 0 0", color: "#475569", lineHeight: 1.7 }}>{description}</p>
-      <div style={{ marginTop: 12, fontWeight: 900 }}>
-        判断：{getDecisionLabel(group, labels)}
-      </div>
+      {decisionLabel && (
+        <div style={{ marginTop: 12, fontWeight: 900 }}>
+          判断：{decisionLabel}
+        </div>
+      )}
       <section style={{ marginTop: 14 }}>
         <h3 style={{ margin: 0, fontSize: 16 }}>理由</h3>
         <p style={{ margin: "6px 0 0", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>
