@@ -179,6 +179,30 @@ function ListSection({ title, items }: { title: string; items: string[] }) {
   );
 }
 
+function InlineListBlock({ title, items }: { title: string; items: string[] }) {
+  const visibleItems = items.filter(Boolean);
+
+  if (visibleItems.length === 0) {
+    return (
+      <section style={{ marginTop: 14 }}>
+        <h3 style={{ margin: 0, fontSize: 16 }}>{title}</h3>
+        <p style={{ margin: "6px 0 0", color: "#64748b" }}>未記載</p>
+      </section>
+    );
+  }
+
+  return (
+    <section style={{ marginTop: 14 }}>
+      <h3 style={{ margin: 0, fontSize: 16 }}>{title}</h3>
+      <ul style={{ margin: "6px 0 0", paddingLeft: 22, lineHeight: 1.8 }}>
+        {visibleItems.map((item, index) => (
+          <li key={`${title}-${index}`}>{item}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function PolicyGroupSection({
   title,
   description,
@@ -191,7 +215,6 @@ function PolicyGroupSection({
   labels: Record<string, string>;
 }) {
   const proposalItems = asStringArray(group?.proposal_items);
-  const merits = asStringArray(group?.merits);
   const demerits = asStringArray(group?.demerits);
   const countermeasures = asStringArray(group?.countermeasures);
 
@@ -202,13 +225,15 @@ function PolicyGroupSection({
       <div style={{ marginTop: 12, fontWeight: 900 }}>
         判断：{getDecisionLabel(group, labels)}
       </div>
-      <p style={{ margin: "10px 0 0", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>
+      <section style={{ marginTop: 14 }}>
+        <h3 style={{ margin: 0, fontSize: 16 }}>理由</h3>
+        <p style={{ margin: "6px 0 0", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>
         {group?.summary || "未記載"}
-      </p>
-      <ListSection title="方法" items={proposalItems} />
-      <ListSection title="メリット" items={merits} />
-      <ListSection title="注意点" items={demerits} />
-      <ListSection title="対策" items={countermeasures} />
+        </p>
+      </section>
+      <InlineListBlock title="方法" items={proposalItems} />
+      <InlineListBlock title="注意点" items={demerits} />
+      <InlineListBlock title="対策" items={countermeasures} />
     </section>
   );
 }
@@ -356,6 +381,9 @@ export default function PolicyDetailPage() {
             </p>
             <div style={{ marginTop: 10, color: "#64748b", fontSize: 13 }}>
               公開日: {formatDate(policy.published_at)}
+            </div>
+            <div style={{ marginTop: 10, fontSize: 18, fontWeight: 900 }}>
+              判断：{proposal.priority_judgment?.label || "未記載"}
             </div>
           </header>
 
