@@ -154,6 +154,13 @@ function formatDate(value: string | null) {
   });
 }
 
+function formatProposalStatus(status?: string | null) {
+  if (status === "published") return "公開済み";
+  if (status === "draft") return "下書き";
+  if (status === "review") return "確認中";
+  return "未確認";
+}
+
 function getDecisionLabel(group: PolicyGroup | undefined, labels: Record<string, string>) {
   if (group?.decision_label) return group.decision_label;
   if (group?.decision && labels[group.decision]) return labels[group.decision];
@@ -336,7 +343,7 @@ export default function PolicyDetailPage() {
   return (
     <main style={pageStyle}>
       <Link href={`/${tenant}/forum/policies`} style={{ color: "#334155", fontWeight: 700 }}>
-        ← 正式公開済み政策提言一覧へ戻る
+        ← 公開済み政策提言一覧へ戻る
       </Link>
 
       {loading && <p style={{ marginTop: 24 }}>公開済み政策提言を読み込んでいます...</p>}
@@ -370,7 +377,7 @@ export default function PolicyDetailPage() {
                   fontWeight: 900,
                 }}
               >
-                {policy.status}
+                {formatProposalStatus(policy.status)}
               </span>
             </div>
             <h1 style={{ margin: "10px 0 0", fontSize: 30, lineHeight: 1.45, letterSpacing: 0 }}>

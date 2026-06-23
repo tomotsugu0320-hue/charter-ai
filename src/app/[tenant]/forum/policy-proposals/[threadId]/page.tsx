@@ -99,6 +99,13 @@ function getParam(value: string | string[] | undefined, fallback = "") {
   return Array.isArray(value) ? value[0] ?? fallback : value ?? fallback;
 }
 
+function formatProposalStatus(status?: string | null) {
+  if (status === "published") return "公開済み";
+  if (status === "draft") return "下書き";
+  if (status === "review") return "確認中";
+  return "未確認";
+}
+
 function ListSection({ title, items }: { title: string; items: string[] }) {
   if (items.length === 0) return null;
 
@@ -771,7 +778,7 @@ export default function PolicyProposalDetailPage() {
               </div>
               {!isUnsavedPreview && savedProposal && (
                 <div style={{ marginTop: 6, color: "#475569", fontSize: 13 }}>
-                  status: {savedProposal.status}
+                  状態: {formatProposalStatus(savedProposal.status)}
                   {savedProposal.id && savedProposal.status === "published" && (
                     <div style={{ marginTop: 8, lineHeight: 1.7 }}>
                       この提言は公開済み政策提言として保存されています。

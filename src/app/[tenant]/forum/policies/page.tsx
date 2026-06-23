@@ -87,6 +87,13 @@ function formatDate(value: string | null) {
   });
 }
 
+function formatProposalStatus(status?: string | null) {
+  if (status === "published") return "公開済み";
+  if (status === "draft") return "下書き";
+  if (status === "review") return "確認中";
+  return "未確認";
+}
+
 function buildPolicyPoints(policy: PublicPolicy) {
   const points = [
     policy.one_line_proposal || policy.proposal_json.one_line_proposal || "",
@@ -136,7 +143,7 @@ function PolicyCard({ policy, tenant }: { policy: PublicPolicy; tenant: string }
             fontWeight: 900,
           }}
         >
-          {policy.status}
+          {formatProposalStatus(policy.status)}
         </span>
       </div>
 
@@ -222,7 +229,7 @@ export default function PoliciesPage() {
       </div>
 
       <header style={{ margin: "22px 0 18px" }}>
-        <h1 style={{ margin: 0, fontSize: 30, letterSpacing: 0 }}>正式公開済み政策提言</h1>
+        <h1 style={{ margin: 0, fontSize: 30, letterSpacing: 0 }}>公開済み政策提言</h1>
         <p style={{ margin: "10px 0 0", color: "#475569", lineHeight: 1.8 }}>
           AI再総括をもとに生成・保存された公開済み政策提言です。AIの判断は最終結論ではなく、議論と検証のためのたたき台です。詳細ページで根拠・反対意見・確認指標を確認できます。
         </p>
