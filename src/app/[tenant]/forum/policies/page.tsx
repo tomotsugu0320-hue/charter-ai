@@ -224,7 +224,7 @@ export default function PoliciesPage() {
       <header style={{ margin: "22px 0 18px" }}>
         <h1 style={{ margin: 0, fontSize: 30, letterSpacing: 0 }}>正式公開済み政策提言</h1>
         <p style={{ margin: "10px 0 0", color: "#475569", lineHeight: 1.8 }}>
-          管理者が公開した政策提言です。掲示板の議論材料をもとにAIで整理しています。
+          AI再総括をもとに生成・保存された公開済み政策提言です。AIの判断は最終結論ではなく、議論と検証のためのたたき台です。詳細ページで根拠・反対意見・確認指標を確認できます。
         </p>
       </header>
 
