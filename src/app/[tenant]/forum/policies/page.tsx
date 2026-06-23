@@ -50,6 +50,17 @@ const POLICY_AREA_LABELS: Record<PolicyArea, string> = {
   unclassified: "未分類",
 };
 
+const POLICY_AREA_SECTIONS: Array<{
+  key: PolicyArea;
+  title: string;
+}> = [
+  { key: "fiscal", title: "財政政策" },
+  { key: "monetary", title: "金融政策" },
+  { key: "other", title: "その他の政策" },
+  { key: "combined", title: "複合政策" },
+  { key: "unclassified", title: "その他" },
+];
+
 function getParam(value: string | string[] | undefined, fallback = "") {
   return Array.isArray(value) ? value[0] ?? fallback : value ?? fallback;
 }
@@ -96,6 +107,7 @@ function buildPolicyPoints(policy: PublicPolicy) {
 
 function PolicyCard({ policy, tenant }: { policy: PublicPolicy; tenant: string }) {
   const points = buildPolicyPoints(policy);
+  const decisionLabel = policy.proposal_json.priority_judgment?.label?.trim() || "未記載";
 
   return (
     <article style={cardStyle}>
@@ -131,6 +143,9 @@ function PolicyCard({ policy, tenant }: { policy: PublicPolicy; tenant: string }
       <h2 style={{ margin: "10px 0 0", fontSize: 21, lineHeight: 1.5 }}>{policy.title}</h2>
       <div style={{ marginTop: 7, color: "#64748b", fontSize: 13 }}>
         公開日: {formatDate(policy.published_at)}
+      </div>
+      <div style={{ marginTop: 8, fontWeight: 900, color: "#334155" }}>
+        判断：{decisionLabel}
       </div>
 
       <section style={{ marginTop: 12, borderTop: "1px solid #e2e8f0", paddingTop: 10 }}>
@@ -220,16 +235,47 @@ export default function PoliciesPage() {
       )}
 
       {!loading && !error && policies.length > 0 && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
-            gap: 14,
-          }}
-        >
-          {policies.map((policy) => (
-            <PolicyCard key={policy.id} policy={policy} tenant={tenant} />
-          ))}
+        <div style={{ display: "grid", gap: 30 }}>
+          {POLICY_AREA_SECTIONS.map((section) => {
+            const sectionPolicies = policies.filter((policy) =>
+              section.key === "unclassified"
+                ? policy.policy_area === "unclassified" ||
+                  !POLICY_AREA_SECTIONS.some((item) => item.key === policy.policy_area)
+                : policy.policy_area === section.key
+            );
+
+            if (sectionPolicies.length === 0) return null;
+
+            return (
+              <section key={section.key}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "baseline",
+                    flexWrap: "wrap",
+                    gap: 8,
+                  }}
+                >
+                  <h2 style={{ margin: 0, fontSize: 24 }}>{section.title}</h2>
+                  <span style={{ color: "#475569", fontSize: 14, fontWeight: 800 }}>
+                    {sectionPolicies.length}件
+                  </span>
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
+                    gap: 14,
+                    marginTop: 14,
+                  }}
+                >
+                  {sectionPolicies.map((policy) => (
+                    <PolicyCard key={policy.id} policy={policy} tenant={tenant} />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
         </div>
       )}
     </main>
