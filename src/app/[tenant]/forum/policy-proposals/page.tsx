@@ -433,8 +433,9 @@ export default function PolicyProposalsPage() {
         >
           <h2 style={{ margin: 0, fontSize: 21 }}>管理者用一括生成</h2>
           <p style={{ margin: "7px 0 0", color: "#475569", lineHeight: 1.7 }}>
-            未保存候補を最大5件まで順番にAI生成し、公開済み政策提言として保存します。
-            OpenAI APIは候補数ぶん使用します。既存AI再総括は更新しません。
+            未保存の政策提言候補を最大5件までAI生成し、公開済み政策提言として保存します。
+            OpenAI APIは候補数分、最大5回呼び出されます。1件ずつ直列実行し、
+            既に保存済みの候補はスキップされます。既存AI再総括は更新しません。
           </p>
           <div
             style={{
@@ -484,7 +485,7 @@ export default function PolicyProposalsPage() {
               disabled={bulkLoading || loading || bulkCandidates.length === 0}
               style={{ marginTop: 5 }}
             />
-            未保存候補を最大5件までAI生成して公開済み政策提言として保存します
+            未保存候補を最大5件までAI政策提言化し、公開済み政策提言として保存します
           </label>
 
           <button
@@ -510,7 +511,7 @@ export default function PolicyProposalsPage() {
           >
             {bulkLoading
               ? "AI生成・保存を実行中..."
-              : "未保存候補を最大5件AI生成して保存"}
+              : "未保存候補を一括でAI政策提言化"}
           </button>
 
           {bulkProgress && (
