@@ -41,6 +41,13 @@ type BulkProgress = {
   skipped: number;
 };
 
+type PublishExistingProposal = {
+  id: string;
+  title: string | null;
+  status: string;
+  published_at: string | null;
+};
+
 const pageStyle: CSSProperties = {
   maxWidth: 1040,
   margin: "0 auto",
@@ -220,6 +227,10 @@ export default function PolicyProposalsPage() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<BulkProgress | null>(null);
   const [bulkResults, setBulkResults] = useState<BulkResult[]>([]);
+  const [publishExistingLoading, setPublishExistingLoading] = useState(false);
+  const [publishExistingMessage, setPublishExistingMessage] = useState("");
+  const [publishExistingMessageIsError, setPublishExistingMessageIsError] = useState(false);
+  const [publishExistingResults, setPublishExistingResults] = useState<PublishExistingProposal[]>([]);
 
   const loadProposals = useCallback(async (signal?: AbortSignal) => {
       try {
@@ -403,6 +414,58 @@ export default function PolicyProposalsPage() {
     }
   }
 
+  async function handlePublishExistingProposals() {
+    if (publishExistingLoading) return;
+
+    setPublishExistingLoading(true);
+    setPublishExistingMessage("");
+    setPublishExistingMessageIsError(false);
+    setPublishExistingResults([]);
+
+    try {
+      const response = await fetch("/api/forum/admin/policy-proposals/publish-existing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tenant,
+          limit: 20,
+          confirm_publish_existing: true,
+        }),
+      });
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || result?.ok !== true) {
+        throw new Error(
+          response.status === 401
+            ? "管理セッションが切れています。"
+            : result?.error || "既存の未公開提言を一括公開できませんでした。"
+        );
+      }
+
+      const updatedCount = Number(result.updated_count ?? 0);
+      const publishedProposals = Array.isArray(result.published_proposals)
+        ? result.published_proposals
+        : [];
+      setPublishExistingResults(publishedProposals);
+      setPublishExistingMessageIsError(false);
+      setPublishExistingMessage(
+        updatedCount > 0
+          ? `既存の未公開提言を${updatedCount}件公開しました。`
+          : "公開対象のdraft/review提言はありませんでした。"
+      );
+      await loadProposals();
+    } catch (publishError) {
+      setPublishExistingMessageIsError(true);
+      setPublishExistingMessage(
+        publishError instanceof Error
+          ? publishError.message
+          : "既存の未公開提言を一括公開できませんでした。"
+      );
+    } finally {
+      setPublishExistingLoading(false);
+    }
+  }
+
   return (
     <main style={pageStyle}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
@@ -564,6 +627,59 @@ export default function PolicyProposalsPage() {
               })}
             </ul>
           )}
+
+          <section
+            style={{
+              marginTop: 16,
+              borderTop: "1px solid #dbe3ef",
+              paddingTop: 14,
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: 18 }}>既存の未公開提言を公開</h3>
+            <p style={{ margin: "7px 0 0", color: "#475569", lineHeight: 1.7 }}>
+              過去にdraft/reviewとして保存された政策提言を、公開済み政策提言としてまとめて公開します。
+              AI生成は行わず、OpenAI APIは呼びません。最大20件まで処理します。
+            </p>
+            <button
+              type="button"
+              onClick={() => void handlePublishExistingProposals()}
+              disabled={publishExistingLoading}
+              style={{
+                marginTop: 10,
+                border: "1px solid #166534",
+                borderRadius: 8,
+                background: publishExistingLoading ? "#cbd5e1" : "#166534",
+                color: "#ffffff",
+                cursor: publishExistingLoading ? "not-allowed" : "pointer",
+                fontWeight: 900,
+                padding: "10px 14px",
+              }}
+            >
+              {publishExistingLoading
+                ? "既存の未公開提言を公開中..."
+                : "既存の未公開提言を一括公開する"}
+            </button>
+            {publishExistingMessage && (
+              <p
+                style={{
+                  margin: "10px 0 0",
+                  color: publishExistingMessageIsError ? "#b91c1c" : "#166534",
+                  lineHeight: 1.7,
+                }}
+              >
+                {publishExistingMessage}
+              </p>
+            )}
+            {publishExistingResults.length > 0 && (
+              <ul style={{ margin: "10px 0 0", paddingLeft: 20, lineHeight: 1.8 }}>
+                {publishExistingResults.slice(0, 5).map((proposal) => (
+                  <li key={proposal.id}>
+                    {proposal.title || "無題の政策提言"}（{proposal.status}）
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </section>
       )}
 
