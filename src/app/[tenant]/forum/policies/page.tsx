@@ -170,7 +170,7 @@ function PolicyCard({ policy, tenant }: { policy: PublicPolicy; tenant: string }
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 16 }}>
         <Link href={`/${tenant}/forum/policies/${policy.id}`} style={{ color: "#075985", fontWeight: 900 }}>
-          詳細を見る
+          根拠と検証を見る
         </Link>
         <Link href={`/${tenant}/forum/thread/${policy.thread_id}`} style={{ color: "#475569", fontWeight: 700 }}>
           元スレッド
