@@ -772,6 +772,19 @@ export default function PolicyProposalDetailPage() {
               {!isUnsavedPreview && savedProposal && (
                 <div style={{ marginTop: 6, color: "#475569", fontSize: 13 }}>
                   status: {savedProposal.status}
+                  {savedProposal.id && savedProposal.status === "published" && (
+                    <div style={{ marginTop: 8, lineHeight: 1.7 }}>
+                      この提言は公開済み政策提言として保存されています。
+                      <div>
+                        <Link
+                          href={`/${tenant}/forum/policies/${savedProposal.id}`}
+                          style={{ color: "#075985", fontWeight: 900 }}
+                        >
+                          公開済み政策提言ページを見る
+                        </Link>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               <h2 style={{ margin: "6px 0 0", fontSize: 26, lineHeight: 1.45 }}>
