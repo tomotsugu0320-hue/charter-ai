@@ -405,9 +405,14 @@ export default function PolicyProposalsPage() {
 
   return (
     <main style={pageStyle}>
-      <Link href={`/${tenant}/forum`} style={{ color: "#334155", fontWeight: 700 }}>
-        ← Forumトップへ戻る
-      </Link>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+        <Link href={`/${tenant}/forum`} style={{ color: "#334155", fontWeight: 700 }}>
+          ← Forumトップへ戻る
+        </Link>
+        <Link href={`/${tenant}/forum/policies`} style={{ color: "#075985", fontWeight: 900 }}>
+          公開済み政策提言一覧へ
+        </Link>
+      </div>
 
       <header style={{ margin: "22px 0 18px" }}>
         <h1 style={{ margin: 0, fontSize: 30, letterSpacing: 0 }}>政策提言候補</h1>

@@ -2033,12 +2033,20 @@ export default function ForumPage() {
           }}
         >
           <h2 style={{ margin: 0, fontSize: 22 }}>AIの政策判断</h2>
-          <Link
-            href={`/${tenant}/forum/policy-proposals`}
-            style={{ color: "#075985", fontWeight: 900 }}
-          >
-            政策提言候補をすべて見る
-          </Link>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+            <Link
+              href={`/${tenant}/forum/policies`}
+              style={{ color: "#075985", fontWeight: 900 }}
+            >
+              公開済み政策提言を見る
+            </Link>
+            <Link
+              href={`/${tenant}/forum/policy-proposals`}
+              style={{ color: "#475569", fontWeight: 800 }}
+            >
+              政策提言候補をすべて見る
+            </Link>
+          </div>
         </div>
         <p style={{ margin: "6px 0 0", color: "#475569", lineHeight: 1.7 }}>
           保存済みの政策提言候補から、財政・金融・その他の判断を1件ずつ表示します。
