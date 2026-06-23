@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
   const contentHash = createHash("sha256").update(serializedPreview).digest("hex");
   const { data: existing, error: existingError } = await supabase
     .from("forum_policy_proposals")
-    .select("id, status, created_at")
+    .select("id, status, created_at, published_at")
     .eq("thread_id", threadId)
     .eq("content_hash", contentHash)
     .maybeSingle();
@@ -219,6 +219,7 @@ export async function POST(request: NextRequest) {
   const policyArea = ["fiscal", "monetary", "other", "combined"].includes(priorityArea)
     ? priorityArea
     : "unclassified";
+  const publishedAt = new Date().toISOString();
   const { data: savedProposal, error: insertError } = await supabase
     .from("forum_policy_proposals")
     .insert({
@@ -233,11 +234,12 @@ export async function POST(request: NextRequest) {
       prompt_version: PROMPT_VERSION,
       model: MODEL,
       source_summary_updated_at: structure.updated_at,
-      status: "draft",
+      status: "published",
+      published_at: publishedAt,
       content_hash: contentHash,
       created_by_admin: null,
     })
-    .select("id, status, created_at")
+    .select("id, status, created_at, published_at")
     .single();
 
   if (insertError || !savedProposal) {

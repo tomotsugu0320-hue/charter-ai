@@ -465,7 +465,6 @@ export default function PolicyProposalDetailPage() {
   const [saveMessage, setSaveMessage] = useState("");
   const [saveMessageIsError, setSaveMessageIsError] = useState(false);
   const [saveConfirmed, setSaveConfirmed] = useState(false);
-  const [publishLoading, setPublishLoading] = useState(false);
 
   useEffect(() => {
     if (!threadId) {
@@ -600,8 +599,9 @@ export default function PolicyProposalDetailPage() {
       const saved = result.saved_proposal;
       setSavedProposal({
         id: String(saved?.id ?? ""),
-        status: String(saved?.status ?? "draft"),
+        status: String(saved?.status ?? "published"),
         created_at: String(saved?.created_at ?? new Date().toISOString()),
+        published_at: saved?.published_at ? String(saved.published_at) : null,
         proposal_json: preview,
       });
       setPreview(null);
@@ -610,7 +610,7 @@ export default function PolicyProposalDetailPage() {
       setSaveMessage(
         result.duplicate
           ? "同じ内容はすでに保存済みです。"
-          : "政策提言候補をdraftとして保存しました。"
+          : "政策提言候補を公開済みとして保存しました。"
       );
     } catch (saveError) {
       setSaveMessageIsError(true);
@@ -622,61 +622,8 @@ export default function PolicyProposalDetailPage() {
     }
   }
 
-  async function handlePublishPolicyProposal() {
-    if (!savedProposal || publishLoading) return;
-
-    setPublishLoading(true);
-    setSaveMessage("");
-    setSaveMessageIsError(false);
-
-    try {
-      const response = await fetch(
-        `/api/forum/admin/policy-proposals/${encodeURIComponent(savedProposal.id)}/publish`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tenant }),
-        }
-      );
-      const result = await response.json().catch(() => null);
-
-      if (!response.ok || result?.ok !== true) {
-        throw new Error(
-          response.status === 401
-            ? "管理セッションが切れました。管理トップで再認証してください。"
-            : result?.error || "政策提言候補を正式公開できませんでした。"
-        );
-      }
-
-      const published = result.policy_proposal;
-      setSavedProposal((current) =>
-        current
-          ? {
-              ...current,
-              status: String(published?.status ?? "published"),
-              published_at: String(published?.published_at ?? new Date().toISOString()),
-            }
-          : current
-      );
-      setSaveMessageIsError(false);
-      setSaveMessage("政策提言候補を正式公開しました。");
-    } catch (publishError) {
-      setSaveMessageIsError(true);
-      setSaveMessage(
-        publishError instanceof Error
-          ? publishError.message
-          : "政策提言候補を正式公開できませんでした。"
-      );
-    } finally {
-      setPublishLoading(false);
-    }
-  }
-
   const displayedPreview = preview ?? savedProposal?.proposal_json ?? null;
   const isUnsavedPreview = Boolean(preview);
-  const canPublishSavedProposal = Boolean(
-    savedProposal && ["draft", "review"].includes(savedProposal.status)
-  );
   const hasStructuredPolicyDecisions = Boolean(
     displayedPreview?.policy_groups &&
       [
@@ -741,7 +688,7 @@ export default function PolicyProposalDetailPage() {
             >
               <h2 style={{ margin: 0, fontSize: 20 }}>管理者用AIプレビュー</h2>
               <p style={{ margin: "7px 0 12px", color: "#475569", lineHeight: 1.7 }}>
-                OpenAI APIを1回使用します。生成後に内容を確認し、政策提言候補としてdraft保存できます。既存AI再総括は更新しません。
+                OpenAI APIを1回使用します。生成後に内容を確認し、公開済み政策提言として保存できます。既存AI再総括は更新しません。
               </p>
               <button
                 type="button"
@@ -816,32 +763,16 @@ export default function PolicyProposalDetailPage() {
               }}
             >
               <div style={{ color: "#1d4ed8", fontSize: 13, fontWeight: 900 }}>
-                {isUnsavedPreview ? "管理者用・未保存プレビュー" : "保存済み政策提言候補"}
+                {isUnsavedPreview
+                  ? "管理者用・未保存プレビュー"
+                  : savedProposal?.status === "published"
+                    ? "公開済み政策提言"
+                    : "保存済み政策提言候補"}
               </div>
               {!isUnsavedPreview && savedProposal && (
                 <div style={{ marginTop: 6, color: "#475569", fontSize: 13 }}>
                   status: {savedProposal.status}
-                  {savedProposal.status === "draft" ? " / 正式公開前" : ""}
                 </div>
-              )}
-              {!isUnsavedPreview && savedProposal && isForumAdmin && canPublishSavedProposal && (
-                <button
-                  type="button"
-                  onClick={() => void handlePublishPolicyProposal()}
-                  disabled={publishLoading}
-                  style={{
-                    marginTop: 10,
-                    border: "1px solid #1d4ed8",
-                    borderRadius: 8,
-                    background: publishLoading ? "#cbd5e1" : "#1d4ed8",
-                    color: "#ffffff",
-                    cursor: publishLoading ? "not-allowed" : "pointer",
-                    fontWeight: 900,
-                    padding: "9px 13px",
-                  }}
-                >
-                  {publishLoading ? "正式公開中..." : "正式公開する"}
-                </button>
               )}
               <h2 style={{ margin: "6px 0 0", fontSize: 26, lineHeight: 1.45 }}>
                 {displayedPreview.title}
@@ -998,7 +929,7 @@ export default function PolicyProposalDetailPage() {
                       disabled={saveLoading}
                       style={{ marginTop: 5 }}
                     />
-                    このAIプレビューを政策提言候補として保存します
+                    このAIプレビューを公開済み政策提言として保存します
                   </label>
                   <button
                     type="button"
