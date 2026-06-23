@@ -167,12 +167,25 @@ function getDecisionLabel(group: PolicyGroup | undefined, labels: Record<string,
   return "未記載";
 }
 
-function ListSection({ title, items }: { title: string; items: string[] }) {
+function ListSection({
+  title,
+  description,
+  items,
+}: {
+  title: string;
+  description?: string;
+  items: string[];
+}) {
   const visibleItems = items.filter(Boolean);
 
   return (
     <section style={{ marginTop: 18, ...sectionStyle }}>
       <h2 style={{ margin: 0, fontSize: 22 }}>{title}</h2>
+      {description && (
+        <p style={{ margin: "8px 0 0", color: "#475569", lineHeight: 1.7 }}>
+          {description}
+        </p>
+      )}
       {visibleItems.length > 0 ? (
         <ul style={{ margin: "10px 0 0", paddingLeft: 22, lineHeight: 1.8 }}>
           {visibleItems.map((item, index) => (
@@ -441,8 +454,16 @@ export default function PolicyDetailPage() {
 
           <EconomicTheorySection checks={proposal.economic_theory_checks ?? []} />
           <ListSection title="反対意見" items={asStringArray(proposal.opposing_views)} />
-          <ListSection title="確認すべき指標" items={asStringArray(proposal.verification_metrics)} />
-          <ListSection title="見直し条件" items={asStringArray(proposal.review_conditions)} />
+          <ListSection
+            title="あとで確認する指標"
+            description="この提言が妥当だったかを後から確認するために見る指標です。"
+            items={asStringArray(proposal.verification_metrics)}
+          />
+          <ListSection
+            title="判断を見直す条件"
+            description="以下の条件が変わった場合、この政策判断は再検討が必要です。"
+            items={asStringArray(proposal.review_conditions)}
+          />
           <ListSection title="不足情報" items={asStringArray(proposal.missing_information)} />
 
           <section style={{ marginTop: 18, ...sectionStyle }}>
