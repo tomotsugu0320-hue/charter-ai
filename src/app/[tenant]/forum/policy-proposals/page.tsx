@@ -203,7 +203,7 @@ function ProposalCard({ proposal, tenant }: { proposal: Proposal; tenant: string
       <h2 style={{ margin: "10px 0 0", fontSize: 20, lineHeight: 1.5 }}>{proposal.title}</h2>
       <CardBulletSection title="要点" items={mainPoints} maxItems={2} />
       <CardBulletSection title="注意点" items={cautions} maxItems={1} />
-      <CardBulletSection title="検証指標" items={proposal.verification_metrics} maxItems={2} />
+      <CardBulletSection title="あとで確認する指標" items={proposal.verification_metrics} maxItems={2} />
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 16 }}>
         <Link
           href={`/${tenant}/forum/policy-proposals/${proposal.thread_id}`}
