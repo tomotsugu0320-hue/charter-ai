@@ -2123,12 +2123,6 @@ export default function ForumPage() {
           <h2 style={{ margin: 0, fontSize: 22 }}>AIの政策判断</h2>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
             <Link
-              href={`/${tenant}/forum/policies`}
-              style={{ color: "#075985", fontWeight: 900 }}
-            >
-              公開済み政策提言を見る
-            </Link>
-            <Link
               href={`/${tenant}/forum/policy-proposals`}
               style={{ color: "#475569", fontWeight: 800 }}
             >
@@ -2240,12 +2234,6 @@ export default function ForumPage() {
           }}
         >
           <h2 style={{ margin: 0, fontSize: 22 }}>公開済みAI政策提言</h2>
-          <Link
-            href={`/${tenant}/forum/policies`}
-            style={{ color: "#166534", fontWeight: 900 }}
-          >
-            公開済み政策提言をすべて見る
-          </Link>
         </div>
         <p style={{ margin: "6px 0 0", color: "#475569", lineHeight: 1.7 }}>
           AI再総括をもとに作成・保存された公開済み政策提言です。詳細ページで根拠や確認指標まで確認できます。
