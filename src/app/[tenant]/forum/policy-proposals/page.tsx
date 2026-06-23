@@ -115,6 +115,13 @@ function firstSentence(value: string, max = 150) {
   return compactText(sentence, max);
 }
 
+function formatProposalStatus(status?: string | null) {
+  if (status === "published") return "公開済み";
+  if (status === "draft") return "下書き";
+  if (status === "review") return "確認中";
+  return "未確認";
+}
+
 function CardBulletSection({
   title,
   items,
@@ -186,7 +193,7 @@ function ProposalCard({ proposal, tenant }: { proposal: Proposal; tenant: string
           }}
         >
           {proposal.has_saved_proposal
-            ? `保存済み / ${proposal.latest_saved_proposal_status ?? "draft"}`
+            ? `保存済み / ${formatProposalStatus(proposal.latest_saved_proposal_status)}`
             : "未保存"}
         </span>
       </div>
@@ -674,7 +681,7 @@ export default function PolicyProposalsPage() {
               <ul style={{ margin: "10px 0 0", paddingLeft: 20, lineHeight: 1.8 }}>
                 {publishExistingResults.slice(0, 5).map((proposal) => (
                   <li key={proposal.id}>
-                    {proposal.title || "無題の政策提言"}（{proposal.status}）
+                    {proposal.title || "無題の政策提言"}（{formatProposalStatus(proposal.status)}）
                   </li>
                 ))}
               </ul>
