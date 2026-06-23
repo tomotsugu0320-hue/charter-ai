@@ -446,9 +446,9 @@ function buildPolicyJudgmentItems(proposal: Proposal): PolicyJudgmentItem[] {
     { key: "drawbacks", title: "反論・リスク候補", items: uniqueItems(points.main_rebuttals, points.needs_review).slice(0, 4), source: "主な反論・要確認事項をリスク候補として配置", dataType: "proxy" },
     { key: "countermeasures", title: "対策候補", items: countermeasures, source: "再総括全体から対策・緩和策に関する記述を抽出", dataType: "keyword" },
     { key: "rebuttals", title: "反論", items: points.main_rebuttals.slice(0, 4), source: "AI再総括の主な反論", dataType: "direct" },
-    { key: "metrics", title: "検証指標", items: points.verification_metrics.slice(0, 4), source: "AI再総括の検証すべき指標", dataType: "direct" },
+    { key: "metrics", title: "あとで確認する指標", items: points.verification_metrics.slice(0, 4), source: "AI再総括の検証すべき指標", dataType: "direct" },
     { key: "tentative-decision", title: "暫定判断候補", items: points.current_tentative_conclusion.slice(0, 4), source: "AI再総括の現時点の暫定結論", dataType: "direct" },
-    { key: "review-conditions", title: "見直し条件", items: reviewConditions, source: "要確認事項と条件付き前提を配置", dataType: "proxy" },
+    { key: "review-conditions", title: "判断を見直す条件", items: reviewConditions, source: "要確認事項と条件付き前提を配置", dataType: "proxy" },
   ];
 }
 
@@ -909,8 +909,8 @@ export default function PolicyProposalDetailPage() {
 
               <PreviewList title="反対意見" items={displayedPreview.opposing_views} />
 
-              <PreviewList title="検証指標" items={displayedPreview.verification_metrics} />
-              <PreviewList title="見直し条件" items={displayedPreview.review_conditions} />
+              <PreviewList title="あとで確認する指標" items={displayedPreview.verification_metrics} />
+              <PreviewList title="判断を見直す条件" items={displayedPreview.review_conditions} />
               <PreviewList title="不足情報" items={displayedPreview.missing_information} />
 
               <section style={{ padding: "14px 0 0", borderTop: "1px solid #e2e8f0" }}>
