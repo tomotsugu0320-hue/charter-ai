@@ -447,6 +447,9 @@ export default function PolicyDetailPage() {
 
           <section style={{ marginTop: 18, ...sectionStyle }}>
             <h2 style={{ margin: 0, fontSize: 22 }}>参考スレッド</h2>
+            <p style={{ margin: "8px 0 0", color: "#475569", lineHeight: 1.7 }}>
+              この政策提言の作成時に参照した掲示板スレッドです。元の議論を確認しながら、提言内容を検証できます。
+            </p>
             {referenceThreads.length > 0 ? (
               <ul style={{ margin: "10px 0 0", paddingLeft: 22, lineHeight: 1.8 }}>
                 {referenceThreads.map((reference, index) => {
