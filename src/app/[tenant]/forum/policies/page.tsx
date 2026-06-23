@@ -226,6 +226,12 @@ export default function PoliciesPage() {
         <Link href={`/${tenant}/forum/policy-proposals`} style={{ color: "#075985", fontWeight: 900 }}>
           政策提言候補へ戻る
         </Link>
+        <Link
+          href={`/${tenant}/forum/economic-policy-comparison`}
+          style={{ color: "#075985", fontWeight: 900 }}
+        >
+          日本と海外の経済政策比較を見る
+        </Link>
       </div>
 
       <header style={{ margin: "22px 0 18px" }}>

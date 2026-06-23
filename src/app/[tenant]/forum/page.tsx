@@ -2046,6 +2046,26 @@ export default function ForumPage() {
         <p style={{ margin: "6px 0 0", color: "#475569", lineHeight: 1.7 }}>
           現在の政策方向を比較用に簡略化した固定表示です。AIによる推奨ではありません。
         </p>
+        <div
+          style={{
+            marginTop: 10,
+            border: "1px solid #dbe3ef",
+            borderRadius: 8,
+            background: "#ffffff",
+            padding: "10px 12px",
+            color: "#475569",
+            fontSize: 14,
+            lineHeight: 1.7,
+          }}
+        >
+          財政政策・金融政策・その他の経済政策を、海外事例と比べて確認します。{" "}
+          <Link
+            href={`/${tenant}/forum/economic-policy-comparison`}
+            style={{ color: "#075985", fontWeight: 900 }}
+          >
+            日本と海外の経済政策を比較する
+          </Link>
+        </div>
         {isForumAdminForPolicyReview && (
           <div
             style={{
