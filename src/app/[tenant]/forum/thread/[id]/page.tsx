@@ -2079,6 +2079,7 @@ const groupedByOpinionForDisplay = useMemo(
 const normalizeQuestionText = (value?: string | null) =>
   (value ?? "").replace(/[。、．.！？!?「」『』【】（）()[\]\s]/g, "");
 const questionCardText = stripExternalAiInternalSections(thread?.original_post);
+const originalIssueText = stripExternalAiInternalSections(thread?.original_post);
 const shouldShowQuestionCard = Boolean(questionCardText);
 const shouldShowMacroEconomyGuide =
   String(thread?.category ?? "").trim() === "経済・政策";
@@ -2190,6 +2191,10 @@ const classifiedSummarySections = [
     items: normalizeClassifiedSummaryItems(section.items, 3),
   }))
   .filter((section) => section.items.length > 0);
+const overviewVerificationMetrics = normalizeClassifiedSummaryItems(
+  classifiedSummaryKeyPoints?.verification_metrics,
+  3
+);
 const shouldShowClassifiedSummary =
   isClassificationBasedSummary ||
   Boolean(classifiedSummaryEasyText) ||
@@ -3037,7 +3042,7 @@ function renderDiscussionCard({
   }}
 >
   <div style={{ flex: "1 1 280px", fontSize: currentFont.base }}>
-    まずは「問い → 現時点の答え → 主な理由 → 反論・リスク」の順に読むと、この議論の全体像が分かります。
+    まずは「投稿者の問題提起 → AIが整理した問い → AIの暫定整理 → 反論・リスク」の順に読むと、この議論の全体像が分かります。
   </div>
   <PrimaryButton
     onClick={jumpToPostForm}
@@ -3104,6 +3109,53 @@ function renderDiscussionCard({
 
   <div>
 
+{originalIssueText && (
+  <div
+    style={{
+      marginTop: 16,
+      padding: 14,
+      border: "1px solid #cbd5e1",
+      borderRadius: 10,
+      background: "#ffffff",
+      color: "#111",
+    }}
+  >
+    <div
+      style={{
+        margin: 0,
+        fontSize: currentFont.title,
+        fontWeight: 800,
+        lineHeight: 1.4,
+        color: "#111",
+      }}
+    >
+      投稿者の問題提起
+    </div>
+    <div
+      style={{
+        marginTop: 8,
+        color: "#334155",
+        fontSize: currentFont.base,
+        lineHeight: 1.7,
+        whiteSpace: "pre-wrap",
+        overflowWrap: "anywhere",
+      }}
+    >
+      {compactText(originalIssueText, 360)}
+    </div>
+    <div
+      style={{
+        marginTop: 8,
+        color: "#64748b",
+        fontSize: currentFont.base * 0.85,
+        lineHeight: 1.6,
+      }}
+    >
+      投稿者が最初に出した問題意識です。AI整理の前に、議論の出発点として確認できます。
+    </div>
+  </div>
+)}
+
 {shouldShowQuestionCard && (
   <div
     style={{
@@ -3124,7 +3176,7 @@ function renderDiscussionCard({
         color: "#111",
       }}
     >
-      起：この議論の問い
+      AIが整理した問い
     </div>
     <div
       style={{
@@ -3143,7 +3195,7 @@ function renderDiscussionCard({
         lineHeight: 1.6,
       }}
     >
-      ※この問いはAIが読みやすく整理したものです。質問者の原文は下部で確認できます。
+      投稿者の問題提起を、AIが読みやすい問いとして整理したものです。
     </div>
   </div>
 )}
@@ -3167,7 +3219,7 @@ function renderDiscussionCard({
       color: "#9a3412",
     }}
   >
-    結：現時点の答え
+    AIの暫定整理
   </h2>
 
   <div
@@ -3179,7 +3231,7 @@ function renderDiscussionCard({
       fontWeight: 700,
     }}
   >
-    投稿内容とAI整理をもとにした、現時点での答えです。今後の反論や補足で更新される可能性があります。
+    投稿内容とAI整理をもとにした暫定的な整理です。今後の反論や補足で更新される可能性があります。
   </div>
 
   {isClassificationBasedSummary ? (
@@ -3287,6 +3339,121 @@ function renderDiscussionCard({
 
 </div>
 
+{(overviewPremises.length > 0 || overviewReasons.length > 0) && (
+  <div
+    style={{
+      marginTop: 16,
+      padding: 14,
+      border: "1px solid #dbe3ef",
+      borderRadius: 10,
+      background: "#fff",
+      color: "#111",
+    }}
+  >
+    <h2
+      style={{
+        margin: 0,
+        fontSize: currentFont.title,
+        fontWeight: 800,
+        lineHeight: 1.4,
+        color: "#111",
+      }}
+    >
+      確認すべき前提・根拠
+    </h2>
+    <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+      {overviewPremises.length > 0 && (
+        <div>
+          <div style={{ fontWeight: 800, marginBottom: 4, color: "#334155" }}>
+            確認すべき前提
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 20, color: "#333", fontSize: currentFont.base, lineHeight: 1.7 }}>
+            {overviewPremises.map((premise, index) => (
+              <li key={`overview-premise-${index}`}>{compactText(premise, 160)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {overviewReasons.length > 0 && (
+        <div>
+          <div style={{ fontWeight: 800, marginBottom: 4, color: "#334155" }}>
+            主な理由・根拠
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 20, color: "#333", fontSize: currentFont.base, lineHeight: 1.7 }}>
+            {overviewReasons.map((reason, index) => (
+              <li key={`overview-reason-${index}`}>{compactText(reason, 160)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  </div>
+)}
+
+{overviewConflicts.length > 0 && (
+  <div
+    style={{
+      marginTop: 16,
+      padding: 14,
+      border: "1px solid #fee2e2",
+      borderRadius: 10,
+      background: "#fff7f7",
+      color: "#111",
+    }}
+  >
+    <h2
+      style={{
+        margin: 0,
+        fontSize: currentFont.title,
+        fontWeight: 800,
+        lineHeight: 1.4,
+        color: "#7f1d1d",
+      }}
+    >
+      反論・リスク
+    </h2>
+    <ul style={{ margin: "10px 0 0", paddingLeft: 20, color: "#333", fontSize: currentFont.base, lineHeight: 1.7 }}>
+      {overviewConflicts.map((conflict, index) => (
+        <li key={`overview-conflict-${index}`}>
+          {compactText(conflict.rebuttal || conflict.opinion, 160)}
+        </li>
+      ))}
+    </ul>
+  </div>
+)}
+
+{overviewVerificationMetrics.length > 0 && (
+  <div
+    style={{
+      marginTop: 16,
+      padding: 14,
+      border: "1px solid #fde68a",
+      borderRadius: 10,
+      background: "#fffbeb",
+      color: "#111",
+    }}
+  >
+    <h2
+      style={{
+        margin: 0,
+        fontSize: currentFont.title,
+        fontWeight: 800,
+        lineHeight: 1.4,
+        color: "#78350f",
+      }}
+    >
+      検証ポイント
+    </h2>
+    <ul style={{ margin: "10px 0 0", paddingLeft: 20, color: "#333", fontSize: currentFont.base, lineHeight: 1.7 }}>
+      {overviewVerificationMetrics.map((metric, index) => (
+        <li key={`overview-verification-metric-${index}`}>
+          {compactText(metric, 160)}
+        </li>
+      ))}
+    </ul>
+  </div>
+)}
+
 {shouldShowClassifiedSummary && (
   <div
     style={{
@@ -3317,7 +3484,7 @@ function renderDiscussionCard({
         lineHeight: 1.6,
       }}
     >
-      AI分類済みコメントを材料に、議論後の変化を整理したものです。分類は補助判断であり、確定判定ではありません。
+      追加コメントや分類済み意見を踏まえて、AIが議論後の変化を再整理した内容です。分類は補助判断であり、確定判定ではありません。
     </div>
 
     {classifiedSummaryEasyText && (
@@ -3517,89 +3684,6 @@ function renderDiscussionCard({
         )}
       </details>
     )}
-  </div>
-)}
-
-{(overviewPremises.length > 0 || overviewReasons.length > 0) && (
-  <div
-    style={{
-      marginTop: 16,
-      padding: 14,
-      border: "1px solid #dbe3ef",
-      borderRadius: 10,
-      background: "#fff",
-      color: "#111",
-    }}
-  >
-    <h2
-      style={{
-        margin: 0,
-        fontSize: currentFont.title,
-        fontWeight: 800,
-        lineHeight: 1.4,
-        color: "#111",
-      }}
-    >
-      承：主な理由・根拠
-    </h2>
-    <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-      {overviewPremises.length > 0 && (
-        <div>
-          <div style={{ fontWeight: 800, marginBottom: 4, color: "#334155" }}>
-            前提
-          </div>
-          <ul style={{ margin: 0, paddingLeft: 20, color: "#333", fontSize: currentFont.base, lineHeight: 1.7 }}>
-            {overviewPremises.map((premise, index) => (
-              <li key={`overview-premise-${index}`}>{compactText(premise, 160)}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {overviewReasons.length > 0 && (
-        <div>
-          <div style={{ fontWeight: 800, marginBottom: 4, color: "#334155" }}>
-            根拠
-          </div>
-          <ul style={{ margin: 0, paddingLeft: 20, color: "#333", fontSize: currentFont.base, lineHeight: 1.7 }}>
-            {overviewReasons.map((reason, index) => (
-              <li key={`overview-reason-${index}`}>{compactText(reason, 160)}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  </div>
-)}
-
-{overviewConflicts.length > 0 && (
-  <div
-    style={{
-      marginTop: 16,
-      padding: 14,
-      border: "1px solid #fee2e2",
-      borderRadius: 10,
-      background: "#fff7f7",
-      color: "#111",
-    }}
-  >
-    <h2
-      style={{
-        margin: 0,
-        fontSize: currentFont.title,
-        fontWeight: 800,
-        lineHeight: 1.4,
-        color: "#7f1d1d",
-      }}
-    >
-      転：反論・リスク
-    </h2>
-    <ul style={{ margin: "10px 0 0", paddingLeft: 20, color: "#333", fontSize: currentFont.base, lineHeight: 1.7 }}>
-      {overviewConflicts.map((conflict, index) => (
-        <li key={`overview-conflict-${index}`}>
-          {compactText(conflict.rebuttal || conflict.opinion, 160)}
-        </li>
-      ))}
-    </ul>
   </div>
 )}
 
