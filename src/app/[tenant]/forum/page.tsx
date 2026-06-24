@@ -2216,7 +2216,7 @@ export default function ForumPage() {
             gap: 8,
           }}
         >
-          <h2 style={{ margin: 0, fontSize: 22 }}>AIの政策判断</h2>
+          <h2 style={{ margin: 0, fontSize: 22 }}>AIが推奨する日本の経済政策</h2>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
             <Link
               href={`/${tenant}/forum/policy-proposals`}
