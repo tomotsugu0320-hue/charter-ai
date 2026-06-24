@@ -227,6 +227,20 @@ export default function NewsCheckPage() {
         </p>
       </section>
 
+      <section style={{ ...sectionStyle, marginBottom: 18, background: "#f8fafc" }}>
+        <h2 style={{ margin: 0, fontSize: 22 }}>入力文の出所と正確性について</h2>
+        <p style={{ margin: "8px 0 0", color: "#475569", lineHeight: 1.8 }}>
+          このページの分析は、ユーザーが入力した文章・要約・URL情報をもとにした論点整理です。
+          元記事の存在、媒体名、本文の正確性、全文一致を保証するものではありません。
+          AIは、入力された文章に含まれる主張・前提・反論・検証指標を整理します。
+        </p>
+        <p style={{ margin: "8px 0 0", color: "#475569", lineHeight: 1.8 }}>
+          この掲示板は、入力された文章の出所や正確性を保証するものではなく、
+          そこに含まれる主張を経済理論・前提・反論・検証指標に分解して整理するための場です。
+          必要に応じて、媒体公式ページ、政府統計、日銀資料、企業決算、国会資料などの一次情報を確認してください。
+        </p>
+      </section>
+
       <section style={{ ...sectionStyle, background: "#f8fafc" }}>
         <h2 style={{ margin: 0, fontSize: 22 }}>記事本文の扱いについて</h2>
         <p style={{ margin: "8px 0 0", color: "#475569", lineHeight: 1.8 }}>
