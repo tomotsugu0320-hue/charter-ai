@@ -15,7 +15,7 @@ type AiClassification = {
 };
 
 const CLASSIFICATION_LABELS: Record<string, string> = {
-  agreement: "同意",
+  agreement: "賛成",
   rebuttal: "反論",
   premise_addition: "前提追加",
   evidence_addition: "根拠追加",
@@ -77,7 +77,7 @@ function scoreColor(score?: number) {
 
 function classificationLabel(classification?: string | null) {
   if (!classification) return "";
-  return CLASSIFICATION_LABELS[classification] ?? classification;
+  return CLASSIFICATION_LABELS[classification] ?? "その他";
 }
 
 function formatConfidence(confidence?: number | null) {
