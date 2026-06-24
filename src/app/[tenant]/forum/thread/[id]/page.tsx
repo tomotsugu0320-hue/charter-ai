@@ -2080,7 +2080,12 @@ const normalizeQuestionText = (value?: string | null) =>
   (value ?? "").replace(/[。、．.！？!?「」『』【】（）()[\]\s]/g, "");
 const questionCardText = stripExternalAiInternalSections(thread?.original_post);
 const originalIssueText = stripExternalAiInternalSections(thread?.original_post);
-const shouldShowQuestionCard = Boolean(questionCardText);
+const normalizedOriginalIssueText = normalizeQuestionText(originalIssueText);
+const normalizedQuestionCardText = normalizeQuestionText(questionCardText);
+const isDuplicateQuestionCard =
+  Boolean(originalIssueText) &&
+  normalizedOriginalIssueText === normalizedQuestionCardText;
+const shouldShowQuestionCard = Boolean(questionCardText) && !isDuplicateQuestionCard;
 const shouldShowMacroEconomyGuide =
   String(thread?.category ?? "").trim() === "経済・政策";
 const initialPostCount = summary?.counts?.total ?? posts.length;
