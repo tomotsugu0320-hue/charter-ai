@@ -1898,24 +1898,27 @@ export default function ForumPage() {
         <div
           style={{
             display: "flex",
-            gap: 12,
-            flexWrap: "wrap",
+            gap: 8,
+            flex: "1 1 auto",
+            flexWrap: "nowrap",
             alignItems: "center",
+            minWidth: 0,
           }}
         >
-          <div style={{ fontWeight: 900, fontSize: currentFontSize }}>
+          <div style={{ fontWeight: 900, fontSize: currentFontSize, whiteSpace: "nowrap" }}>
             表示設定
           </div>
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 10,
-              flexWrap: "wrap",
+              gap: 8,
+              flexWrap: "nowrap",
+              minWidth: 0,
             }}
           >
-            <div style={{ fontWeight: 800, minWidth: 92 }}>文字サイズ：</div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ fontWeight: 800, whiteSpace: "nowrap" }}>文字サイズ：</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "nowrap" }}>
               {(["small", "medium", "large"] as const).map((size) => (
                 <button
                   key={size}

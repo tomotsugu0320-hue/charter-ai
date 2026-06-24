@@ -108,7 +108,7 @@ export default function ForumHamburgerMenu({
   }
 
   return (
-    <div style={{ position: "relative" }}>
+    <div style={{ position: "relative", marginLeft: "auto" }}>
       <button
         type="button"
         aria-label="Forumメニューを開く"
@@ -131,9 +131,11 @@ export default function ForumHamburgerMenu({
             position: "absolute",
             top: "calc(100% + 8px)",
             right: 0,
-            zIndex: 20,
-            minWidth: 240,
+            zIndex: 60,
+            width: "min(80vw, 320px)",
+            minWidth: "min(240px, calc(100vw - 24px))",
             maxWidth: "calc(100vw - 32px)",
+            boxSizing: "border-box",
             display: "grid",
             gap: 6,
             padding: 10,
@@ -142,6 +144,7 @@ export default function ForumHamburgerMenu({
             background: "#ffffff",
             color: "#111827",
             boxShadow: "0 12px 30px rgba(15, 23, 42, 0.18)",
+            overflowWrap: "anywhere",
           }}
         >
           {menuItems.map((item) => (
