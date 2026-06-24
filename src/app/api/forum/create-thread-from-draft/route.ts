@@ -221,6 +221,27 @@ function buildExternalAiDraftClaim({
   return parts.join("\n\n") || claim;
 }
 
+function buildExternalAiNodeMetaBlock({
+  sourceText,
+  nodeCandidate,
+  childTopics,
+}: {
+  sourceText: string;
+  nodeCandidate: string;
+  childTopics: string[];
+}) {
+  const parts = [
+    nodeCandidate && !sourceText.includes("親テーマ候補")
+      ? `親テーマ候補:\n${nodeCandidate}`
+      : "",
+    childTopics.length > 0 && !sourceText.includes("子論点候補")
+      ? `子論点候補:\n${childTopics.map((topic) => `- ${topic}`).join("\n")}`
+      : "",
+  ].filter(Boolean);
+
+  return parts.join("\n\n");
+}
+
 function looksLikeEconomyPolicyText(text: string) {
   return [
     "経済",
@@ -582,7 +603,16 @@ export async function POST(req: NextRequest) {
       childTopics: cleanedDraftChildTopics,
       notSplitReason,
     });
-    const savedOriginalPost = originalText || draftClaim;
+    const nodeMetaBlock = originalText
+      ? buildExternalAiNodeMetaBlock({
+          sourceText: originalText,
+          nodeCandidate,
+          childTopics: cleanedDraftChildTopics,
+        })
+      : "";
+    const savedOriginalPost = originalText
+      ? [originalText, nodeMetaBlock].filter(Boolean).join("\n\n")
+      : draftClaim;
 
     if (draftClaim.length > MAX_DRAFT_CLAIM_LENGTH) {
       return NextResponse.json(
