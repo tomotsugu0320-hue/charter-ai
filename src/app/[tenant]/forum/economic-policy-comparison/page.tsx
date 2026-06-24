@@ -10,6 +10,13 @@ type ComparisonSection = {
   points: string[];
 };
 
+type SituationComparisonCard = {
+  situation: string;
+  overseas: string;
+  japan: string;
+  metrics: string[];
+};
+
 const pageStyle: CSSProperties = {
   maxWidth: 1040,
   margin: "0 auto",
@@ -100,6 +107,42 @@ const comparisonSections: ComparisonSection[] = [
   },
 ];
 
+const situationCards: SituationComparisonCard[] = [
+  {
+    situation: "需要不足で賃金が弱い場合",
+    overseas: "財政支出や減税で需要を支え、雇用と賃金の回復を優先することがあります。",
+    japan: "財政健全化や金融正常化を急ぎ、需要回復前に引き締め方向へ向かうことがあります。",
+    metrics: ["実質賃金", "個人消費", "失業率", "正社員求人倍率", "中小企業賃上げ率"],
+  },
+  {
+    situation: "物価上昇が輸入コスト主導の場合",
+    overseas:
+      "エネルギー補助、給付、減税などで家計負担を和らげつつ、需要過熱かどうかを確認することがあります。",
+    japan: "物価上昇だけを見て、利上げや緊縮の議論に寄りやすくなることがあります。",
+    metrics: ["輸入物価", "為替", "エネルギー価格", "実質賃金", "企業物価"],
+  },
+  {
+    situation: "政府債務が大きいと言われる場合",
+    overseas: "債務残高だけでなく、通貨建て、金利、名目GDP、中央銀行保有、政府資産も見ます。",
+    japan:
+      "国の借金だけが強調され、政府資産、日銀保有国債、対外純資産が見落とされやすいことがあります。",
+    metrics: ["政府債務", "純債務", "政府資産", "日銀保有国債", "対外純資産", "名目GDP"],
+  },
+  {
+    situation: "賃金上昇がまだ定着していない場合",
+    overseas: "雇用と賃金の回復を確認してから、金融引き締めへ移ることがあります。",
+    japan:
+      "実質賃金や中小企業賃上げが弱い段階でも、正常化や利上げが議論されやすいことがあります。",
+    metrics: ["実質賃金", "名目賃金", "中小企業賃上げ率", "個人消費", "正社員求人倍率"],
+  },
+  {
+    situation: "内需を強くしたい場合",
+    overseas: "国内需要を企業売上、設備投資、雇用、賃金上昇につなげる政策を重視することがあります。",
+    japan: "輸入物価や円安への警戒が先に立ち、内需拡大策が弱くなることがあります。",
+    metrics: ["個人消費", "設備投資", "国内売上", "雇用者数", "賃金", "輸入依存度"],
+  },
+];
+
 const checkItems = [
   "比較対象国の景気局面は同じか。",
   "需要不足か、需要超過か。",
@@ -154,6 +197,71 @@ export default function EconomicPolicyComparisonPage() {
           公開済み政策提言やForum投稿を読む前に、日本の政策判断が海外と比べて何を前提にしているのかを確認します。
           海外礼賛や日本批判ではなく、比較可能な条件をそろえるための親ページです。
         </p>
+      </section>
+
+      <section style={{ ...sectionStyle, marginBottom: 18 }}>
+        <h2 style={{ margin: 0, fontSize: 22 }}>局面別に見る政策比較</h2>
+        <p style={{ margin: "8px 0 0", color: "#475569", lineHeight: 1.8 }}>
+          同じ経済状況でも、海外と日本では政策判断が違う場合があります。ここでは、よくある局面ごとに
+          「海外では何を重視するか」「日本では何が起こりがちか」「確認すべき指標」を簡単に整理します。
+        </p>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+            gap: 12,
+            marginTop: 14,
+          }}
+        >
+          {situationCards.map((card) => (
+            <article
+              key={card.situation}
+              style={{
+                border: "1px solid #dbe3ef",
+                borderRadius: 8,
+                background: "#f8fafc",
+                padding: 14,
+                minWidth: 0,
+              }}
+            >
+              <p style={{ margin: 0, color: "#64748b", fontSize: 12, fontWeight: 900 }}>局面</p>
+              <h3 style={{ margin: "4px 0 12px", fontSize: 18, lineHeight: 1.5 }}>{card.situation}</h3>
+              <div style={{ display: "grid", gap: 10 }}>
+                <div>
+                  <p style={{ margin: 0, color: "#0f766e", fontSize: 13, fontWeight: 900 }}>海外では</p>
+                  <p style={{ margin: "4px 0 0", color: "#334155", lineHeight: 1.75 }}>{card.overseas}</p>
+                </div>
+                <div>
+                  <p style={{ margin: 0, color: "#b45309", fontSize: 13, fontWeight: 900 }}>日本では</p>
+                  <p style={{ margin: "4px 0 0", color: "#334155", lineHeight: 1.75 }}>{card.japan}</p>
+                </div>
+                <div>
+                  <p style={{ margin: 0, color: "#334155", fontSize: 13, fontWeight: 900 }}>
+                    見るべき指標
+                  </p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 7 }}>
+                    {card.metrics.map((metric) => (
+                      <span
+                        key={`${card.situation}-${metric}`}
+                        style={{
+                          border: "1px solid #cbd5e1",
+                          borderRadius: 999,
+                          background: "#ffffff",
+                          padding: "3px 8px",
+                          color: "#475569",
+                          fontSize: 12,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {metric}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
       </section>
 
       <div style={{ display: "grid", gap: 14 }}>

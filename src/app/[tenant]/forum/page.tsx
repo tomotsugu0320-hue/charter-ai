@@ -88,6 +88,12 @@ type PublishedPolicyCard = {
   published_at: string;
 };
 
+type CompactPolicyComparison = {
+  situation: string;
+  overseas: string;
+  japan: string;
+};
+
 const ALL_CATEGORIES = "すべて";
 const TOP_CARD_LIMIT = 9;
 const SEARCH_RESULTS_PER_PAGE = 9;
@@ -331,7 +337,7 @@ const POLICY_DECISION_AREAS = [
 const CURRENT_JAPAN_POLICY_DIRECTIONS = [
   {
     key: "fiscal",
-    title: "財政政策",
+    title: "日本の財政政策",
     judgment: "引き締め寄り",
     points: [
       "財政健全化を重視",
@@ -341,7 +347,7 @@ const CURRENT_JAPAN_POLICY_DIRECTIONS = [
   },
   {
     key: "monetary",
-    title: "金融政策",
+    title: "日本の金融政策",
     judgment: "金利引き上げ・引き締め",
     points: [
       "日銀は政策金利を1.0％程度へ引き上げる方向",
@@ -351,9 +357,27 @@ const CURRENT_JAPAN_POLICY_DIRECTIONS = [
   },
   {
     key: "other",
-    title: "その他の政策",
+    title: "日本のその他の経済政策",
     judgment: "賃上げ・成長戦略",
     points: ["賃上げ", "生産性向上", "価格転嫁", "成長投資", "制度改革"],
+  },
+];
+
+const COMPACT_POLICY_COMPARISONS: CompactPolicyComparison[] = [
+  {
+    situation: "需要不足で賃金が弱い場合",
+    overseas: "需要と雇用の回復を優先",
+    japan: "財政健全化や金融正常化が先に議論されがち",
+  },
+  {
+    situation: "物価上昇が輸入コスト主導の場合",
+    overseas: "家計負担を和らげつつ需要過熱を確認",
+    japan: "物価上昇だけを見て利上げ・緊縮に寄りがち",
+  },
+  {
+    situation: "賃金上昇がまだ定着していない場合",
+    overseas: "雇用と賃金の回復を確認してから引き締め",
+    japan: "実質賃金が弱い段階でも正常化が議論されがち",
   },
 ];
 
@@ -1845,7 +1869,10 @@ export default function ForumPage() {
           ...panelStyle,
           marginBottom: 18,
           gap: 12,
-          display: "grid",
+          display: "flex",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          alignItems: "center",
           background: "#f8fafc",
           color: "#0f172a",
           border: "1px solid #cbd5e1",
@@ -1854,7 +1881,6 @@ export default function ForumPage() {
         <div
           style={{
             display: "flex",
-            justifyContent: "space-between",
             gap: 12,
             flexWrap: "wrap",
             alignItems: "center",
@@ -1863,27 +1889,12 @@ export default function ForumPage() {
           <div style={{ fontWeight: 900, fontSize: currentFontSize }}>
             表示設定
           </div>
-          <ForumHamburgerMenu
-            tenant={tenant}
-            isLoggedIn={isForumBetaLoggedIn}
-            onLoggedOut={() => setIsForumBetaLoggedIn(false)}
-          />
-        </div>
-        <div
-          style={{
-            display: "flex",
-            gap: 18,
-            flexWrap: "wrap",
-            alignItems: "center",
-          }}
-        >
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: 10,
               flexWrap: "wrap",
-              flex: "1 1 240px",
             }}
           >
             <div style={{ fontWeight: 800, minWidth: 92 }}>文字サイズ：</div>
@@ -1906,6 +1917,11 @@ export default function ForumPage() {
             </div>
           </div>
         </div>
+        <ForumHamburgerMenu
+          tenant={tenant}
+          isLoggedIn={isForumBetaLoggedIn}
+          onLoggedOut={() => setIsForumBetaLoggedIn(false)}
+        />
       </section>
 
       <header style={{ ...darkPanelStyle, marginBottom: 18 }}>
@@ -2066,6 +2082,66 @@ export default function ForumPage() {
             日本と海外の経済政策を比較する
           </Link>
         </div>
+        <section
+          style={{
+            marginTop: 10,
+            border: "1px solid #dbe3ef",
+            borderRadius: 8,
+            background: "#ffffff",
+            padding: 12,
+          }}
+        >
+          <h3 style={{ margin: 0, fontSize: 18 }}>局面別に見る政策比較</h3>
+          <p style={{ margin: "6px 0 0", color: "#475569", lineHeight: 1.7, fontSize: 14 }}>
+            よくある経済局面ごとに、海外で重視されやすい対応と、日本で起こりがちな判断を簡単に比較します。
+          </p>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
+              gap: 10,
+              marginTop: 12,
+            }}
+          >
+            {COMPACT_POLICY_COMPARISONS.map((item) => (
+              <article
+                key={item.situation}
+                style={{
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 8,
+                  background: "#f8fafc",
+                  padding: 12,
+                  minWidth: 0,
+                }}
+              >
+                <h4 style={{ margin: 0, fontSize: 15, lineHeight: 1.5 }}>{item.situation}</h4>
+                <p style={{ margin: "8px 0 0", color: "#0f766e", fontSize: 13, fontWeight: 900 }}>
+                  海外では
+                </p>
+                <p style={{ margin: "3px 0 0", color: "#334155", lineHeight: 1.6, fontSize: 14 }}>
+                  {item.overseas}
+                </p>
+                <p style={{ margin: "8px 0 0", color: "#b45309", fontSize: 13, fontWeight: 900 }}>
+                  日本では
+                </p>
+                <p style={{ margin: "3px 0 0", color: "#334155", lineHeight: 1.6, fontSize: 14 }}>
+                  {item.japan}
+                </p>
+              </article>
+            ))}
+          </div>
+          <Link
+            href={`/${tenant}/forum/economic-policy-comparison`}
+            style={{
+              display: "inline-block",
+              marginTop: 12,
+              color: "#075985",
+              fontWeight: 900,
+            }}
+          >
+            日本と海外の経済政策比較を詳しく見る
+          </Link>
+        </section>
         {isForumAdminForPolicyReview && (
           <div
             style={{
