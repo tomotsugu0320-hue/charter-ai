@@ -1227,9 +1227,15 @@ export default function ForumPage() {
   const [rankingMode, setRankingMode] = useState<RankingMode>("score");
   const [fontSizeMode, setFontSizeMode] =
     useState<"small" | "medium" | "large">("medium");
+  const [fontSizePreferenceReady, setFontSizePreferenceReady] = useState(false);
 
   const currentFontSize =
-    fontSizeMode === "small" ? 14 : fontSizeMode === "large" ? 18 : 16;
+    fontSizePreferenceReady && fontSizeMode === "small"
+      ? 14
+      : fontSizePreferenceReady && fontSizeMode === "large"
+        ? 18
+        : 16;
+  const displayedFontSizeMode = fontSizePreferenceReady ? fontSizeMode : "medium";
 
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [activeAiSummaryThreadId, setActiveAiSummaryThreadId] = useState<
@@ -1420,10 +1426,16 @@ export default function ForumPage() {
   }, [categoryFilter, node, searchQuery]);
 
   useEffect(() => {
-    const saved = localStorage.getItem("forum_font_size");
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem("forum_font_size");
+    } catch {
+      saved = null;
+    }
     if (saved === "small" || saved === "medium" || saved === "large") {
       setFontSizeMode(saved);
     }
+    setFontSizePreferenceReady(true);
   }, []);
 
   useEffect(() => {
@@ -1848,7 +1860,12 @@ export default function ForumPage() {
   }
 
   function selectFontSize(size: "small" | "medium" | "large") {
-    localStorage.setItem("forum_font_size", size);
+    try {
+      localStorage.setItem("forum_font_size", size);
+    } catch {
+      // 保存できない環境でも、その場の文字サイズ変更は有効にする。
+    }
+    setFontSizePreferenceReady(true);
     setFontSizeMode(size);
   }
 
@@ -1906,9 +1923,9 @@ export default function ForumPage() {
                   onClick={() => selectFontSize(size)}
                   style={{
                     ...ghostButtonStyle,
-                    background: fontSizeMode === size ? "#111827" : "#ffffff",
-                    color: fontSizeMode === size ? "#ffffff" : "#111827",
-                    borderColor: fontSizeMode === size ? "#111827" : "#cbd5e1",
+                    background: displayedFontSizeMode === size ? "#111827" : "#ffffff",
+                    color: displayedFontSizeMode === size ? "#ffffff" : "#111827",
+                    borderColor: displayedFontSizeMode === size ? "#111827" : "#cbd5e1",
                   }}
                 >
                   {size === "small" ? "小" : size === "medium" ? "中" : "大"}
@@ -2081,6 +2098,12 @@ export default function ForumPage() {
           >
             日本と海外の経済政策を比較する
           </Link>
+          <div style={{ marginTop: 8 }}>
+            新聞記事や経済ニュースを、短い要約・主張・前提・反論・海外比較・検証指標に分けて整理します。{" "}
+            <Link href={`/${tenant}/forum/news-check`} style={{ color: "#075985", fontWeight: 900 }}>
+              最新ニュースをAIで読み解く
+            </Link>
+          </div>
         </div>
         <section
           style={{
