@@ -190,6 +190,7 @@ function buildExternalAiDraftClaim({
   aiAnswerShort,
   aiAnswerDetail,
   aiAnswer,
+  nodeCandidate,
   supplements,
   childTopics,
   notSplitReason,
@@ -198,6 +199,7 @@ function buildExternalAiDraftClaim({
   aiAnswerShort: string;
   aiAnswerDetail: string;
   aiAnswer: string;
+  nodeCandidate: string;
   supplements: string[];
   childTopics: string[];
   notSplitReason: string;
@@ -210,6 +212,7 @@ function buildExternalAiDraftClaim({
     aiAnswerShort ? `${ANSWER_LAYER_LABELS[0]}\n${aiAnswerShort}` : "",
     aiAnswerDetail ? `${ANSWER_LAYER_LABELS[1]}\n${aiAnswerDetail}` : "",
     aiAnswer ? `AI回答・整理:\n${aiAnswer}` : "",
+    nodeCandidate ? `親テーマ候補:\n${nodeCandidate}` : "",
     supplements.length ? `補足:\n${supplements.join("\n")}` : "",
     childTopics.length ? `子論点候補:\n${childTopics.join("\n")}` : "",
     notSplitReason ? `分割しなかった理由:\n${notSplitReason}` : "",
@@ -514,6 +517,11 @@ export async function POST(req: NextRequest) {
     const aiAnswer = maskForumPrivacyText(
       String(body?.ai_answer || body?.aiAnswer || "").trim()
     );
+    const nodeCandidate = maskForumPrivacyText(
+      String(
+        body?.node || body?.node_candidate || body?.nodeCandidate || ""
+      ).trim()
+    );
     const draftSupplements = maskForumPrivacyArray(
       Array.isArray(body?.supplements)
         ? body.supplements.map((value: unknown) => String(value ?? ""))
@@ -562,13 +570,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const cleanedDraftSupplements = toCleanStringArray(draftSupplements, 8);
+    const cleanedDraftChildTopics = toCleanStringArray(draftChildTopics, 8);
     const draftClaim = buildExternalAiDraftClaim({
       claim,
       aiAnswerShort,
       aiAnswerDetail,
       aiAnswer,
-      supplements: toCleanStringArray(draftSupplements, 8),
-      childTopics: toCleanStringArray(draftChildTopics, 8),
+      nodeCandidate,
+      supplements: cleanedDraftSupplements,
+      childTopics: cleanedDraftChildTopics,
       notSplitReason,
     });
     const savedOriginalPost = originalText || draftClaim;
@@ -797,7 +808,11 @@ export async function POST(req: NextRequest) {
         issues: [title],
         opinions: initialOpinions,
         rebuttals: initialRebuttals,
-        supplements: toCleanStringArray(premises),
+        supplements: toCleanStringArray([
+          ...(nodeCandidate ? [`親テーマ候補: ${nodeCandidate}`] : []),
+          ...cleanedDraftChildTopics.map((topic) => `子論点候補: ${topic}`),
+          ...premises,
+        ]),
         explanations: toCleanStringArray(reasons),
       };
 

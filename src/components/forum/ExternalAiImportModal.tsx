@@ -1016,6 +1016,7 @@ export default function ExternalAiImportModal({
       category: candidate.category,
       main_category: candidate.category,
       sub_category: candidate.sub_category,
+      node: candidate.node,
       supplements: safeItems(candidate.supplements),
       child_topics: safeItems(candidate.child_topics),
       not_split_reason: candidate.not_split_reason,
