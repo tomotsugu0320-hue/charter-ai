@@ -79,6 +79,8 @@ const MAX_CANDIDATES = 20;
 const MAX_PRIVATE_ITEMS = 20;
 const MAX_SELECTED_CATEGORIES = 3;
 const EXTERNAL_AI_IMPORT_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const LOGIN_REQUIRED_MESSAGE =
+  "投稿にはログインが必要です。候補内容は一時保存されています。ログイン後、候補を復元して投稿できます。";
 const MAIN_CATEGORY_OPTIONS = [
   "経済・政策",
   "AI・技術",
@@ -839,6 +841,7 @@ export default function ExternalAiImportModal({
   const [sourceAi, setSourceAi] = useState("未指定");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [submitResults, setSubmitResults] = useState<Record<number, SubmitResult>>(
     {}
   );
@@ -961,6 +964,21 @@ export default function ExternalAiImportModal({
         `/${tenant}/forum?externalAiImport=1#create`
       )}`
     );
+  };
+
+  const checkForumLoginStatus = async () => {
+    try {
+      const response = await fetch("/api/forum/login/status", {
+        cache: "no-store",
+      });
+      const data: unknown = await response.json().catch(() => null);
+
+      if (!response.ok || !isRecord(data)) return null;
+
+      return data.loggedIn === true;
+    } catch {
+      return null;
+    }
   };
 
   const updateCandidate = (
@@ -1088,9 +1106,19 @@ export default function ExternalAiImportModal({
       return;
     }
 
-    setIsSubmitting(true);
     setSubmitError("");
+    setShowLoginPrompt(false);
     setNotice("");
+
+    const loggedIn = await checkForumLoginStatus();
+    if (loggedIn === false) {
+      saveImportDraft();
+      setSubmitError(LOGIN_REQUIRED_MESSAGE);
+      setShowLoginPrompt(true);
+      return;
+    }
+
+    setIsSubmitting(true);
 
     let allSubmitted = true;
     for (const { candidate, index } of selected) {
@@ -1124,6 +1152,7 @@ export default function ExternalAiImportModal({
       setRelatedByCandidate({});
       setSavedReferences({});
       setSubmitError("");
+      setShowLoginPrompt(false);
       setNotice(`${selected.length}件の投稿候補を投稿しました。`);
     }
     setIsSubmitting(false);
@@ -2515,6 +2544,25 @@ export default function ExternalAiImportModal({
                 >
                   {submitError}
                 </div>
+              )}
+
+              {showLoginPrompt && (
+                <button
+                  type="button"
+                  onClick={redirectToLogin}
+                  style={{
+                    marginTop: 10,
+                    border: "1px solid #f59e0b",
+                    borderRadius: 8,
+                    padding: "9px 12px",
+                    background: "#fffbeb",
+                    color: "#92400e",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                >
+                  ログインして投稿を再開する
+                </button>
               )}
 
               <button
