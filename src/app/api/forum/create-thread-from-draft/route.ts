@@ -693,6 +693,7 @@ export async function POST(req: NextRequest) {
       .from("forum_threads")
       .select("id")
       .eq("title", title)
+      .eq("is_deleted", false)
       .limit(1)
       .maybeSingle();
 
@@ -700,6 +701,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         threadId: existing.id,
+        created: false,
+        existing: true,
       });
     }
 
@@ -878,6 +881,8 @@ export async function POST(req: NextRequest) {
     const response = NextResponse.json({
       success: true,
       threadId,
+      created: true,
+      existing: false,
     });
 
     if (shouldSetCookie) {

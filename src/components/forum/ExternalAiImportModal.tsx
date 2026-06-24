@@ -52,6 +52,8 @@ type SubmitResult = {
   url?: string;
   error?: string;
   requiresLogin?: boolean;
+  created?: boolean;
+  existing?: boolean;
 };
 
 type RelatedThread = {
@@ -90,6 +92,12 @@ const MAIN_CATEGORY_OPTIONS = [
   "生活・健康",
   "その他",
 ];
+
+function formatSubmitSuccessMessage(result: SubmitResult) {
+  if (result.created === true) return "新規投稿を作成しました：";
+  if (result.existing === true) return "同じタイトルの既存スレッドに紐づきました：";
+  return "投稿済み：";
+}
 
 const SOURCE_AI_OPTIONS = [
   "未指定",
@@ -1075,6 +1083,8 @@ export default function ExternalAiImportModal({
       const threadId = isRecord(data)
         ? toText(data.threadId) || toText(data.id)
         : "";
+      const created = isRecord(data) ? data.created === true : undefined;
+      const existing = isRecord(data) ? data.existing === true : undefined;
 
       if (!threadId) {
         return {
@@ -1087,6 +1097,8 @@ export default function ExternalAiImportModal({
         status: "success",
         threadId,
         url: `/${tenant}/forum/thread/${threadId}`,
+        created,
+        existing,
       };
     } catch {
       return {
@@ -1121,6 +1133,7 @@ export default function ExternalAiImportModal({
     setIsSubmitting(true);
 
     let allSubmitted = true;
+    const successfulResults: SubmitResult[] = [];
     for (const { candidate, index } of selected) {
       const result = await submitCandidate(candidate);
       setSubmitResults((current) => ({
@@ -1140,20 +1153,41 @@ export default function ExternalAiImportModal({
 
       if (result.status !== "success") {
         allSubmitted = false;
+      } else {
+        successfulResults.push(result);
       }
     }
 
     if (allSubmitted) {
+      const selectedIndexes = new Set(selected.map(({ index }) => index));
+      const createdCount = successfulResults.filter(
+        (result) => result.created === true
+      ).length;
+      const existingCount = successfulResults.filter(
+        (result) => result.existing === true
+      ).length;
+      const statusParts = [
+        createdCount > 0 ? `新規作成${createdCount}件` : "",
+        existingCount > 0 ? `既存スレッド紐づき${existingCount}件` : "",
+      ].filter(Boolean);
+
       removeExternalAiImportDraft(draftStorageKey);
       setJsonInput("");
-      setCandidates([]);
+      setCandidates((current) =>
+        current.map((candidate, index) =>
+          selectedIndexes.has(index) ? { ...candidate, status: "skip" } : candidate
+        )
+      );
       setPrivateItems([]);
-      setSubmitResults({});
       setRelatedByCandidate({});
       setSavedReferences({});
       setSubmitError("");
       setShowLoginPrompt(false);
-      setNotice(`${selected.length}件の投稿候補を投稿しました。`);
+      setNotice(
+        `${selected.length}件の投稿処理が完了しました。${
+          statusParts.length > 0 ? `（${statusParts.join(" / ")}）` : ""
+        }各カードの「詳しく見る」から詳細ページを確認できます。`
+      );
     }
     setIsSubmitting(false);
   };
@@ -2500,7 +2534,7 @@ export default function ExternalAiImportModal({
                       >
                         {submitResults[index].status === "success" ? (
                           <>
-                            投稿済み：
+                            {formatSubmitSuccessMessage(submitResults[index])}
                             {submitResults[index].url ? (
                               <a
                                 href={submitResults[index].url}
