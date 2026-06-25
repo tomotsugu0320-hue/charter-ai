@@ -2659,6 +2659,11 @@ function jumpToPostForm() {
   el?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+function jumpToReplies() {
+  const el = document.getElementById("thread-replies");
+  el?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function discussionCardHint(text: string) {
   const isSelected = selectedGuide?.text.trim() === text.trim();
   const hasReadableTarget =
@@ -3049,17 +3054,31 @@ function renderDiscussionCard({
   <div style={{ flex: "1 1 280px", fontSize: currentFont.base }}>
     まずは「投稿者の問題提起 → AIが整理した問い → AIの暫定整理 → 反論・リスク」の順に読むと、この議論の全体像が分かります。
   </div>
-  <PrimaryButton
-    onClick={jumpToPostForm}
-    style={{
-      padding: "8px 12px",
-      background: "#1d4ed8",
-      color: "#ffffff",
-      border: "1px solid #1d4ed8",
-    }}
-  >
-    この議論に投稿する
-  </PrimaryButton>
+  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+    <PrimaryButton
+      variant="secondary"
+      onClick={jumpToReplies}
+      style={{
+        padding: "8px 12px",
+        border: "1px solid #bfdbfe",
+        color: "#1d4ed8",
+        background: "#ffffff",
+      }}
+    >
+      返信を見る
+    </PrimaryButton>
+    <PrimaryButton
+      onClick={jumpToPostForm}
+      style={{
+        padding: "8px 12px",
+        background: "#1d4ed8",
+        color: "#ffffff",
+        border: "1px solid #1d4ed8",
+      }}
+    >
+      返信を書く
+    </PrimaryButton>
+  </div>
 </div>
 
 <div style={{ marginTop: 8, fontSize: currentFont.base * 0.9, color: "#666" }}>
@@ -3797,9 +3816,10 @@ function renderDiscussionCard({
 )}
 
 
+<div id="thread-replies" style={{ scrollMarginTop: 120 }}>
 <SectionCard variant="white" style={{ marginTop: 24 }}>
             <SectionTitle style={{ fontSize: currentFont.title, color: "#111" }}>
-              この議論への投稿
+              みんなの投稿・返信
             </SectionTitle>
 
             <p
@@ -3811,7 +3831,7 @@ function renderDiscussionCard({
                 lineHeight: 1.6,
               }}
             >
-              意見・反論・補足をここで読めます。
+              他の人の意見や返信を読み、必要なら返信できます。
             </p>
 
             <div
@@ -4059,6 +4079,7 @@ function renderDiscussionCard({
             </div>
             </details>
           </SectionCard>
+</div>
 
 
 <SectionCard variant="white" style={{ marginTop: 24 }}>
