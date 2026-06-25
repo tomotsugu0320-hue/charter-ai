@@ -340,7 +340,7 @@ export default function OpinionView({
                 padding: "4px 0",
               }}
             >
-              {isExpanded ? "閉じる" : "意見と返信を見る"}
+              {isExpanded ? "閉じる" : "この意見を読む"}
             </button>
           )}
           <button
