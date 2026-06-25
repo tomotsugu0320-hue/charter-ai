@@ -3052,7 +3052,7 @@ function renderDiscussionCard({
   }}
 >
   <div style={{ flex: "1 1 280px", fontSize: currentFont.base }}>
-    まずは「投稿者の問題提起 → AIが整理した問い → AIの暫定整理 → 反論・リスク」の順に読むと、この議論の全体像が分かります。
+    まず投稿者の問題提起を読み、必要ならAI整理を参考にしてください。他の人の意見を読んだり、自分の意見を書いたりできます。
   </div>
   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
     <PrimaryButton
@@ -3065,7 +3065,7 @@ function renderDiscussionCard({
         background: "#ffffff",
       }}
     >
-      返信を見る
+      投稿・返信を見る
     </PrimaryButton>
     <PrimaryButton
       onClick={jumpToPostForm}
@@ -3076,7 +3076,7 @@ function renderDiscussionCard({
         border: "1px solid #1d4ed8",
       }}
     >
-      返信を書く
+      意見を書く
     </PrimaryButton>
   </div>
 </div>
