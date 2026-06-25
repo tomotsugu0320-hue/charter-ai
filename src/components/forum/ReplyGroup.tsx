@@ -95,14 +95,14 @@ function classificationBadgeStyle(classification?: string | null) {
     alignItems: "center",
     gap: 6,
     borderRadius: 999,
-    padding: "2px 8px",
-    fontSize: 12,
-    fontWeight: 700,
+    padding: "1px 7px",
+    fontSize: 11,
+    fontWeight: 600,
     lineHeight: 1.4,
     whiteSpace: "nowrap" as const,
-    border: isReview ? "1px solid #fde68a" : "1px solid #cbd5e1",
-    background: isReview ? "#fffbeb" : "#f8fafc",
-    color: isReview ? "#92400e" : "#475569",
+    border: isReview ? "1px solid #fde68a" : "1px solid #e2e8f0",
+    background: isReview ? "#fffbeb" : "#ffffff",
+    color: isReview ? "#92400e" : "#64748b",
   };
 }
 
@@ -128,12 +128,24 @@ export default function ReplyGroup({
       <div
         style={{
           marginTop: 10,
-          paddingLeft: 12,
-          borderLeft: "3px solid #ddd",
+          padding: "10px 0 0 14px",
+          borderLeft: "2px solid #cbd5e1",
           display: "grid",
           gap: 8,
         }}
       >
+        <div
+          style={{
+            color: "#64748b",
+            fontSize: 12,
+            fontWeight: 600,
+            lineHeight: 1.5,
+            marginBottom: 2,
+          }}
+        >
+          この意見に対する返信です
+        </div>
+
         {op.children.map((child: any) => {
           const childScore = child.logic_score ?? 0;
           const split = splitContent(child.content);
@@ -169,10 +181,11 @@ export default function ReplyGroup({
             <PostCard
               key={child.id}
               style={{
-                background: "#fafafa",
-                border: "1px solid #ddd",
+                background: "#ffffff",
+                border: "1px solid #e5e7eb",
                 color: "#111",
                 opacity: childOpacity,
+                boxShadow: "none",
               }}
             >
               <div
@@ -190,11 +203,19 @@ export default function ReplyGroup({
                     flexWrap: "wrap",
                     alignItems: "center",
                     gap: 6,
-                    fontWeight: 700,
-                    color: roleColor(child.post_role),
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#64748b",
                   }}
                 >
-                  <span>{roleLabel(child.post_role)}</span>
+                  <span
+                    style={{
+                      color: roleColor(child.post_role),
+                      fontWeight: 700,
+                    }}
+                  >
+                    {roleLabel(child.post_role)}
+                  </span>
                   <span style={{ color: "#64748b" }}>・</span>
                   <span>
                     AI評価{" "}
