@@ -394,9 +394,9 @@ const feedbackActions = [
           </span>
 <span style={scoreBadgeStyle(hasLogicScoreReason ? score : null)}>
   {score === null || score === undefined
-    ? "AI論理スコア 未評価"
+    ? "AI評価 未評価"
     : hasLogicScoreReason
-    ? `AI論理スコア ${score}点`
+    ? `AI評価 ${score}点`
     : `参考スコア ${score}点`}
 </span>
           {aiClassificationLabel && (
@@ -446,14 +446,15 @@ const feedbackActions = [
           )}
           <span
             style={{
-              color: "#64748b",
-              fontSize: currentFont?.base ? currentFont.base * 0.78 : 12,
-              fontWeight: 600,
-              lineHeight: 1.4,
+              color: "#94a3b8",
+              fontSize: currentFont?.base ? currentFont.base * 0.68 : 10,
+              fontWeight: 500,
+              lineHeight: 1.3,
+              opacity: 0.75,
               wordBreak: "break-all",
             }}
           >
-            PostID: {op.opinion.id}
+            投稿ID: {op.opinion.id}
           </span>
         </div>
 
@@ -580,7 +581,7 @@ window.dispatchEvent(new Event("scroll-to-post-form"));
               fontWeight: 800,
             }}
           >
-            AI論理スコアの理由
+            AI評価の理由
           </div>
           <div>{displayLogicScoreReason}</div>
           {shouldShowLogicBreakNote && (

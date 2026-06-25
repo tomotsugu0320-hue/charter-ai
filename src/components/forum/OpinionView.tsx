@@ -296,19 +296,20 @@ export default function OpinionView({
                 fontSize: currentFont.base,
               }}
             >
-              意見・AI論理スコア {op.opinion.logic_score ?? "-"}
+              意見・AI評価 {op.opinion.logic_score ?? "-"}
             </div>
           )}
           <div
             style={{
-              color: "#64748b",
-              fontSize: currentFont.base * 0.78,
-              fontWeight: 600,
-              lineHeight: 1.4,
+              color: "#94a3b8",
+              fontSize: currentFont.base * 0.68,
+              fontWeight: 500,
+              lineHeight: 1.3,
+              opacity: 0.75,
               overflowWrap: "anywhere",
             }}
           >
-            PostID: {op.opinion.id}
+            投稿ID: {op.opinion.id}
           </div>
         </div>
 
@@ -433,7 +434,7 @@ export default function OpinionView({
               fontSize: currentFont.base * 0.85,
             }}
           >
-            開くと反論・補足も見られます
+            開くとこの意見への返信も見られます
           </div>
           {replyCount > 0 && (
             <div
@@ -443,7 +444,7 @@ export default function OpinionView({
                 fontSize: currentFont.base * 0.85,
               }}
             >
-              反論・補足あり（{replyCount}件）
+              この意見への返信（{replyCount}件）
             </div>
           )}
         </div>

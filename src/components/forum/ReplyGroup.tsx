@@ -122,7 +122,7 @@ export default function ReplyGroup({
           color: "#555",
         }}
       >
-        反論・補足を見る（{op.children.length}件）
+        この意見への返信（{op.children.length}件）
       </summary>
 
       <div
@@ -194,11 +194,14 @@ export default function ReplyGroup({
                     color: roleColor(child.post_role),
                   }}
                 >
-                  {roleLabel(child.post_role)}（
-                  <span style={{ color: scoreColor(childScore) }}>
-                    {childScore || "未評価"}
+                  <span>{roleLabel(child.post_role)}</span>
+                  <span style={{ color: "#64748b" }}>・</span>
+                  <span>
+                    AI評価{" "}
+                    <span style={{ color: scoreColor(childScore) }}>
+                      {childScore || "未評価"}
+                    </span>
                   </span>
-                  ）
                 </div>
 
                 {aiClassificationLabel && (
