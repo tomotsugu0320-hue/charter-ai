@@ -1869,6 +1869,18 @@ export default function ForumPage() {
     setFontSizeMode(size);
   }
 
+  function scrollToForumSection(sectionId: string) {
+    const scroll = () => {
+      document
+        .getElementById(sectionId)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+
+    scroll();
+    window.setTimeout(scroll, 500);
+    window.setTimeout(scroll, 1200);
+  }
+
   const renderedPremises = generatedIssue?.premises ?? [];
   const renderedReasons = generatedIssue?.reasons ?? [];
   const renderedConflicts = generatedIssue?.conflicts ?? [];
@@ -2026,6 +2038,77 @@ export default function ForumPage() {
           </p>
         )}
       </header>
+
+      <section
+        style={{
+          ...panelStyle,
+          marginBottom: 18,
+          background: "#f8fafc",
+          border: "1px solid #cbd5e1",
+          color: "#0f172a",
+        }}
+      >
+        <div style={{ marginBottom: 12 }}>
+          <h2 style={{ margin: 0, fontSize: 20 }}>まず何をしますか？</h2>
+          <p
+            style={{
+              margin: "6px 0 0",
+              color: "#475569",
+              fontSize: currentFontSize - 2,
+              lineHeight: 1.6,
+            }}
+          >
+            新しい議論を読む、自分の意見を書く、過去の会話から投稿候補を作る入口です。
+          </p>
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+            gap: 10,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => scrollToForumSection("latest-threads")}
+            style={{
+              ...ghostButtonStyle,
+              justifyContent: "center",
+              background: "#ffffff",
+              color: "#0f172a",
+              borderColor: "#cbd5e1",
+            }}
+          >
+            新着の議論を読む
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToForumSection("post-entry")}
+            style={{
+              ...ghostButtonStyle,
+              justifyContent: "center",
+              background: "#111827",
+              color: "#ffffff",
+              borderColor: "#111827",
+            }}
+          >
+            意見を書く
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsExternalAiImportOpen(true)}
+            style={{
+              ...ghostButtonStyle,
+              justifyContent: "center",
+              background: "#2563eb",
+              color: "#ffffff",
+              borderColor: "#2563eb",
+            }}
+          >
+            過去の会話から投稿候補を作る
+          </button>
+        </div>
+      </section>
 
       <section
         style={{
@@ -2540,7 +2623,7 @@ export default function ForumPage() {
         </div>
       </section>
 
-      <section style={{ ...panelStyle, marginBottom: 18 }}>
+      <section id="post-entry" style={{ ...panelStyle, marginBottom: 18 }}>
         <div style={{ marginBottom: 14 }}>
           <h2 style={{ margin: 0, fontSize: 22 }}>投稿する・投稿候補を作る</h2>
           <p
@@ -3008,6 +3091,7 @@ export default function ForumPage() {
     </section>
 
       <section
+        id="latest-threads"
         style={{
           ...panelStyle,
           marginBottom: 22,
