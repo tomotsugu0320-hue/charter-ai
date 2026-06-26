@@ -2059,6 +2059,18 @@ export default function ForumPage() {
             }}
           >
             新着を読む、ChatGPTなど、あなたとAIとの会話ログを貼って投稿候補を作る、新しい議論を下書きする入口です。
+            {" "}
+            <Link
+              href={`/${tenant}/forum/external-ai-import-guide`}
+              style={{
+                color: "#2563eb",
+                fontWeight: 900,
+                textDecoration: "underline",
+                textUnderlineOffset: 3,
+              }}
+            >
+              外部AI取り込みの使い方
+            </Link>
           </p>
         </div>
         <div

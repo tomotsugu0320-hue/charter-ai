@@ -1442,6 +1442,19 @@ export default function ExternalAiImportModal({
             <p style={{ margin: "8px 0 0", color: "#475569", lineHeight: 1.7 }}>
               外部AIで会話ログを整理し、返ってきたJSONから投稿候補を作ります。
             </p>
+            <a
+              href={`/${tenant}/forum/external-ai-import-guide`}
+              style={{
+                display: "inline-block",
+                marginTop: 8,
+                color: "#2563eb",
+                fontWeight: 900,
+                textDecoration: "underline",
+                textUnderlineOffset: 3,
+              }}
+            >
+              詳しい使い方を見る
+            </a>
           </div>
           <button type="button" onClick={onClose} style={buttonStyle}>
             閉じる
