@@ -2058,7 +2058,7 @@ export default function ForumPage() {
               lineHeight: 1.6,
             }}
           >
-            新しい議論を読む、下書きをAIで整理して投稿へ進む、過去の会話から投稿候補を作る入口です。
+            新着を読む、ChatGPTなどとの会話ログから投稿候補を作る、新しい議論を下書きする入口です。
           </p>
         </div>
         <div
@@ -2083,19 +2083,6 @@ export default function ForumPage() {
           </button>
           <button
             type="button"
-            onClick={() => scrollToForumSection("post-entry")}
-            style={{
-              ...ghostButtonStyle,
-              justifyContent: "center",
-              background: "#111827",
-              color: "#ffffff",
-              borderColor: "#111827",
-            }}
-          >
-            新しい議論を作る
-          </button>
-          <button
-            type="button"
             onClick={() => setIsExternalAiImportOpen(true)}
             style={{
               ...ghostButtonStyle,
@@ -2105,7 +2092,20 @@ export default function ForumPage() {
               borderColor: "#2563eb",
             }}
           >
-            過去の会話から投稿候補を作る
+            過去のAI会話から投稿候補を作る
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToForumSection("thread-draft-input")}
+            style={{
+              ...ghostButtonStyle,
+              justifyContent: "center",
+              background: "#111827",
+              color: "#ffffff",
+              borderColor: "#111827",
+            }}
+          >
+            新しい議論を作る
           </button>
         </div>
       </section>
