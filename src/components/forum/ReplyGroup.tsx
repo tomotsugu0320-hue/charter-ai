@@ -87,6 +87,37 @@ function formatConfidence(confidence?: number | null) {
   return `信頼度 ${rounded}%`;
 }
 
+function formatPostDate(value?: string | null) {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function sourceTypeLabel(sourceType?: string | null) {
+  return sourceType === "ai" ? "AI整理から作成" : "人の投稿";
+}
+
+function postMetaText(
+  authorLabel: string,
+  createdAt?: string | null,
+  sourceType?: string | null
+) {
+  return [authorLabel, formatPostDate(createdAt), sourceTypeLabel(sourceType)]
+    .filter(Boolean)
+    .join(" ・ ");
+}
+
 function classificationBadgeStyle(classification?: string | null) {
   const isReview = classification === "needs_review_or_misinformation_risk";
 
@@ -162,6 +193,11 @@ export default function ReplyGroup({
           const aiClassificationTitle = aiClassification?.reason
             ? `理由: ${aiClassification.reason}`
             : undefined;
+          const metaText = postMetaText(
+            "返信者",
+            child.created_at,
+            child.source_type
+          );
           const canHideChild =
             !!onHidePost &&
             child.can_delete === true;
@@ -188,6 +224,18 @@ export default function ReplyGroup({
                 boxShadow: "none",
               }}
             >
+              <div
+                style={{
+                  marginBottom: 8,
+                  color: "#64748b",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  lineHeight: 1.5,
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {metaText}
+              </div>
               <div
                 style={{
                   display: "flex",
