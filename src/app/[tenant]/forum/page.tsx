@@ -2058,7 +2058,7 @@ export default function ForumPage() {
               lineHeight: 1.6,
             }}
           >
-            新着を読む、ChatGPTなどとの会話ログから投稿候補を作る、新しい議論を下書きする入口です。
+            新着を読む、ChatGPTなど、あなたとAIとの会話ログを貼って投稿候補を作る、新しい議論を下書きする入口です。
           </p>
         </div>
         <div
@@ -2092,7 +2092,7 @@ export default function ForumPage() {
               borderColor: "#2563eb",
             }}
           >
-            過去のAI会話から投稿候補を作る
+            スマホ・PCのAI会話から作る
           </button>
           <button
             type="button"
