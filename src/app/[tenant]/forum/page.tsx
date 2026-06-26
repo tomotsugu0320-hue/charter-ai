@@ -2058,7 +2058,7 @@ export default function ForumPage() {
               lineHeight: 1.6,
             }}
           >
-            新しい議論を読む、自分の意見を書く、過去の会話から投稿候補を作る入口です。
+            新しい議論を読む、下書きをAIで整理して投稿へ進む、過去の会話から投稿候補を作る入口です。
           </p>
         </div>
         <div
@@ -2092,7 +2092,7 @@ export default function ForumPage() {
               borderColor: "#111827",
             }}
           >
-            意見を書く
+            新しい議論を作る
           </button>
           <button
             type="button"
@@ -2635,6 +2635,16 @@ export default function ForumPage() {
             }}
           >
             過去の会話やメモから投稿候補を作るか、自分の考えを直接書いて投稿できます。
+          </p>
+          <p
+            style={{
+              margin: "8px 0 0",
+              color: "#64748b",
+              fontSize: currentFontSize - 2,
+              lineHeight: 1.7,
+            }}
+          >
+            この段階ではまだ投稿されません。入力内容をAIで整理したあと、新しい議論として作成できます。
           </p>
         </div>
 
@@ -3931,7 +3941,7 @@ export default function ForumPage() {
               {selectedThreadId ? (
                 <>
                   <div style={{ ...smallMetaStyle }}>
-                    選択したスレッドの詳細画面へ移動します。
+                    このスレッドに参加する場合は、移動先の詳細ページで返信できます。ここではまだ投稿されません。
                   </div>
                   <Link
                     href={`/${tenant}/forum/thread/${selectedThreadId}`}
