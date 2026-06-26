@@ -562,7 +562,7 @@ const supabase = createClient(
 );
 
 // ① 投稿保存
-const { error } = await supabase
+const { data: insertedPosts, error } = await supabase
   .from("forum_posts")
 .insert({
   thread_id: threadId,
@@ -627,6 +627,7 @@ await supabase
 
 const res = NextResponse.json({
   success: true,
+  postId: insertedPosts?.[0]?.id ?? null,
 });
 
 res.headers.set(

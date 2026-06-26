@@ -1181,6 +1181,7 @@ export default function ForumThreadPage({ params }: PageProps) {
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [postLoginRequired, setPostLoginRequired] = useState(false);
+  const [postSuccessMessage, setPostSuccessMessage] = useState<string | null>(null);
   const [isThreadMenuOpen, setIsThreadMenuOpen] = useState(false);
   const [isForumBetaLoggedIn, setIsForumBetaLoggedIn] = useState<boolean | null>(
     null
@@ -1197,6 +1198,13 @@ const [feedbackLoadingPostId, setFeedbackLoadingPostId] = useState<string | null
 
 const [summaryLoading, setSummaryLoading] = useState(false);
 const [summaryNotice, setSummaryNotice] = useState<string | null>(null);
+
+useEffect(() => {
+  if (typeof window === "undefined") return;
+  if (window.location.hash.startsWith("#post-")) {
+    setSortType("new");
+  }
+}, []);
 
 
   const [thread, setThread] = useState<ThreadRow | null>(null);
@@ -2518,6 +2526,7 @@ if (postRole === "rebuttal" && !replyToOpinionId) {
     setPosting(true);
     setError(null);
     setPostLoginRequired(false);
+    setPostSuccessMessage(null);
 
     try {
       const res = await fetch("/api/forum/add-post", {
@@ -2551,6 +2560,9 @@ if (postRole === "rebuttal" && !replyToOpinionId) {
         throw new Error(result?.error || "投稿失敗");
       }
 
+      const createdPostId =
+        typeof result?.postId === "string" ? result.postId : "";
+
       setReplyToOpinionId(null);
       setText("");
       setPostRole("opinion");
@@ -2559,9 +2571,23 @@ if (postRole === "rebuttal" && !replyToOpinionId) {
       setPredictionTarget("");
       setPredictionDeadline("");
       setSelectedGuide(null);
+      setSearchText("");
+      setSortType("new");
+      setPostSuccessMessage("投稿しました。新着投稿として表示しています。");
       setPostLoginRequired(false);
       clearReplyDraft();
       await loadThread();
+
+      if (createdPostId && typeof window !== "undefined") {
+        window.setTimeout(() => {
+          const elementId = `post-${createdPostId}`;
+          const el = document.getElementById(elementId);
+          if (!el) return;
+
+          window.history.replaceState(null, "", `#${elementId}`);
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 200);
+      }
     } catch (e: any) {
       console.error(e);
       setError(e?.message || "投稿失敗");
@@ -2655,6 +2681,18 @@ function jumpToMainIssues() {
 }
 
 function jumpToPostForm() {
+  setPostRole("opinion");
+  setReplyToOpinionId(null);
+  setSelectedGuide(null);
+  setStanceLabel("unknown");
+  setPredictionFlag(false);
+  setPredictionTarget("");
+  setPredictionDeadline("");
+  setRebuttalClaim("");
+  setRebuttalPremise("");
+  setRebuttalReason("");
+  setPostLoginRequired(false);
+  setPostSuccessMessage(null);
   const el = document.getElementById("post-form");
   el?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -5475,6 +5513,25 @@ function renderDiscussionCard({
               </div>
             )}
 
+            {postSuccessMessage && (
+              <div
+                role="status"
+                style={{
+                  marginTop: 12,
+                  border: "1px solid #bbf7d0",
+                  borderRadius: 10,
+                  padding: 12,
+                  background: "#f0fdf4",
+                  color: "#166534",
+                  fontSize: currentFont.base,
+                  fontWeight: 800,
+                  lineHeight: 1.7,
+                }}
+              >
+                {postSuccessMessage}
+              </div>
+            )}
+
             <div style={{ marginTop: 12, display: "flex", gap: 12, flexWrap: "wrap" }}>
               <PrimaryButton onClick={handlePost} disabled={posting}>
                 {posting ? "投稿中..." : postSubmitLabel(postRole)}
@@ -5498,6 +5555,8 @@ function renderDiscussionCard({
                   setRelatedPosts([]);
                   setRelatedSummary(null);
                   setLoadingRelated(false);
+                  setPostLoginRequired(false);
+                  setPostSuccessMessage(null);
                 }}
                 disabled={posting}
               >
