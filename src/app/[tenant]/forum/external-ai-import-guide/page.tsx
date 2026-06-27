@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import LinkButton from "@/components/forum/LinkButton";
+import GuideImageLightbox from "@/components/forum/GuideImageLightbox";
 import SectionCard from "@/components/forum/SectionCard";
 import SectionTitle from "@/components/forum/SectionTitle";
 
@@ -130,18 +131,9 @@ export default async function ExternalAiImportGuidePage({ params }: PageProps) {
         <p style={{ ...textStyle, marginBottom: 14 }}>
           全体の流れは、Forumで取り込みプロンプトをコピーし、ChatGPTなどに会話ログと一緒に渡し、AIの出力結果をForumへ貼り戻して候補を確認する、という順番です。
         </p>
-        <img
+        <GuideImageLightbox
           src="/forum/external-ai-import-guide/overview.png"
           alt="外部AI取り込みの使い方を6ステップで説明した図"
-          style={{
-            display: "block",
-            width: "100%",
-            maxWidth: 940,
-            height: "auto",
-            border: "1px solid #d7dde8",
-            borderRadius: 8,
-            background: "#ffffff",
-          }}
         />
       </SectionCard>
 
