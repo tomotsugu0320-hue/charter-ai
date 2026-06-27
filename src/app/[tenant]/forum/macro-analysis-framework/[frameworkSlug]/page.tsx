@@ -104,6 +104,100 @@ function MetricChips({ framework }: { framework: MacroFramework }) {
   );
 }
 
+function DiscussionLinks({
+  tenant,
+  framework,
+}: {
+  tenant: string;
+  framework: MacroFramework;
+}) {
+  const searchHref = `/${tenant}/forum?keyword=${encodeURIComponent(framework.title)}`;
+  const createHref = `/${tenant}/forum#post-entry`;
+
+  return (
+    <section
+      style={{
+        ...sectionStyle,
+        borderColor: "#bae6fd",
+        background: "#f0f9ff",
+      }}
+    >
+      <h2 style={{ margin: 0, fontSize: 22 }}>この理論について議論する</h2>
+      <p style={textStyle}>
+        AIの説明に反論や補足がある場合は、前提・根拠・確認指標を示して投稿できます。
+        {framework.title}
+        を日本経済に当てはめるとき、どこが有効で、どこに限界があるのかを確認できます。
+      </p>
+      <p style={textStyle}>
+        肩書きや印象ではなく、前提、因果関係、指標、反論、あとで検証できる点を分けて議論するための入口です。
+      </p>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+          gap: 10,
+          marginTop: 14,
+        }}
+      >
+        <Link
+          href={searchHref}
+          style={{
+            border: "1px solid #7dd3fc",
+            borderRadius: 8,
+            background: "#ffffff",
+            color: "#075985",
+            textDecoration: "none",
+            padding: 12,
+            fontWeight: 900,
+            minWidth: 0,
+          }}
+        >
+          関連する議論を検索する
+          <span
+            style={{
+              display: "block",
+              marginTop: 4,
+              color: "#64748b",
+              fontSize: 13,
+              fontWeight: 700,
+              lineHeight: 1.6,
+            }}
+          >
+            Forum内で「{framework.title}」に近い議論を探します。
+          </span>
+        </Link>
+        <Link
+          href={createHref}
+          style={{
+            border: "1px solid #7dd3fc",
+            borderRadius: 8,
+            background: "#ffffff",
+            color: "#075985",
+            textDecoration: "none",
+            padding: 12,
+            fontWeight: 900,
+            minWidth: 0,
+          }}
+        >
+          この理論で新しい議論を作る
+          <span
+            style={{
+              display: "block",
+              marginTop: 4,
+              color: "#64748b",
+              fontSize: 13,
+              fontWeight: 700,
+              lineHeight: 1.6,
+            }}
+          >
+            投稿欄で論点を書き、AIで整理してから新しい議論にできます。
+          </span>
+        </Link>
+      </div>
+    </section>
+  );
+}
+
 export default async function MacroFrameworkDetailPage({ params }: PageProps) {
   const { tenant, frameworkSlug } = await params;
   const framework = findMacroFramework(frameworkSlug);
@@ -153,6 +247,7 @@ export default async function MacroFrameworkDetailPage({ params }: PageProps) {
       <MetricChips framework={framework} />
       <ListSection title="誤用リスク" items={framework.misuseRisks} />
       <ListSection title="AIで日本経済を分析すると何が見えるか" items={framework.aiAnalysis} />
+      <DiscussionLinks tenant={tenant} framework={framework} />
 
       <section style={{ ...sectionStyle, background: "#f8fafc" }}>
         <h2 style={{ margin: 0, fontSize: 22 }}>ほかの分析フレームも見る</h2>
