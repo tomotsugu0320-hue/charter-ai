@@ -3,7 +3,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import ExternalAiImportModal from "@/components/forum/ExternalAiImportModal";
@@ -1244,6 +1244,7 @@ export default function ForumPage() {
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [searchResultPage, setSearchResultPage] = useState(1);
+  const lastAutoScrolledKeywordRef = useRef("");
   const [analyzeScrollKey, setAnalyzeScrollKey] = useState(0);
   const [relatedThreads, setRelatedThreads] = useState<RelatedThread[]>([]);
   const [generatedIssue, setGeneratedIssue] = useState<GeneratedIssue | null>(null);
@@ -1424,6 +1425,27 @@ export default function ForumPage() {
   useEffect(() => {
     setSearchResultPage(1);
   }, [categoryFilter, node, searchQuery]);
+
+  useEffect(() => {
+    const trimmedKeyword = keyword.trim();
+    if (
+      !trimmedKeyword ||
+      !hasSearchResultContext ||
+      lastAutoScrolledKeywordRef.current === trimmedKeyword
+    ) {
+      return;
+    }
+
+    lastAutoScrolledKeywordRef.current = trimmedKeyword;
+    const scrollTimer = window.setTimeout(() => {
+      document.getElementById("forum-search-results")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 100);
+
+    return () => window.clearTimeout(scrollTimer);
+  }, [hasSearchResultContext, keyword]);
 
   useEffect(() => {
     let saved: string | null = null;
@@ -2931,6 +2953,7 @@ export default function ForumPage() {
 
       {hasSearchResultContext && (
         <section
+          id="forum-search-results"
           style={{
             ...panelStyle,
             marginBottom: 22,
