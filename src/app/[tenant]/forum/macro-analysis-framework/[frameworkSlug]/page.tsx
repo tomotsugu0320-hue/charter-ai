@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
+import MacroFrameworkRelatedThreads from "@/components/forum/MacroFrameworkRelatedThreads";
 import {
   findMacroFramework,
   macroFrameworks,
@@ -131,6 +132,12 @@ function DiscussionLinks({
       <p style={textStyle}>
         肩書きや印象ではなく、前提、因果関係、指標、反論、あとで検証できる点を分けて議論するための入口です。
       </p>
+      <MacroFrameworkRelatedThreads
+        tenant={tenant}
+        frameworkTitle={framework.title}
+        metrics={framework.metrics}
+        lookAt={framework.lookAt}
+      />
       <div
         style={{
           display: "grid",
