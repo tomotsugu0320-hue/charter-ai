@@ -26,6 +26,7 @@ type ConflictPair = {
 
 type StoredSummaryRow = {
   summary_type?: string | null;
+  status?: string | null;
   summary_text?: string | null;
   easy_summary_text?: string | null;
   key_points?: unknown;
@@ -518,7 +519,7 @@ if (!thread) {
     const { data: storedSummary, error: storedSummaryError } = await supabase
       .from("thread_ai_structures")
       .select(
-        "summary_type, summary_text, easy_summary_text, key_points, issues, opinions, rebuttals, supplements, explanations"
+        "summary_type, status, summary_text, easy_summary_text, key_points, issues, opinions, rebuttals, supplements, explanations"
       )
       .eq("thread_id", threadId)
       .maybeSingle();
@@ -526,6 +527,10 @@ if (!thread) {
     if (storedSummaryError) {
       console.warn("[thread-detail summary skipped]", storedSummaryError.message);
     }
+
+    const hasPolicyProposalCandidate =
+      storedSummary?.summary_type === "thread_summary_from_classifications" &&
+      storedSummary?.status === "active";
 
     const storedSummaryPayload = buildStoredSummaryPayload(
       (storedSummary ?? null) as StoredSummaryRow | null,
@@ -609,7 +614,10 @@ if (!thread) {
 
     return NextResponse.json({
       success: true,
-      thread,
+      thread: {
+        ...thread,
+        has_policy_proposal_candidate: hasPolicyProposalCandidate,
+      },
       posts: postsWithFeedback,
       feedback_summary: feedbackSummary,
       summary: storedSummaryPayload?.summary ?? null,

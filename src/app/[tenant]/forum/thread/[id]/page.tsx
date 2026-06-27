@@ -27,6 +27,7 @@ type ThreadRow = {
   ai_premises?: string[];
   ai_reasons?: string[];
   ai_conflicts?: { opinion: string; rebuttal: string }[];
+  has_policy_proposal_candidate?: boolean;
 };
 
 
@@ -3747,29 +3748,46 @@ function renderDiscussionCard({
       </details>
     )}
 
-    <div
-      style={{
-        marginTop: 12,
-        border: "1px solid #bfdbfe",
-        borderRadius: 10,
-        background: "#ffffff",
-        padding: 12,
-      }}
-    >
+    {thread.has_policy_proposal_candidate === true ? (
       <div
         style={{
-          color: "#475569",
-          fontSize: currentFont.base * 0.9,
-          lineHeight: 1.6,
-          marginBottom: 10,
+          marginTop: 12,
+          border: "1px solid #bfdbfe",
+          borderRadius: 10,
+          background: "#ffffff",
+          padding: 12,
         }}
       >
-        このAI再総括をもとに、政策判断に必要な項目へ並べ替えた確認ページです。
+        <div
+          style={{
+            color: "#475569",
+            fontSize: currentFont.base * 0.9,
+            lineHeight: 1.6,
+            marginBottom: 10,
+          }}
+        >
+          このAI再総括をもとに、政策判断に必要な項目へ並べ替えた確認ページです。
+        </div>
+        <LinkButton href={`/${tenant}/forum/policy-proposals/${thread.id}`}>
+          政策提言候補を見る
+        </LinkButton>
       </div>
-      <LinkButton href={`/${tenant}/forum/policy-proposals/${thread.id}`}>
-        政策提言候補を見る
-      </LinkButton>
-    </div>
+    ) : (
+      <div
+        style={{
+          marginTop: 12,
+          border: "1px solid #e2e8f0",
+          borderRadius: 10,
+          background: "#f8fafc",
+          padding: 12,
+          color: "#64748b",
+          fontSize: currentFont.base * 0.9,
+          lineHeight: 1.6,
+        }}
+      >
+        政策提言候補はまだ作成されていません。分類済みコメントを反映したAI再総括が作成されると、政策提言候補として確認できます。
+      </div>
+    )}
   </div>
 )}
 
