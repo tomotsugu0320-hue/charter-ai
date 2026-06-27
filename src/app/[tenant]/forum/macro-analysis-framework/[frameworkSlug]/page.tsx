@@ -113,7 +113,21 @@ function DiscussionLinks({
   framework: MacroFramework;
 }) {
   const searchHref = `/${tenant}/forum?keyword=${encodeURIComponent(framework.title)}`;
-  const createHref = `/${tenant}/forum#post-entry`;
+  const draftBody = `${framework.title}で見ると、日本経済にはどの政策対応が妥当なのか
+
+${framework.title}を日本経済に当てはめるとき、どの前提が重要なのかを確認したいです。
+
+確認したい点：
+- 現在の日本経済は需要不足なのか、需要過熱なのか
+- この理論では、どの政策が所得・雇用・物価にどう影響すると考えられるのか
+- この理論を日本に当てはめるとき、どこに限界があるのか
+- どの指標で判断すべきか
+
+この理論の説明ページ：
+/${tenant}/forum/macro-analysis-framework/${framework.slug}`;
+  const createHref = `/${tenant}/forum?draftBody=${encodeURIComponent(
+    draftBody
+  )}#post-entry`;
 
   return (
     <section

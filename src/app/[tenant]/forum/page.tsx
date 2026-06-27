@@ -1194,6 +1194,7 @@ export default function ForumPage() {
   const keyword = searchParams.get("keyword") || "";
   const goal = searchParams.get("goal") || "";
   const node = searchParams.get("node") || "";
+  const draftBody = searchParams.get("draftBody") || "";
   const shouldOpenExternalAiImport =
     searchParams.get("externalAiImport") === "1";
   const fallbackSelectedNodeInfo = NODE_INFO[node];
@@ -1245,6 +1246,7 @@ export default function ForumPage() {
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [searchResultPage, setSearchResultPage] = useState(1);
   const lastAutoScrolledKeywordRef = useRef("");
+  const appliedDraftBodyRef = useRef("");
   const [analyzeScrollKey, setAnalyzeScrollKey] = useState(0);
   const [relatedThreads, setRelatedThreads] = useState<RelatedThread[]>([]);
   const [generatedIssue, setGeneratedIssue] = useState<GeneratedIssue | null>(null);
@@ -1427,6 +1429,10 @@ export default function ForumPage() {
   }, [categoryFilter, node, searchQuery]);
 
   useEffect(() => {
+    if (draftBody.trim()) {
+      return;
+    }
+
     const trimmedKeyword = keyword.trim();
     if (
       !trimmedKeyword ||
@@ -1445,7 +1451,7 @@ export default function ForumPage() {
     }, 100);
 
     return () => window.clearTimeout(scrollTimer);
-  }, [hasSearchResultContext, keyword]);
+  }, [draftBody, hasSearchResultContext, keyword]);
 
   useEffect(() => {
     let saved: string | null = null;
@@ -1461,11 +1467,33 @@ export default function ForumPage() {
   }, []);
 
   useEffect(() => {
+    const initialDraftBody = draftBody.trim();
+    if (initialDraftBody) {
+      if (appliedDraftBodyRef.current === draftBody) {
+        return;
+      }
+
+      appliedDraftBodyRef.current = draftBody;
+      setText(initialDraftBody);
+      try {
+        sessionStorage.setItem(draftStorageKey, initialDraftBody);
+      } catch {
+        // sessionStorageが使えない環境でも、画面上の初期入力は反映する。
+      }
+
+      requestAnimationFrame(() => {
+        document
+          .getElementById("thread-draft-input")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      return;
+    }
+
     const saved = sessionStorage.getItem(draftStorageKey);
     if (saved) {
       setText(saved);
     }
-  }, []);
+  }, [draftBody]);
 
   useEffect(() => {
     sessionStorage.setItem(draftStorageKey, text);
