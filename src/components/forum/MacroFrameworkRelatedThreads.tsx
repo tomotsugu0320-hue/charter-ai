@@ -23,10 +23,57 @@ type RelatedThreadsState =
   | { status: "loaded"; threads: RelatedThread[] }
   | { status: "error"; threads: RelatedThread[] };
 
-function compactExcerpt(value: string | null | undefined) {
+type JsonObject = Record<string, unknown>;
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function firstString(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return "";
+}
+
+function extractJsonExcerpt(value: unknown) {
+  const root = Array.isArray(value) ? value[0] : value;
+  if (!isJsonObject(root)) return "";
+
+  const firstPost = Array.isArray(root.posts) ? root.posts[0] : null;
+  const post = isJsonObject(firstPost) ? firstPost : null;
+
+  return firstString(
+    post?.question,
+    post?.ai_answer,
+    post?.summary,
+    root.question,
+    root.ai_answer,
+    root.summary
+  );
+}
+
+function compactPlainText(value: string | null | undefined) {
   const text = String(value ?? "").replace(/\s+/g, " ").trim();
   if (!text) return "";
   return text.length > 120 ? `${text.slice(0, 120)}...` : text;
+}
+
+function compactExcerpt(value: string | null | undefined) {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+
+  if (text.startsWith("{") || text.startsWith("[")) {
+    try {
+      return compactPlainText(extractJsonExcerpt(JSON.parse(text)));
+    } catch {
+      return "";
+    }
+  }
+
+  return compactPlainText(text);
 }
 
 export default function MacroFrameworkRelatedThreads({
