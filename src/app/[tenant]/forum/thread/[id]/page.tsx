@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import SectionCard from "@/components/forum/SectionCard";
 import SectionTitle from "@/components/forum/SectionTitle";
 import PostCard from "@/components/forum/PostCard";
+import LinkedText from "@/components/forum/LinkedText";
 import PrimaryButton from "@/components/forum/PrimaryButton";
 import SelectableCardButton from "@/components/forum/SelectableCardButton";
 import LinkButton from "@/components/forum/LinkButton";
@@ -3204,7 +3205,7 @@ function renderDiscussionCard({
         overflowWrap: "anywhere",
       }}
     >
-      {compactText(originalIssueText, 360)}
+      <LinkedText text={compactText(originalIssueText, 360)} />
     </div>
     <div
       style={{
@@ -3248,7 +3249,7 @@ function renderDiscussionCard({
         lineHeight: 1.7,
       }}
     >
-      {compactText(questionCardText, 280)}
+      <LinkedText text={compactText(questionCardText, 280)} />
     </div>
     <div
       style={{
@@ -4226,7 +4227,7 @@ function renderDiscussionCard({
         lineHeight: 1.7,
       }}
     >
-      {thread.original_post}
+      <LinkedText text={thread.original_post} />
     </div>
   </div>
 </details>
@@ -4327,7 +4328,7 @@ function renderDiscussionCard({
           overflowWrap: "anywhere",
         }}
       >
-        {thread.original_post}
+        <LinkedText text={thread.original_post} />
       </div>
     </div>
 

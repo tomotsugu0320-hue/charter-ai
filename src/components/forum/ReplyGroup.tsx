@@ -4,6 +4,7 @@
 "use client";
 
 import PostCard from "@/components/forum/PostCard";
+import LinkedText from "@/components/forum/LinkedText";
 
 type AiClassification = {
   classification?: string | null;
@@ -310,7 +311,9 @@ export default function ReplyGroup({
 
               <div style={{ marginBottom: 6 }}>
                 <b>主張</b>
-                <div>{split.claim}</div>
+                <div>
+                  <LinkedText text={split.claim} />
+                </div>
               </div>
 
               {split.premises.length > 0 && (
@@ -318,7 +321,9 @@ export default function ReplyGroup({
                   <b>前提</b>
                   <ul style={{ paddingLeft: 20 }}>
                     {split.premises.map((p: string, i: number) => (
-                      <li key={i}>{p}</li>
+                      <li key={i}>
+                        <LinkedText text={p} />
+                      </li>
                     ))}
                   </ul>
                 </div>
@@ -329,7 +334,9 @@ export default function ReplyGroup({
                   <b>根拠</b>
                   <ul style={{ paddingLeft: 20 }}>
                     {split.reasons.map((r: string, i: number) => (
-                      <li key={i}>{r}</li>
+                      <li key={i}>
+                        <LinkedText text={r} />
+                      </li>
                     ))}
                   </ul>
                 </div>

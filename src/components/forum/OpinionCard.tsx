@@ -4,6 +4,7 @@
 "use client";
 
 import PostCard from "@/components/forum/PostCard";
+import LinkedText from "@/components/forum/LinkedText";
 import PrimaryButton from "@/components/forum/PrimaryButton";
 import ReplyGroup from "@/components/forum/ReplyGroup";
 import SectionCard from "@/components/forum/SectionCard";
@@ -548,7 +549,9 @@ const feedbackActions = [
       <div>
         <div style={{ marginBottom: 6 }}>
           <b>主張</b>
-          <div>{claim}</div>
+          <div>
+            <LinkedText text={claim} />
+          </div>
         </div>
 
       </div>
