@@ -3746,6 +3746,30 @@ function renderDiscussionCard({
         )}
       </details>
     )}
+
+    <div
+      style={{
+        marginTop: 12,
+        border: "1px solid #bfdbfe",
+        borderRadius: 10,
+        background: "#ffffff",
+        padding: 12,
+      }}
+    >
+      <div
+        style={{
+          color: "#475569",
+          fontSize: currentFont.base * 0.9,
+          lineHeight: 1.6,
+          marginBottom: 10,
+        }}
+      >
+        このAI再総括をもとに、政策判断に必要な項目へ並べ替えた確認ページです。
+      </div>
+      <LinkButton href={`/${tenant}/forum/policy-proposals/${thread.id}`}>
+        政策提言候補を見る
+      </LinkButton>
+    </div>
   </div>
 )}
 
