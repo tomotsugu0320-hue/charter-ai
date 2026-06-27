@@ -2202,6 +2202,12 @@ export default function ForumPage() {
               最新ニュースをAIで読み解く
             </Link>
           </div>
+          <div style={{ marginTop: 8 }}>
+            IS-LM、AD-AS、需給ギャップなどの分析フレームで、日本経済の論点を整理します。{" "}
+            <Link href={`/${tenant}/forum/macro-analysis-framework`} style={{ color: "#075985", fontWeight: 900 }}>
+              マクロ経済分析フレームを学ぶ
+            </Link>
+          </div>
         </div>
         <section
           style={{
