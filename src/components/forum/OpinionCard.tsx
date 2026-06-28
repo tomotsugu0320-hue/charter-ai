@@ -8,6 +8,7 @@ import LinkedText from "@/components/forum/LinkedText";
 import PrimaryButton from "@/components/forum/PrimaryButton";
 import ReplyGroup from "@/components/forum/ReplyGroup";
 import SectionCard from "@/components/forum/SectionCard";
+import ReportButton from "@/components/forum/ReportButton";
 
 type AiClassification = {
   classification?: string | null;
@@ -353,6 +354,9 @@ const isLowScore =
     !!onHidePost &&
     !String(op.opinion.id).startsWith("virtual-") &&
     op.opinion.can_delete === true;
+  const canReportOpinion =
+    !String(op.opinion.id).startsWith("virtual-") &&
+    Boolean(op.opinion.thread_id);
 
 const displayText = op.opinion.is_sensitive
   ? "（非公開）プライバシー保護のため一部内容を表示していません"
@@ -506,6 +510,13 @@ const feedbackActions = [
             投稿ID: {op.opinion.id}
           </span>
         </div>
+
+        {canReportOpinion && (
+          <ReportButton
+            postId={op.opinion.id}
+            threadId={op.opinion.thread_id}
+          />
+        )}
 
         {canHideOpinion && (
           <button

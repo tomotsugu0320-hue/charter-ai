@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import SectionCard from "@/components/forum/SectionCard";
 import PostCard from "@/components/forum/PostCard";
 import OpinionCard from "@/components/forum/OpinionCard";
+import ReportButton from "@/components/forum/ReportButton";
 
 const INITIAL_VISIBLE_OPINIONS = 5;
 const LOAD_MORE_OPINIONS = 10;
@@ -219,6 +220,9 @@ export default function OpinionView({
     !!onHidePost &&
     !String(op.opinion.id).startsWith("virtual-") &&
     op.opinion.can_delete === true;
+  const canReportOpinion =
+    !String(op.opinion.id).startsWith("virtual-") &&
+    Boolean(op.opinion.thread_id);
 
   return (
     <div
@@ -363,6 +367,12 @@ export default function OpinionView({
           >
             共有
           </button>
+          {canReportOpinion && (
+            <ReportButton
+              postId={op.opinion.id}
+              threadId={op.opinion.thread_id}
+            />
+          )}
           {canHideOpinion && (
             <button
               type="button"

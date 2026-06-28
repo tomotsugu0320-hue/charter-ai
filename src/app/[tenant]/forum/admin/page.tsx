@@ -1453,6 +1453,15 @@ export default function ForumAdminPage() {
             </p>
           </Link>
 
+          <Link href={`/${tenant}/forum/admin/reports`} style={menuCardStyle}>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
+              通報一覧
+            </h2>
+            <p style={menuDescriptionStyle}>
+              投稿・返信への通報を確認し、対応済みまたは却下として記録します。削除や非表示は既存の管理画面で行います。
+            </p>
+          </Link>
+
           <Link
             href={`/${tenant}/forum/admin/re-evaluate-logic-score`}
             style={menuCardStyle}

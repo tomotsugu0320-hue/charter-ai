@@ -5,6 +5,7 @@
 
 import PostCard from "@/components/forum/PostCard";
 import LinkedText from "@/components/forum/LinkedText";
+import ReportButton from "@/components/forum/ReportButton";
 
 type AiClassification = {
   classification?: string | null;
@@ -214,6 +215,7 @@ export default function ReplyGroup({
           const canHideChild =
             !!onHidePost &&
             child.can_delete === true;
+          const canReportChild = Boolean(child.id && child.thread_id);
 
           const childOpacity =
             hideLowScore && childScore > 0 && childScore < 60
@@ -298,6 +300,10 @@ export default function ReplyGroup({
                       ? ` / ${aiClassificationConfidence}`
                       : ""}
                   </span>
+                )}
+
+                {canReportChild && (
+                  <ReportButton postId={child.id} threadId={child.thread_id} />
                 )}
 
                 {canHideChild && (
