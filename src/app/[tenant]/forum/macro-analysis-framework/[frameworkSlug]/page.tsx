@@ -145,6 +145,7 @@ ${draftMetricLines}
 
   return (
     <section
+      id="related-discussions"
       style={{
         ...sectionStyle,
         borderColor: "#bae6fd",

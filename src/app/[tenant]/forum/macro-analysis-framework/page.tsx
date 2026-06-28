@@ -128,6 +128,50 @@ export default function MacroAnalysisFrameworkPage() {
               >
                 この理論を詳しく見る
               </Link>
+              <div
+                style={{
+                  borderTop: "1px solid #dbe3ef",
+                  marginTop: 14,
+                  paddingTop: 12,
+                }}
+              >
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    border: "1px solid #bae6fd",
+                    borderRadius: 999,
+                    background: "#eff6ff",
+                    color: "#1d4ed8",
+                    fontSize: 12,
+                    fontWeight: 900,
+                    padding: "4px 9px",
+                  }}
+                >
+                  関連議論あり
+                </span>
+                <p
+                  style={{
+                    margin: "8px 0 0",
+                    color: "#475569",
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  AIの説明に反論・補足できます
+                </p>
+                <Link
+                  href={`/${tenant}/forum/macro-analysis-framework/${card.slug}#related-discussions`}
+                  style={{
+                    ...linkStyle,
+                    display: "inline-block",
+                    marginTop: 8,
+                    fontSize: 13,
+                  }}
+                >
+                  この理論の議論を見る
+                </Link>
+              </div>
             </article>
           ))}
         </div>
