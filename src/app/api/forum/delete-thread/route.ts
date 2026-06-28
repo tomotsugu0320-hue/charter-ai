@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
+import {
+  getActiveForumBetaSessionUser,
+  isForumAdminAuthenticated,
+} from "@/lib/forum-auth";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,6 +17,13 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { ok: false, error: activeUser.error },
         { status: activeUser.status }
+      );
+    }
+
+    if (!isForumAdminAuthenticated(req)) {
+      return NextResponse.json(
+        { success: false, error: "Admin permission required." },
+        { status: 403 }
       );
     }
 
