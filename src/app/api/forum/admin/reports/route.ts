@@ -2,11 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isForumAdminAuthenticated } from "@/lib/forum-auth";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 const ALLOWED_STATUSES = [
   "pending",
   "reviewing",
@@ -30,6 +25,21 @@ function safePostContent(post: any) {
   return sanitizedText || String(post.content ?? "");
 }
 
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceRole) {
+    throw new Error("Supabase environment is not configured");
+  }
+
+  return createClient(url, serviceRole, {
+    auth: {
+      persistSession: false,
+    },
+  });
+}
+
 export async function GET(request: NextRequest) {
   if (!isForumAdminAuthenticated(request)) {
     return NextResponse.json(
@@ -47,6 +57,8 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  const supabase = getSupabaseAdmin();
 
   let query = supabase
     .from("forum_reports")

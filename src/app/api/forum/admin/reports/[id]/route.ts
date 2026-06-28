@@ -8,11 +8,6 @@ type RouteContext = {
   }>;
 };
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 const ALLOWED_UPDATE_STATUSES = ["reviewing", "resolved", "dismissed"] as const;
 
 function isAllowedUpdateStatus(value: string) {
@@ -25,6 +20,21 @@ function normalizeAdminNote(value: unknown) {
   if (typeof value !== "string") return null;
   const note = value.trim().slice(0, 1000);
   return note || null;
+}
+
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceRole) {
+    throw new Error("Supabase environment is not configured");
+  }
+
+  return createClient(url, serviceRole, {
+    auth: {
+      persistSession: false,
+    },
+  });
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
@@ -54,6 +64,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       { status: 400 }
     );
   }
+
+  const supabase = getSupabaseAdmin();
 
   const { data, error } = await supabase
     .from("forum_reports")

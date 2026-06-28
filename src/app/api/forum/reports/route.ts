@@ -2,11 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 const ALLOWED_REASON_TYPES = [
   "personal_info",
   "harassment",
@@ -32,6 +27,21 @@ function normalizeDetail(value: unknown) {
   return value.trim().slice(0, 500);
 }
 
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceRole) {
+    throw new Error("Supabase environment is not configured");
+  }
+
+  return createClient(url, serviceRole, {
+    auth: {
+      persistSession: false,
+    },
+  });
+}
+
 export async function POST(req: NextRequest) {
   const activeUser = await getActiveForumBetaSessionUser(req);
   if (!activeUser.ok) {
@@ -42,6 +52,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const supabase = getSupabaseAdmin();
     const body = await req.json().catch(() => ({}));
     const postId = String(body?.post_id ?? body?.postId ?? "").trim();
     const threadIdFromBody = String(
