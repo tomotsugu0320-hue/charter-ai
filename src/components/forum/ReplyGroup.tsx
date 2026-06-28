@@ -119,6 +119,17 @@ function postMetaText(
     .join(" ・ ");
 }
 
+function safeReplyText(child: any) {
+  if (child?.is_sensitive === true) {
+    return "個人情報保護のため、この返信は表示を制限しています。";
+  }
+
+  const sanitizedText =
+    typeof child?.sanitized_text === "string" ? child.sanitized_text.trim() : "";
+
+  return sanitizedText || String(child?.content ?? "");
+}
+
 function classificationBadgeStyle(classification?: string | null) {
   const isReview = classification === "needs_review_or_misinformation_risk";
 
@@ -180,7 +191,8 @@ export default function ReplyGroup({
 
         {op.children.map((child: any) => {
           const childScore = child.logic_score ?? 0;
-          const split = splitContent(child.content);
+          const displayText = safeReplyText(child);
+          const split = splitContent(displayText);
           const aiClassification = child.ai_classification as
             | AiClassification
             | null
@@ -308,6 +320,24 @@ export default function ReplyGroup({
                   </button>
                 )}
               </div>
+
+              {child.is_sensitive === true && (
+                <div
+                  style={{
+                    marginBottom: 10,
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    background: "#fff8e1",
+                    border: "1px solid #f0c36d",
+                    color: "#8a5a00",
+                    fontSize: 12,
+                    lineHeight: 1.6,
+                    fontWeight: 700,
+                  }}
+                >
+                  プライバシー保護のため元の返信本文は非公開です
+                </div>
+              )}
 
               <div style={{ marginBottom: 6 }}>
                 <b>主張</b>

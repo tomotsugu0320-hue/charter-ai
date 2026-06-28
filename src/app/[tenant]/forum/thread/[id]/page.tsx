@@ -41,6 +41,8 @@ type PostRow = {
   post_role: string;
   stance_label?: StanceLabel | null;
   content: string;
+  sanitized_text?: string | null;
+  is_sensitive?: boolean | null;
   can_delete?: boolean;
   trust_status: string;
   created_at?: string;

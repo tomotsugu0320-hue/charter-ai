@@ -433,6 +433,8 @@ if (!thread) {
   post_role,
   stance_label,
   content,
+  sanitized_text,
+  is_sensitive,
   author_key,
   trust_status,
   created_at,
@@ -581,9 +583,19 @@ if (!thread) {
 
     const postsWithFeedback = (posts ?? []).map((post: any) => {
       const { author_key: postAuthorKey, ...publicPost } = post;
+      const isSensitive = post.is_sensitive === true;
+      const sanitizedText =
+        typeof post.sanitized_text === "string"
+          ? post.sanitized_text.trim()
+          : "";
 
       return {
         ...publicPost,
+        content: isSensitive
+          ? "個人情報保護のため、この投稿は表示を制限しています。"
+          : sanitizedText || publicPost.content,
+        sanitized_text: sanitizedText || null,
+        is_sensitive: isSensitive,
         can_delete: Boolean(cookieAuthorKey && postAuthorKey === cookieAuthorKey),
         feedback_counts: feedbackMap[post.id] ?? {
           term_unknown: 0,
