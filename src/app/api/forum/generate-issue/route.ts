@@ -7,6 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
 import { getErrorMessage, recordForumApiUsageLog } from "@/lib/forum-api-usage";
 import { maskForumPrivacyText } from "@/lib/forum-privacy";
+import { assertRecentRateLimit, DAY_MS, MINUTE_MS } from "@/lib/forum/rate-limit";
 
 type DbStructure = {
   premises: string[];
@@ -523,6 +524,34 @@ claim: typeof text === "string" ? text : "",
 
 
     // ③ AI fallback
+    const shortLimitResponse = await assertRecentRateLimit({
+      table: "forum_api_usage_logs",
+      filters: [
+        { column: "feature_key", value: "generate_issue" },
+        { column: "user_id", value: activeUser.user.id },
+      ],
+      limit: 3,
+      windowMs: 10 * MINUTE_MS,
+      retryAfterSeconds: 10 * 60,
+      message:
+        "AI整理の利用回数が短時間に上限へ達しました。しばらくしてから再試行してください。",
+    });
+    if (shortLimitResponse) return shortLimitResponse;
+
+    const dailyLimitResponse = await assertRecentRateLimit({
+      table: "forum_api_usage_logs",
+      filters: [
+        { column: "feature_key", value: "generate_issue" },
+        { column: "user_id", value: activeUser.user.id },
+      ],
+      limit: 20,
+      windowMs: DAY_MS,
+      retryAfterSeconds: 60 * 60,
+      message:
+        "AI整理の1日の利用回数が上限へ達しました。時間をおいてから再試行してください。",
+    });
+    if (dailyLimitResponse) return dailyLimitResponse;
+
     let completion: any;
     try {
       completion = await openai.chat.completions.create({

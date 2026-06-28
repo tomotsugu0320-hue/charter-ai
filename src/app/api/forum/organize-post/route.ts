@@ -6,6 +6,7 @@ import OpenAI from "openai";
 import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
 import { getErrorMessage, recordForumApiUsageLog } from "@/lib/forum-api-usage";
 import { maskForumPrivacyText } from "@/lib/forum-privacy";
+import { assertRecentRateLimit, DAY_MS, HOUR_MS } from "@/lib/forum/rate-limit";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -81,6 +82,34 @@ export async function POST(req: NextRequest) {
         source: "memory",
       });
     }
+
+    const hourlyLimitResponse = await assertRecentRateLimit({
+      table: "forum_api_usage_logs",
+      filters: [
+        { column: "feature_key", value: "organize_post" },
+        { column: "user_id", value: activeUser.user.id },
+      ],
+      limit: 5,
+      windowMs: HOUR_MS,
+      retryAfterSeconds: 60 * 60,
+      message:
+        "AI整理の利用回数が短時間に上限へ達しました。しばらくしてから再試行してください。",
+    });
+    if (hourlyLimitResponse) return hourlyLimitResponse;
+
+    const dailyLimitResponse = await assertRecentRateLimit({
+      table: "forum_api_usage_logs",
+      filters: [
+        { column: "feature_key", value: "organize_post" },
+        { column: "user_id", value: activeUser.user.id },
+      ],
+      limit: 20,
+      windowMs: DAY_MS,
+      retryAfterSeconds: 60 * 60,
+      message:
+        "AI整理の1日の利用回数が上限へ達しました。時間をおいてから再試行してください。",
+    });
+    if (dailyLimitResponse) return dailyLimitResponse;
 
     const prompt = `
 あなたは、AI掲示板の投稿補助AIです。

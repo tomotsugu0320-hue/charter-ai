@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import { checkPrivacyRisk } from "@/lib/privacy";
 import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
 import { getErrorMessage, recordForumApiUsageLog } from "@/lib/forum-api-usage";
+import { assertRecentRateLimit, DAY_MS, HOUR_MS, MINUTE_MS } from "@/lib/forum/rate-limit";
 
 type ForumPost = {
   id: string;
@@ -490,6 +491,42 @@ const predictionResult = predictionFlag
 if (!isAllowedPostRole(postRole)) {
   return NextResponse.json({ success: false, error: "invalid postRole" }, { status: 400 });
 }
+
+const shortLimitResponse = await assertRecentRateLimit({
+  table: "forum_posts",
+  filters: [{ column: "author_key", value: authorKey }],
+  limit: 10,
+  windowMs: 5 * MINUTE_MS,
+  retryAfterSeconds: 5 * 60,
+  message:
+    "投稿が短時間に集中しています。少し時間をおいてから再試行してください。",
+});
+if (shortLimitResponse) return shortLimitResponse;
+
+const dailyLimitResponse = await assertRecentRateLimit({
+  table: "forum_posts",
+  filters: [{ column: "author_key", value: authorKey }],
+  limit: 80,
+  windowMs: DAY_MS,
+  retryAfterSeconds: 60 * 60,
+  message:
+    "投稿の1日の作成数が上限へ達しました。時間をおいてから再試行してください。",
+});
+if (dailyLimitResponse) return dailyLimitResponse;
+
+const threadLimitResponse = await assertRecentRateLimit({
+  table: "forum_posts",
+  filters: [
+    { column: "author_key", value: authorKey },
+    { column: "thread_id", value: threadId },
+  ],
+  limit: 20,
+  windowMs: HOUR_MS,
+  retryAfterSeconds: 60 * 60,
+  message:
+    "このスレッドへの投稿が短時間に集中しています。少し時間をおいてから再試行してください。",
+});
+if (threadLimitResponse) return threadLimitResponse;
 
 const privacy = checkPrivacyRisk(content);
 const logicResult = calcLogicScoreFallback(content, postRole);

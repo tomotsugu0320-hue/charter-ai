@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
+import { assertRecentRateLimit, DAY_MS, MINUTE_MS } from "@/lib/forum/rate-limit";
 
 const ALLOWED_REASON_TYPES = [
   "personal_info",
@@ -104,6 +105,55 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    const { data: duplicateReport, error: duplicateError } = await supabase
+      .from("forum_reports")
+      .select("id")
+      .eq("post_id", postId)
+      .eq("reporter_user_id", activeUser.user.id)
+      .in("status", ["pending", "reviewing"])
+      .limit(1)
+      .maybeSingle();
+
+    if (duplicateError) {
+      return NextResponse.json(
+        { success: false, error: duplicateError.message },
+        { status: 500 }
+      );
+    }
+
+    if (duplicateReport) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "この投稿への通報はすでに受け付けています。管理者の確認をお待ちください。",
+        },
+        { status: 409 }
+      );
+    }
+
+    const shortLimitResponse = await assertRecentRateLimit({
+      table: "forum_reports",
+      filters: [{ column: "reporter_user_id", value: activeUser.user.id }],
+      limit: 5,
+      windowMs: 10 * MINUTE_MS,
+      retryAfterSeconds: 10 * 60,
+      message:
+        "通報が短時間に集中しています。少し時間をおいてから再試行してください。",
+    });
+    if (shortLimitResponse) return shortLimitResponse;
+
+    const dailyLimitResponse = await assertRecentRateLimit({
+      table: "forum_reports",
+      filters: [{ column: "reporter_user_id", value: activeUser.user.id }],
+      limit: 30,
+      windowMs: DAY_MS,
+      retryAfterSeconds: 60 * 60,
+      message:
+        "通報の1日の送信数が上限へ達しました。時間をおいてから再試行してください。",
+    });
+    if (dailyLimitResponse) return dailyLimitResponse;
 
     const { error: insertError } = await supabase.from("forum_reports").insert({
       target_type: "post",

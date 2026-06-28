@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
+import { assertRecentRateLimit, DAY_MS, MINUTE_MS } from "@/lib/forum/rate-limit";
 import {
   maskForumPrivacyArray,
   maskForumPrivacyText,
@@ -707,6 +708,34 @@ export async function POST(req: NextRequest) {
     }
 
     const { authorKey, shouldSetCookie } = getOrCreateAuthorKey(req);
+
+    const shortLimitResponse = await assertRecentRateLimit({
+      table: "forum_posts",
+      filters: [
+        { column: "author_key", value: authorKey },
+        { column: "post_role", value: "issue_raise" },
+      ],
+      limit: 3,
+      windowMs: 10 * MINUTE_MS,
+      retryAfterSeconds: 10 * 60,
+      message:
+        "投稿が短時間に集中しています。少し時間をおいてから再試行してください。",
+    });
+    if (shortLimitResponse) return shortLimitResponse;
+
+    const dailyLimitResponse = await assertRecentRateLimit({
+      table: "forum_posts",
+      filters: [
+        { column: "author_key", value: authorKey },
+        { column: "post_role", value: "issue_raise" },
+      ],
+      limit: 20,
+      windowMs: DAY_MS,
+      retryAfterSeconds: 60 * 60,
+      message:
+        "投稿の1日の作成数が上限へ達しました。時間をおいてから再試行してください。",
+    });
+    if (dailyLimitResponse) return dailyLimitResponse;
 
     const { data: thread, error: threadError } = await supabase
       .from("forum_threads")
