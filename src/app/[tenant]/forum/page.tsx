@@ -2043,9 +2043,9 @@ export default function ForumPage() {
                 color: "#d1d5db",
                 lineHeight: 1.8,
                 fontSize: currentFontSize,
-              }}
-            >
-              長くなった考えやChatGPTとの会話を、投稿しやすい形にまとめて共有できます。
+            }}
+          >
+              会話ログやニュース、政策論点をAIで整理し、前提・反論・検証指標まで残せます。長くなった考えも、投稿しやすい形にまとめて共有できます。
             </p>
           </div>
 
@@ -2169,6 +2169,46 @@ export default function ForumPage() {
           >
             新しい議論を作る
           </button>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 8,
+            marginTop: 12,
+            alignItems: "center",
+            color: "#64748b",
+            fontSize: currentFontSize - 2,
+          }}
+        >
+          <span style={{ fontWeight: 800 }}>はじめての方へ：</span>
+          {[
+            { label: "使い方を見る", href: `/${tenant}/forum/guide` },
+            { label: "公開済み政策提言を見る", href: `/${tenant}/forum/policies` },
+            {
+              label: "マクロ分析フレームを見る",
+              href: `/${tenant}/forum/macro-analysis-framework`,
+            },
+          ].map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                border: "1px solid #cbd5e1",
+                borderRadius: 999,
+                padding: "5px 9px",
+                background: "#ffffff",
+                color: "#334155",
+                fontWeight: 800,
+                textDecoration: "none",
+                lineHeight: 1.4,
+              }}
+            >
+              {link.label}
+            </Link>
+          ))}
         </div>
       </section>
 
