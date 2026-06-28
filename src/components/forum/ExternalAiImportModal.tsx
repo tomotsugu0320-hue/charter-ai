@@ -1474,6 +1474,7 @@ export default function ExternalAiImportModal({
             }}
           >
             個人情報や投稿したくない内容が含まれていないか、投稿前に必ず確認してください。
+            他人のLINE、DM、メール、会話ログを、本人の許可なく公開しないでください。
           </div>
 
           <section

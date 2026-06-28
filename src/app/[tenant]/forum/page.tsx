@@ -2714,6 +2714,21 @@ export default function ForumPage() {
           >
             この段階ではまだ投稿されません。入力内容をAIで整理したあと、新しい議論として作成できます。
           </p>
+          <p
+            style={{
+              margin: "10px 0 0",
+              border: "1px solid #fed7aa",
+              borderRadius: 8,
+              background: "#fff7ed",
+              color: "#9a3412",
+              padding: "9px 11px",
+              fontSize: currentFontSize - 2,
+              lineHeight: 1.7,
+            }}
+          >
+            投稿前に、個人情報や第三者が特定される情報が含まれていないか確認してください。
+            AIの整理は正解ではなく、議論の叩き台です。問題のある投稿を見つけた場合は通報できます。
+          </p>
         </div>
 
         <div
