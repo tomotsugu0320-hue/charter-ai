@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isForumAdminAuthenticated } from "@/lib/forum-auth";
 import { getErrorMessage, recordForumApiUsageLog } from "@/lib/forum-api-usage";
+import { ECONOMIC_POLICY_ANALYSIS_FRAME_PROMPT } from "@/lib/forum/economic-policy-analysis-frame";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -290,6 +291,8 @@ function buildPrompt(input: {
   references: ReferenceThread[];
 }) {
   return `
+${ECONOMIC_POLICY_ANALYSIS_FRAME_PROMPT}
+
 あなたはAI知恵袋Forumの政策判断プレビューAIです。
 掲示板の主張をそのまま政策として採用せず、議論材料を論理的な政策判断へ再構成してください。
 

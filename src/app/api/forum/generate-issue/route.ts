@@ -8,6 +8,7 @@ import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
 import { getErrorMessage, recordForumApiUsageLog } from "@/lib/forum-api-usage";
 import { maskForumPrivacyText } from "@/lib/forum-privacy";
 import { assertRecentRateLimit, DAY_MS, MINUTE_MS } from "@/lib/forum/rate-limit";
+import { ECONOMIC_POLICY_ANALYSIS_FRAME_PROMPT } from "@/lib/forum/economic-policy-analysis-frame";
 
 type DbStructure = {
   premises: string[];
@@ -281,6 +282,8 @@ function fallbackStructure(): DbStructure {
 // =========================
 
 const generateIssueSystemPrompt = `
+${ECONOMIC_POLICY_ANALYSIS_FRAME_PROMPT}
+
 あなたは、投稿文を掲示板の論点整理に変換するAIです。
 投稿文をそのまま要約するのではなく、議論として検証すべき前提・根拠・反論リスクに分けてください。
 

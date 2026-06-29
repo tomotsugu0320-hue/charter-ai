@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isForumAdminAuthenticated } from "@/lib/forum-auth";
 import { getErrorMessage, recordForumApiUsageLog } from "@/lib/forum-api-usage";
+import { ECONOMIC_POLICY_ANALYSIS_FRAME_PROMPT } from "@/lib/forum/economic-policy-analysis-frame";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -297,6 +298,8 @@ function buildPrompt(input: {
   const existingRebuttals = asStringArray(existingSummary?.rebuttals, 5).join(" / ");
 
   return `
+${ECONOMIC_POLICY_ANALYSIS_FRAME_PROMPT}
+
 あなたはAI知恵袋Forumの議論再総括AIです。
 管理者がAI分類済みコメントを確認した後、スレッド全体のAI総括を更新するための材料を整理します。
 

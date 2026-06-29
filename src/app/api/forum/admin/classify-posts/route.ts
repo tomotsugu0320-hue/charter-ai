@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isForumAdminAuthenticated } from "@/lib/forum-auth";
 import { getErrorMessage, recordForumApiUsageLog } from "@/lib/forum-api-usage";
+import { ECONOMIC_POLICY_ANALYSIS_FRAME_PROMPT } from "@/lib/forum/economic-policy-analysis-frame";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -181,6 +182,8 @@ function buildPrompt(
   parentPost?: ForumPostRow | null
 ) {
   return `
+${ECONOMIC_POLICY_ANALYSIS_FRAME_PROMPT}
+
 あなたはAI知恵袋Forumのコメント分類AIです。
 次の投稿を、スレッド文脈に照らして1つの分類にしてください。
 

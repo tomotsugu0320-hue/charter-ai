@@ -7,6 +7,7 @@ import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
 import { getErrorMessage, recordForumApiUsageLog } from "@/lib/forum-api-usage";
 import { maskForumPrivacyText } from "@/lib/forum-privacy";
 import { assertRecentRateLimit, DAY_MS, HOUR_MS } from "@/lib/forum/rate-limit";
+import { ECONOMIC_POLICY_ANALYSIS_FRAME_PROMPT } from "@/lib/forum/economic-policy-analysis-frame";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -122,6 +123,9 @@ export async function POST(req: NextRequest) {
 - 感情的・攻撃的な表現は少し和らげる
 - 断定しすぎる表現は必要に応じて弱める
 - ただし、内容を勝手に捏造しない
+
+## 経済・政策カテゴリーの追加整理
+${ECONOMIC_POLICY_ANALYSIS_FRAME_PROMPT}
 
 ## summary のルール
 - 2〜4行程度

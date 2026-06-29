@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getActiveForumBetaSessionUser } from "@/lib/forum-auth";
 import { getErrorMessage, recordForumApiUsageLog } from "@/lib/forum-api-usage";
+import { ECONOMIC_POLICY_ANALYSIS_FRAME_PROMPT } from "@/lib/forum/economic-policy-analysis-frame";
 
 type ForumPost = {
   id: string;
@@ -276,6 +277,8 @@ async function generateNormalSummaryWithAI(
     .join("\n\n");
 
   const prompt = `
+${ECONOMIC_POLICY_ANALYSIS_FRAME_PROMPT}
+
 あなたは議論整理AIです。
 以下の投稿群を読んで、日本語で「通常モード向けのAIまとめ」を作ってください。
 
