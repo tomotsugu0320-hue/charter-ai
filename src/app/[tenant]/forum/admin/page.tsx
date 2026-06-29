@@ -1462,6 +1462,15 @@ export default function ForumAdminPage() {
             </p>
           </Link>
 
+          <Link href={`/${tenant}/forum/admin/feedback`} style={menuCardStyle}>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>
+              不具合・改善報告
+            </h2>
+            <p style={menuDescriptionStyle}>
+              Forumの表示崩れ、リンク切れ、スマホ表示、AI整理への改善要望などを確認し、状態と管理メモを記録します。
+            </p>
+          </Link>
+
           <Link
             href={`/${tenant}/forum/admin/re-evaluate-logic-score`}
             style={menuCardStyle}

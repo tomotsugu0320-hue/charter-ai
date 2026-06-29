@@ -2198,6 +2198,10 @@ export default function ForumPage() {
               label: "マクロ分析フレームを見る",
               href: `/${tenant}/forum/macro-analysis-framework`,
             },
+            {
+              label: "不具合・改善を報告",
+              href: `/${tenant}/forum/feedback`,
+            },
           ].map((link) => (
             <Link
               key={link.href}

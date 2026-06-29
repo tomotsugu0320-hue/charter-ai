@@ -15,6 +15,128 @@ const ALLOWED_FEEDBACK_TYPES = [
 
 type AllowedFeedbackType = (typeof ALLOWED_FEEDBACK_TYPES)[number];
 
+const SITE_FEEDBACK_REPORT_TYPES = [
+  "bug",
+  "display",
+  "unclear",
+  "link",
+  "ai_output",
+  "request",
+  "other",
+] as const;
+
+const SITE_FEEDBACK_DEVICE_TYPES = [
+  "pc",
+  "smartphone",
+  "tablet",
+  "unknown",
+] as const;
+
+type SiteFeedbackReportType = (typeof SITE_FEEDBACK_REPORT_TYPES)[number];
+type SiteFeedbackDeviceType = (typeof SITE_FEEDBACK_DEVICE_TYPES)[number];
+
+function isSiteFeedbackReportType(value: string): value is SiteFeedbackReportType {
+  return SITE_FEEDBACK_REPORT_TYPES.includes(value as SiteFeedbackReportType);
+}
+
+function isSiteFeedbackDeviceType(value: string): value is SiteFeedbackDeviceType {
+  return SITE_FEEDBACK_DEVICE_TYPES.includes(value as SiteFeedbackDeviceType);
+}
+
+function normalizeSiteFeedbackText(value: unknown, maxLength: number) {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, maxLength);
+}
+
+function isSiteFeedbackPayload(body: any) {
+  return Boolean(
+    body &&
+      typeof body === "object" &&
+      ("report_type" in body ||
+        "reportType" in body ||
+        "message" in body ||
+        "device_type" in body ||
+        "deviceType" in body ||
+        "page_url" in body ||
+        "pageUrl" in body)
+  );
+}
+
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceRole) {
+    throw new Error("Supabase environment is not configured");
+  }
+
+  return createClient(url, serviceRole, {
+    auth: {
+      persistSession: false,
+    },
+  });
+}
+
+async function handleSiteFeedback(req: NextRequest, body: any) {
+  const reportType = normalizeSiteFeedbackText(
+    body?.report_type ?? body?.reportType,
+    40
+  );
+  const deviceType = normalizeSiteFeedbackText(
+    body?.device_type ?? body?.deviceType ?? "unknown",
+    40
+  );
+  const message = normalizeSiteFeedbackText(body?.message, 2000);
+  const tenantId =
+    normalizeSiteFeedbackText(body?.tenant_id ?? body?.tenant, 80) || "dev";
+  const pageUrl = normalizeSiteFeedbackText(body?.page_url ?? body?.pageUrl, 1000);
+  const contact = normalizeSiteFeedbackText(body?.contact, 200);
+  const userAgent = normalizeSiteFeedbackText(
+    req.headers.get("user-agent"),
+    1000
+  );
+
+  if (!isSiteFeedbackReportType(reportType)) {
+    return NextResponse.json(
+      { ok: false, error: "報告の種類を選んでください。" },
+      { status: 400 }
+    );
+  }
+
+  if (!message) {
+    return NextResponse.json(
+      { ok: false, error: "内容を入力してください。" },
+      { status: 400 }
+    );
+  }
+
+  const supabase = getSupabaseAdmin();
+
+  const { error } = await supabase.from("forum_feedback_reports").insert({
+    tenant_id: tenantId,
+    page_url: pageUrl || null,
+    report_type: reportType,
+    device_type: isSiteFeedbackDeviceType(deviceType) ? deviceType : "unknown",
+    message,
+    contact: contact || null,
+    user_agent: userAgent || null,
+    status: "new",
+  });
+
+  if (error) {
+    console.error("[forum site feedback insert error]", error);
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "報告を保存できませんでした。時間をおいて再度お試しください。",
+      },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
 function isAllowedFeedbackType(value: string): value is AllowedFeedbackType {
   return ALLOWED_FEEDBACK_TYPES.includes(value as AllowedFeedbackType);
 }
@@ -212,6 +334,17 @@ return explanation;
 }
 
 export async function POST(req: NextRequest) {
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    body = {};
+  }
+
+  if (isSiteFeedbackPayload(body)) {
+    return handleSiteFeedback(req, body);
+  }
+
   const activeUser = await getActiveForumBetaSessionUser(req);
   if (!activeUser.ok) {
     return NextResponse.json(
@@ -221,8 +354,6 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
-
     const threadId = String(body?.threadId ?? "").trim();
     const postId = String(body?.postId ?? "").trim();
     const feedbackType = String(body?.feedbackType ?? "").trim();
