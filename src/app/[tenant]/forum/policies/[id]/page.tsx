@@ -408,6 +408,21 @@ export default function PolicyDetailPage() {
             <div style={{ marginTop: 10, fontSize: 18, fontWeight: 900 }}>
               判断：{proposal.priority_judgment?.label || "未記載"}
             </div>
+            <p
+              style={{
+                margin: "12px 0 0",
+                border: "1px solid #bfdbfe",
+                borderRadius: 8,
+                background: "#eff6ff",
+                color: "#1e3a8a",
+                padding: "8px 10px",
+                fontSize: 14,
+                fontWeight: 800,
+                lineHeight: 1.7,
+              }}
+            >
+              この政策提言は、Forum投稿とAI再総括をもとに生成された暫定整理です。管理人の最終回答ではなく、根拠・反対意見・確認指標を検証するためのたたき台です。
+            </p>
           </header>
 
           <section style={{ marginTop: 18, ...sectionStyle }}>

@@ -72,6 +72,9 @@ export default function MacroAnalysisFrameworkPage() {
       </header>
 
       <section style={{ ...noteStyle, marginBottom: 18 }}>
+        <p style={{ margin: "0 0 8px", color: "#1e3a8a", fontWeight: 900 }}>
+          このページは、AIを使って経済理論の見方を学び、日本経済の論点を整理するための入口です。特定の政策を断定するものではありません。
+        </p>
         経済停滞を気分や精神論だけで片づけず、需要、供給、物価、雇用、賃金、財政、為替の関係に分解して見ます。
         このページでは、よく使われる分析フレームをAIに質問しながら学べる形で整理します。
       </section>

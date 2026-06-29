@@ -130,7 +130,7 @@ const situationCards: SituationComparisonCard[] = [
   },
   {
     situation: "賃金上昇がまだ定着していない場合",
-    overseas: "雇用と賃金の回復を確認してから、金融引き締めへ移ることがあります。",
+    overseas: "需要・雇用・賃金の回復を確認したうえで、必要な場合に限り金融引き締めを検討します。",
     japan:
       "実質賃金や中小企業賃上げが弱い段階でも、正常化や利上げが議論されやすいことがあります。",
     metrics: ["実質賃金", "名目賃金", "中小企業賃上げ率", "個人消費", "正社員求人倍率"],
@@ -173,22 +173,45 @@ export default function EconomicPolicyComparisonPage() {
         </Link>
       </div>
 
-      <header style={{ margin: "22px 0 18px" }}>
-        <p style={{ margin: 0, color: "#64748b", fontSize: 13, fontWeight: 900 }}>
+      <header
+        style={{
+          margin: "22px 0 18px",
+          border: "1px solid #dbe3ef",
+          borderRadius: 10,
+          background: "#ffffff",
+          padding: 16,
+        }}
+      >
+        <p style={{ margin: 0, color: "#334155", fontSize: 13, fontWeight: 900 }}>
           政策判断の比較ページ
         </p>
-        <h1 style={{ margin: "6px 0 0", fontSize: 30, lineHeight: 1.4, letterSpacing: 0 }}>
+        <h1 style={{ margin: "6px 0 0", color: "#0f172a", fontSize: 30, lineHeight: 1.4, letterSpacing: 0 }}>
           日本と海外の経済政策比較
         </h1>
-        <p style={{ margin: "10px 0 0", color: "#475569", lineHeight: 1.8 }}>
+        <p style={{ margin: "10px 0 0", color: "#334155", lineHeight: 1.8 }}>
           財政政策・金融政策・その他の経済政策を、海外事例と比べて検証するページです。
+        </p>
+        <p
+          style={{
+            margin: "10px 0 0",
+            border: "1px solid #bfdbfe",
+            borderRadius: 8,
+            background: "#eff6ff",
+            color: "#1e3a8a",
+            padding: "8px 10px",
+            fontSize: 14,
+            fontWeight: 800,
+            lineHeight: 1.7,
+          }}
+        >
+          AIによる暫定整理です。管理人の最終回答ではなく、議論と検証のためのたたき台として読んでください。
         </p>
       </header>
 
       <section style={{ ...noteStyle, marginBottom: 18 }}>
         このページは、海外政策をそのまま日本に当てはめるためのものではありません。
         景気局面、通貨条件、産業構造、雇用・賃金の状態を比較しながら、
-        日本の政策判断を検証するための整理ページです。初期版は固定表示で、必要に応じて手動更新します。
+        日本の政策判断を検証するための整理ページです。初期版は固定表示で、AI整理の見直しに応じて更新します。
       </section>
 
       <section style={{ ...sectionStyle, marginBottom: 18 }}>

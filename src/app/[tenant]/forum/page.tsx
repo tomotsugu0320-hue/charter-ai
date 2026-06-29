@@ -376,7 +376,7 @@ const COMPACT_POLICY_COMPARISONS: CompactPolicyComparison[] = [
   },
   {
     situation: "賃金上昇がまだ定着していない場合",
-    overseas: "雇用と賃金の回復を確認してから引き締め",
+    overseas: "需要・雇用・賃金の回復後、必要な場合に限り引き締め検討",
     japan: "実質賃金が弱い段階でも正常化が議論されがち",
   },
 ];
@@ -2283,12 +2283,12 @@ export default function ForumPage() {
             },
             {
               href: `/${tenant}/forum/news-check`,
-              body: "新聞記事や経済ニュースを、短い要約・主張・前提・反論・海外比較・検証指標に分けて整理します。",
+              body: "新聞記事や経済ニュースを、AIで短い要約・主張・前提・反論・海外比較・検証指標に分けて整理します。",
               label: "最新ニュースをAIで読み解く",
             },
             {
               href: `/${tenant}/forum/macro-analysis-framework`,
-              body: "IS-LM、AD-AS、需給ギャップなどの分析フレームで、日本経済の論点を整理します。",
+              body: "IS-LM、AD-AS、需給ギャップなどをAIで学び、日本経済の論点を整理します。",
               label: "マクロ経済分析フレームを学ぶ",
             },
           ].map((item) => (
@@ -2567,7 +2567,7 @@ export default function ForumPage() {
           <h2 style={{ margin: 0, fontSize: 22 }}>公開済みAI政策提言</h2>
         </div>
         <p style={{ margin: "6px 0 0", color: "#475569", lineHeight: 1.7 }}>
-          AI再総括をもとに作成・保存された公開済み政策提言です。詳細ページで根拠や確認指標まで確認できます。
+          AI再総括をもとに作成・保存された、検証用の政策提言です。詳細ページで根拠や確認指標まで確認できます。
         </p>
 
         {publishedPoliciesLoading && (
