@@ -3297,7 +3297,6 @@ export default function ForumPage() {
     </section>
 
       <section
-        id="latest-threads"
         style={{
           ...panelStyle,
           marginBottom: 22,
@@ -3394,6 +3393,7 @@ export default function ForumPage() {
       </section>
 
       <section
+        id="latest-threads"
         style={{
           ...panelStyle,
           marginBottom: 22,
