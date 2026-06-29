@@ -18,6 +18,11 @@ type SituationComparisonCard = {
   metrics: string[];
 };
 
+type EconomicTheoryCard = {
+  title: string;
+  description: string;
+};
+
 const pageStyle: CSSProperties = {
   maxWidth: 1040,
   margin: "0 auto",
@@ -161,6 +166,44 @@ const situationCards: SituationComparisonCard[] = [
   },
 ];
 
+const economicTheoryCards: EconomicTheoryCard[] = [
+  {
+    title: "AD-AS分析",
+    description:
+      "需要不足・需要超過・供給制約を分け、物価上昇が需要過熱型かコストプッシュ型かを確認します。",
+  },
+  {
+    title: "需給ギャップ",
+    description:
+      "経済全体の需要が足りないのか、過熱しているのかを見て、財政・金融政策の方向を判断します。",
+  },
+  {
+    title: "フィリップス曲線",
+    description:
+      "失業率・求人倍率・賃金上昇率・物価上昇率の関係から、雇用と物価の持続性を確認します。",
+  },
+  {
+    title: "テイラー・ルール",
+    description:
+      "政策金利を考えるときに、インフレ率だけでなく、需給ギャップや雇用の状態も確認します。",
+  },
+  {
+    title: "コストプッシュインフレ分析",
+    description:
+      "円安・輸入物価・エネルギー価格・食料価格が家計や実質賃金に与える影響を見ます。",
+  },
+  {
+    title: "財政乗数",
+    description:
+      "減税・給付・公共投資・社会保険料軽減が、需要不足局面でどれくらい効くかを考えます。",
+  },
+  {
+    title: "マンデル＝フレミング・モデル",
+    description:
+      "開放経済で、金利・為替・財政政策・金融政策・輸出入がどうつながるかを整理します。",
+  },
+];
+
 const checkItems = [
   "比較対象国の景気局面は同じか。",
   "需要不足か、需要超過か。",
@@ -238,6 +281,47 @@ export default function EconomicPolicyComparisonPage() {
           公開済み政策提言やForum投稿を読む前に、日本の政策判断が海外と比べて何を前提にしているのかを確認します。
           海外礼賛や日本批判ではなく、比較可能な条件をそろえるための親ページです。
         </p>
+      </section>
+
+      <section style={{ ...sectionStyle, marginBottom: 18 }}>
+        <p style={{ margin: 0, color: "#2563eb", fontSize: 13, fontWeight: 900 }}>
+          AI判定の見方
+        </p>
+        <h2 style={{ margin: "4px 0 0", fontSize: 22 }}>
+          AIが政策判定に使う主な経済理論
+        </h2>
+        <p style={{ margin: "8px 0 0", color: "#334155", lineHeight: 1.8 }}>
+          このページのAI整理では、単なる賛否ではなく、マクロ経済学・経済理論・検証指標を使って、
+          財政政策・金融政策・その他政策を比較します。
+        </p>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+            gap: 10,
+            marginTop: 14,
+          }}
+        >
+          {economicTheoryCards.map((theory) => (
+            <article
+              key={theory.title}
+              style={{
+                border: "1px solid #dbe3ef",
+                borderRadius: 8,
+                background: "#f8fafc",
+                padding: 12,
+                minWidth: 0,
+              }}
+            >
+              <h3 style={{ margin: 0, color: "#0f172a", fontSize: 16, lineHeight: 1.5 }}>
+                {theory.title}
+              </h3>
+              <p style={{ margin: "6px 0 0", color: "#475569", lineHeight: 1.75, fontSize: 14 }}>
+                {theory.description}
+              </p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section style={{ ...sectionStyle, marginBottom: 18 }}>
