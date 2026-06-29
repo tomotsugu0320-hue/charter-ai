@@ -2499,7 +2499,7 @@ export default function ForumPage() {
             gap: 8,
           }}
         >
-          <h2 style={{ margin: 0, fontSize: 22 }}>AIが推奨する日本の経済政策</h2>
+          <h2 style={{ margin: 0, fontSize: 22 }}>AIが経済理論で自動判定した日本の経済政策</h2>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
             <Link
               href={`/${tenant}/forum/policy-proposals`}
@@ -2510,7 +2510,10 @@ export default function ForumPage() {
           </div>
         </div>
         <p style={{ margin: "6px 0 0", color: "#475569", lineHeight: 1.7 }}>
-          現在の政策方向をもとに、AIが財政・金融・その他政策の方向性を整理したものです。
+          掲示板の投稿や政策論点をもとに、AIがマクロ経済学・経済理論・検証指標で自動判定した政策案です。
+        </p>
+        <p style={{ margin: "6px 0 0", color: "#334155", lineHeight: 1.7, fontSize: 14, fontWeight: 800 }}>
+          管理人の断定ではなく、経済理論・前提・因果・反論・検証指標をもとにしたAIの検証用整理です。
         </p>
         <div
           style={{
@@ -2545,12 +2548,12 @@ export default function ForumPage() {
                   {area.description}
                 </div>
                 <div style={{ marginTop: 10, fontWeight: 900 }}>
-                  判断：
+                  AI判定：
                   {card
                     ? getPolicyDecisionLabel(card)
                     : policyDecisionsLoading
                       ? "確認中..."
-                      : "判断はまだありません"}
+                      : "AI判定はまだありません"}
                 </div>
                 <p
                   style={{
