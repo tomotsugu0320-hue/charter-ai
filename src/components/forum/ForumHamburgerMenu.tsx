@@ -76,6 +76,7 @@ export default function ForumHamburgerMenu({
     () =>
       effectiveLoggedIn
         ? [
+            { href: `/${tenant}/forum/feedback`, label: "不具合・改善を報告" },
             { href: `/${tenant}/forum/guide`, label: "使い方" },
             { href: `/${tenant}/forum/private-logs`, label: "あとで読む管理" },
             {
@@ -86,6 +87,7 @@ export default function ForumHamburgerMenu({
             { href: `/${tenant}/forum`, label: "トップへ戻る" },
           ]
         : [
+            { href: `/${tenant}/forum/feedback`, label: "不具合・改善を報告" },
             {
               href: `/${tenant}/forum/login?next=${encodeURIComponent(
                 `/${tenant}/forum`

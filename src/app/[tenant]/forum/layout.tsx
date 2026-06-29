@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import ForumFeedbackLinks from "@/components/forum/ForumFeedbackLinks";
 import { absoluteUrl, siteName } from "@/lib/seo";
 
 type LayoutProps = {
@@ -38,6 +39,8 @@ export async function generateMetadata({
   };
 }
 
-export default function ForumLayout({ children }: LayoutProps) {
-  return <>{children}</>;
+export default async function ForumLayout({ children, params }: LayoutProps) {
+  const { tenant } = await params;
+
+  return <ForumFeedbackLinks tenant={tenant}>{children}</ForumFeedbackLinks>;
 }
