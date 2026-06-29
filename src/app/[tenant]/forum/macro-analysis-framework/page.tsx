@@ -59,22 +59,42 @@ export default function MacroAnalysisFrameworkPage() {
         </Link>
       </div>
 
-      <header style={{ margin: "22px 0 18px" }}>
-        <p style={{ margin: 0, color: "#64748b", fontSize: 13, fontWeight: 900 }}>
+      <header
+        style={{
+          margin: "22px 0 18px",
+          border: "1px solid #dbe3ef",
+          borderRadius: 10,
+          background: "#ffffff",
+          padding: 16,
+        }}
+      >
+        <p style={{ margin: 0, color: "#334155", fontSize: 13, fontWeight: 900 }}>
           AIで学ぶマクロ経済分析
         </p>
-        <h1 style={{ margin: "6px 0 0", fontSize: 30, lineHeight: 1.4, letterSpacing: 0 }}>
+        <h1 style={{ margin: "6px 0 0", color: "#0f172a", fontSize: 30, lineHeight: 1.4, letterSpacing: 0 }}>
           世界標準のマクロ経済分析フレームで見る日本経済
         </h1>
-        <p style={{ margin: "10px 0 0", color: "#475569", lineHeight: 1.8 }}>
+        <p style={{ margin: "10px 0 0", color: "#334155", lineHeight: 1.8 }}>
           AIを使って、経済学・経済理論・経済分析の基本フレームを学びながら、日本経済の論点を整理するページです。
+        </p>
+        <p
+          style={{
+            margin: "10px 0 0",
+            border: "1px solid #bfdbfe",
+            borderRadius: 8,
+            background: "#eff6ff",
+            color: "#1e3a8a",
+            padding: "8px 10px",
+            fontSize: 14,
+            fontWeight: 800,
+            lineHeight: 1.7,
+          }}
+        >
+          このページは、AIを使って経済理論の見方を学び、日本経済の論点を整理するための入口です。特定の政策を断定するものではありません。
         </p>
       </header>
 
       <section style={{ ...noteStyle, marginBottom: 18 }}>
-        <p style={{ margin: "0 0 8px", color: "#1e3a8a", fontWeight: 900 }}>
-          このページは、AIを使って経済理論の見方を学び、日本経済の論点を整理するための入口です。特定の政策を断定するものではありません。
-        </p>
         経済停滞を気分や精神論だけで片づけず、需要、供給、物価、雇用、賃金、財政、為替の関係に分解して見ます。
         このページでは、よく使われる分析フレームをAIに質問しながら学べる形で整理します。
       </section>

@@ -131,15 +131,38 @@ export default function NewsCheckPage() {
         </Link>
       </div>
 
-      <header style={{ margin: "22px 0 18px" }}>
-        <p style={{ margin: 0, color: "#64748b", fontSize: 13, fontWeight: 900 }}>
+      <header
+        style={{
+          margin: "22px 0 18px",
+          border: "1px solid #dbe3ef",
+          borderRadius: 10,
+          background: "#ffffff",
+          padding: 16,
+        }}
+      >
+        <p style={{ margin: 0, color: "#334155", fontSize: 13, fontWeight: 900 }}>
           最新ニュースの読み解き
         </p>
-        <h1 style={{ margin: "6px 0 0", fontSize: 30, lineHeight: 1.4, letterSpacing: 0 }}>
+        <h1 style={{ margin: "6px 0 0", color: "#0f172a", fontSize: 30, lineHeight: 1.4, letterSpacing: 0 }}>
           最新ニュースをAIで読み解く
         </h1>
-        <p style={{ margin: "10px 0 0", color: "#475569", lineHeight: 1.8 }}>
+        <p style={{ margin: "10px 0 0", color: "#334155", lineHeight: 1.8 }}>
           新聞記事や経済ニュースを、全文転載ではなく、短い要約・主張・前提・反論・海外比較・検証指標に分けて整理します。
+        </p>
+        <p
+          style={{
+            margin: "10px 0 0",
+            border: "1px solid #bfdbfe",
+            borderRadius: 8,
+            background: "#eff6ff",
+            color: "#1e3a8a",
+            padding: "8px 10px",
+            fontSize: 14,
+            fontWeight: 800,
+            lineHeight: 1.7,
+          }}
+        >
+          AIによるニュース読解です。記事本文の転載ではなく、要約・主張・前提・反論・海外比較・検証指標を整理するためのたたき台です。
         </p>
       </header>
 
