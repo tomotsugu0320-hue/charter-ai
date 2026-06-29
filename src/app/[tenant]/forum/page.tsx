@@ -2269,35 +2269,51 @@ export default function ForumPage() {
         </p>
         <div
           style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+            gap: 10,
             marginTop: 10,
-            border: "1px solid #dbe3ef",
-            borderRadius: 8,
-            background: "#ffffff",
-            padding: "10px 12px",
-            color: "#475569",
-            fontSize: 14,
-            lineHeight: 1.7,
           }}
         >
-          財政政策・金融政策・その他の経済政策を、海外事例と比べて確認します。{" "}
-          <Link
-            href={`/${tenant}/forum/economic-policy-comparison`}
-            style={{ color: "#075985", fontWeight: 900 }}
-          >
-            日本と海外の経済政策を比較する
-          </Link>
-          <div style={{ marginTop: 8 }}>
-            新聞記事や経済ニュースを、短い要約・主張・前提・反論・海外比較・検証指標に分けて整理します。{" "}
-            <Link href={`/${tenant}/forum/news-check`} style={{ color: "#075985", fontWeight: 900 }}>
-              最新ニュースをAIで読み解く
+          {[
+            {
+              href: `/${tenant}/forum/economic-policy-comparison`,
+              body: "財政政策・金融政策・その他の経済政策を、海外事例と比べて確認します。",
+              label: "日本と海外の経済政策を比較する",
+            },
+            {
+              href: `/${tenant}/forum/news-check`,
+              body: "新聞記事や経済ニュースを、短い要約・主張・前提・反論・海外比較・検証指標に分けて整理します。",
+              label: "最新ニュースをAIで読み解く",
+            },
+            {
+              href: `/${tenant}/forum/macro-analysis-framework`,
+              body: "IS-LM、AD-AS、需給ギャップなどの分析フレームで、日本経済の論点を整理します。",
+              label: "マクロ経済分析フレームを学ぶ",
+            },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              style={{
+                display: "block",
+                minWidth: 0,
+                border: "1px solid #dbe3ef",
+                borderRadius: 8,
+                background: "#ffffff",
+                padding: "10px 12px",
+                color: "#475569",
+                fontSize: 14,
+                lineHeight: 1.7,
+                textDecoration: "none",
+              }}
+            >
+              <span style={{ display: "block" }}>{item.body}</span>
+              <span style={{ display: "block", marginTop: 8, color: "#075985", fontWeight: 900 }}>
+                → {item.label}
+              </span>
             </Link>
-          </div>
-          <div style={{ marginTop: 8 }}>
-            IS-LM、AD-AS、需給ギャップなどの分析フレームで、日本経済の論点を整理します。{" "}
-            <Link href={`/${tenant}/forum/macro-analysis-framework`} style={{ color: "#075985", fontWeight: 900 }}>
-              マクロ経済分析フレームを学ぶ
-            </Link>
-          </div>
+          ))}
         </div>
         <section
           style={{
@@ -2458,15 +2474,22 @@ export default function ForumPage() {
             const card = policyDecisionCards.find(
               (item) => item.policy_area === area.key
             );
+            const policyHref = card
+              ? `/${tenant}/forum/policy-proposals/${card.thread_id}`
+              : `/${tenant}/forum/policy-proposals`;
             return (
-              <article
+              <Link
                 key={area.key}
+                href={policyHref}
                 style={{
+                  display: "block",
                   border: "1px solid #cbd5e1",
                   borderRadius: 8,
                   background: "#ffffff",
                   padding: 14,
                   minWidth: 0,
+                  color: "inherit",
+                  textDecoration: "none",
                 }}
               >
                 <h3 style={{ margin: 0, fontSize: 19 }}>{area.title}</h3>
@@ -2507,12 +2530,7 @@ export default function ForumPage() {
                     </ul>
                   </div>
                 )}
-                <Link
-                  href={
-                    card
-                      ? `/${tenant}/forum/policy-proposals/${card.thread_id}`
-                      : `/${tenant}/forum/policy-proposals`
-                  }
+                <div
                   style={{
                     display: "inline-block",
                     marginTop: 10,
@@ -2521,8 +2539,8 @@ export default function ForumPage() {
                   }}
                 >
                   {card ? "詳細を見る" : "候補一覧を見る"}
-                </Link>
-              </article>
+                </div>
+              </Link>
             );
           })}
         </div>
@@ -2583,14 +2601,18 @@ export default function ForumPage() {
             }}
           >
             {publishedPolicyCards.map((policy) => (
-              <article
+              <Link
                 key={policy.id}
+                href={`/${tenant}/forum/policies/${policy.id}`}
                 style={{
+                  display: "block",
                   border: "1px solid #bbf7d0",
                   borderRadius: 8,
                   background: "#ffffff",
                   padding: 14,
                   minWidth: 0,
+                  color: "inherit",
+                  textDecoration: "none",
                 }}
               >
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -2641,8 +2663,7 @@ export default function ForumPage() {
                 <div style={{ marginTop: 8, color: "#64748b", fontSize: 13 }}>
                   公開日: {formatDate(policy.published_at) || "未記載"}
                 </div>
-                <Link
-                  href={`/${tenant}/forum/policies/${policy.id}`}
+                <div
                   style={{
                     display: "inline-block",
                     marginTop: 10,
@@ -2651,8 +2672,8 @@ export default function ForumPage() {
                   }}
                 >
                   詳細を見る
-                </Link>
-              </article>
+                </div>
+              </Link>
             ))}
           </div>
         )}

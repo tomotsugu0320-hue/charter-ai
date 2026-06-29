@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 
 type ReportButtonProps = {
   postId: string;
@@ -38,10 +38,14 @@ const panelStyle: CSSProperties = {
   display: "grid",
   gap: 8,
   maxWidth: "100%",
+  minWidth: 0,
+  boxSizing: "border-box",
+  overflowWrap: "anywhere",
 };
 
 export default function ReportButton({ postId, threadId }: ReportButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isNarrowScreen, setIsNarrowScreen] = useState(false);
   const [reasonType, setReasonType] = useState<(typeof reasonOptions)[number]["value"]>(
     "personal_info"
   );
@@ -49,6 +53,35 @@ export default function ReportButton({ postId, threadId }: ReportButtonProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 640px)");
+    const syncNarrowScreen = () => setIsNarrowScreen(mediaQuery.matches);
+
+    syncNarrowScreen();
+    mediaQuery.addEventListener("change", syncNarrowScreen);
+    return () => mediaQuery.removeEventListener("change", syncNarrowScreen);
+  }, []);
+
+  const activePanelStyle: CSSProperties = isNarrowScreen
+    ? {
+        ...panelStyle,
+        position: "fixed",
+        left: 16,
+        right: 16,
+        bottom: 16,
+        zIndex: 1000,
+        marginTop: 0,
+        width: "auto",
+        maxWidth: "calc(100vw - 32px)",
+        maxHeight: "calc(100vh - 32px)",
+        overflowY: "auto",
+        boxShadow: "0 20px 45px rgba(15, 23, 42, 0.24)",
+      }
+    : {
+        ...panelStyle,
+        width: "min(360px, calc(100vw - 32px))",
+      };
 
   async function submitReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -90,7 +123,7 @@ export default function ReportButton({ postId, threadId }: ReportButtonProps) {
   }
 
   return (
-    <div style={{ maxWidth: "100%" }}>
+    <div style={{ maxWidth: "100%", position: "relative" }}>
       <button
         type="button"
         onClick={() => {
@@ -105,7 +138,7 @@ export default function ReportButton({ postId, threadId }: ReportButtonProps) {
       </button>
 
       {isOpen && (
-        <form onSubmit={submitReport} style={panelStyle}>
+        <form onSubmit={submitReport} style={activePanelStyle}>
           <label
             style={{
               display: "grid",
@@ -124,6 +157,7 @@ export default function ReportButton({ postId, threadId }: ReportButtonProps) {
               }
               style={{
                 width: "100%",
+                boxSizing: "border-box",
                 border: "1px solid #cbd5e1",
                 borderRadius: 6,
                 padding: "6px 8px",
