@@ -339,6 +339,9 @@ const CURRENT_JAPAN_POLICY_DIRECTIONS = [
     key: "fiscal",
     title: "日本の財政政策",
     judgment: "引き締め寄り",
+    aiEvaluation: "△",
+    aiEvaluationReason:
+      "需要不足や実質賃金低迷への対応としては弱く、財政健全化が先に出やすい。ただし制度対応の余地はある。",
     points: [
       "財政健全化を重視",
       "社会保障費や債務費の増加に対応するため、負担増・歳出抑制・給付見直しの議論が起きやすい",
@@ -349,6 +352,9 @@ const CURRENT_JAPAN_POLICY_DIRECTIONS = [
     key: "monetary",
     title: "日本の金融政策",
     judgment: "金利引き上げ・引き締め",
+    aiEvaluation: "✕",
+    aiEvaluationReason:
+      "円安・輸入物価主導の物価上昇に対し、需要・賃金・雇用の確認前に引き締め寄りに見える。",
     points: [
       "日銀は政策金利を1.0％程度へ引き上げる方向",
       "円安や物価上昇を抑える狙いがある",
@@ -359,6 +365,9 @@ const CURRENT_JAPAN_POLICY_DIRECTIONS = [
     key: "other",
     title: "日本のその他の経済政策",
     judgment: "賃上げ・成長戦略",
+    aiEvaluation: "△",
+    aiEvaluationReason:
+      "賃上げ・価格転嫁・制度改革は必要だが、需要不足対策や家計負担軽減との接続が弱い。",
     points: ["賃上げ", "生産性向上", "価格転嫁", "成長投資", "制度改革"],
   },
 ];
@@ -2266,6 +2275,7 @@ export default function ForumPage() {
         <h2 style={{ margin: 0, fontSize: 22 }}>現在の日本の政策方向</h2>
         <p style={{ margin: "6px 0 0", color: "#475569", lineHeight: 1.7 }}>
           現在の政策方向を比較用に簡略化した固定表示です。AIによる推奨ではありません。
+          現在の政策方向をAIが評価し、その下に改善案として整理した政策方向を表示しています。
         </p>
         <div
           style={{
@@ -2421,6 +2431,46 @@ export default function ForumPage() {
               <div style={{ marginTop: 10, fontWeight: 900 }}>
                 判断：{direction.judgment}
               </div>
+              <div
+                style={{
+                  marginTop: 8,
+                  border: "1px solid #dbe3ef",
+                  borderRadius: 8,
+                  background: "#f8fafc",
+                  padding: "8px 10px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    color: "#0f172a",
+                    fontWeight: 900,
+                  }}
+                >
+                  <span>AI評価</span>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      minWidth: 28,
+                      minHeight: 28,
+                      borderRadius: 999,
+                      background: direction.aiEvaluation === "✕" ? "#fee2e2" : "#fef3c7",
+                      color: direction.aiEvaluation === "✕" ? "#991b1b" : "#92400e",
+                      fontSize: 18,
+                    }}
+                  >
+                    {direction.aiEvaluation}
+                  </span>
+                </div>
+                <p style={{ margin: "6px 0 0", color: "#334155", lineHeight: 1.65, fontSize: 14 }}>
+                  {direction.aiEvaluationReason}
+                </p>
+              </div>
               <ul style={{ margin: "8px 0 0", paddingLeft: 20, lineHeight: 1.7 }}>
                 {direction.points.map((point) => (
                   <li key={`${direction.key}-${point}`}>{point}</li>
@@ -2474,9 +2524,7 @@ export default function ForumPage() {
             const card = policyDecisionCards.find(
               (item) => item.policy_area === area.key
             );
-            const policyHref = card
-              ? `/${tenant}/forum/policy-proposals/${card.thread_id}`
-              : `/${tenant}/forum/policy-proposals`;
+            const policyHref = `/${tenant}/forum/policy-proposals#${area.key}`;
             return (
               <Link
                 key={area.key}

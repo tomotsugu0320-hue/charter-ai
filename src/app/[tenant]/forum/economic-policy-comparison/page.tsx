@@ -7,6 +7,7 @@ import type { CSSProperties } from "react";
 type ComparisonSection = {
   title: string;
   lead: string;
+  note?: string;
   points: string[];
 };
 
@@ -41,14 +42,28 @@ const noteStyle: CSSProperties = {
   lineHeight: 1.8,
 };
 
+const sectionNoteStyle: CSSProperties = {
+  border: "1px solid #bfdbfe",
+  borderRadius: 8,
+  background: "#eff6ff",
+  color: "#1e3a8a",
+  padding: "8px 10px",
+  fontSize: 14,
+  fontWeight: 800,
+  lineHeight: 1.7,
+};
+
 const comparisonSections: ComparisonSection[] = [
   {
     title: "財政政策の比較",
     lead: "政府のお金の取り方・使い方を比べる軸です。",
+    note:
+      "AIによる暫定整理です。景気局面・財源・インフレリスクを検証するためのたたき台です。",
     points: [
-      "減税、給付、政府支出、公共投資、財政赤字、財政余地を分けて見る。",
+      "需要不足局面では、減税、給付、政府支出、公共投資などが有力な選択肢になり得るかを分けて見る。",
       "政府債務だけでなく、政府資産、中央銀行保有国債、自国通貨建て債務、対外純資産も確認する。",
-      "支出の規模だけでなく、需要不足局面か、供給制約が強い局面かを合わせて見る。",
+      "ただし、需要超過、供給制約、円安再燃、財源設計、インフレリスクは合わせて検証する。",
+      "財政政策の妥当性は、景気局面、雇用、実質賃金、物価、為替、財源設計を見て判断する。",
     ],
   },
   {
@@ -62,11 +77,14 @@ const comparisonSections: ComparisonSection[] = [
   },
   {
     title: "その他の経済政策の比較",
-    lead: "財政政策・金融政策だけでは説明しきれない制度面を比べる軸です。",
+    lead: "財政政策・金融政策だけでは説明しきれない制度面を、景気局面や副作用と合わせて比べる軸です。",
+    note:
+      "AIによる暫定整理です。産業政策・雇用・社会保障・規制などを検証するためのたたき台です。",
     points: [
-      "雇用政策、賃金政策、産業政策、価格転嫁支援、社会保険料、エネルギー政策を扱う。",
-      "賃金上昇が企業収益、価格転嫁、労働市場、産業構造とどうつながるかを見る。",
-      "内需強化や国内供給力の維持が、雇用・賃金回復に結びつくかを確認する。",
+      "雇用政策、賃金政策、産業政策、価格転嫁支援、社会保険料、エネルギー政策を、短期の需要対策と中長期の供給力強化に分けて扱う。",
+      "産業政策や規制改革は、投資・雇用・生産性への効果と副作用を確認しながら検討する。",
+      "社会保障や労働政策は、家計所得、消費、企業負担、賃金への影響を合わせて見る。",
+      "政策の妥当性は、景気局面、雇用、実質賃金、物価、投資、社会保障負担を見て判断する。",
     ],
   },
   {
@@ -291,9 +309,10 @@ export default function EconomicPolicyComparisonPage() {
         {comparisonSections.map((section) => (
           <section key={section.title} style={sectionStyle}>
             <h2 style={{ margin: 0, fontSize: 22 }}>{section.title}</h2>
-            <p style={{ margin: "8px 0 0", color: "#475569", lineHeight: 1.8 }}>
+            <p style={{ margin: "8px 0 0", color: "#334155", lineHeight: 1.8 }}>
               {section.lead}
             </p>
+            {section.note && <p style={{ ...sectionNoteStyle, margin: "10px 0 0" }}>{section.note}</p>}
             <ul style={{ margin: "10px 0 0", paddingLeft: 22, lineHeight: 1.8 }}>
               {section.points.map((point) => (
                 <li key={`${section.title}-${point}`}>{point}</li>

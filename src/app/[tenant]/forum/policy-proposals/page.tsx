@@ -304,6 +304,17 @@ export default function PolicyProposalsPage() {
     .filter((proposal) => !proposal.has_saved_proposal)
     .slice(0, 5);
 
+  useEffect(() => {
+    if (loading || proposals.length === 0 || typeof window === "undefined") return;
+
+    const targetId = window.location.hash.replace("#", "");
+    if (!POLICY_AREA_SECTIONS.some((section) => section.key === targetId)) return;
+
+    window.setTimeout(() => {
+      document.getElementById(targetId)?.scrollIntoView({ block: "start" });
+    }, 0);
+  }, [loading, proposals.length]);
+
   async function handleBulkGenerateAndSave() {
     if (bulkLoading || !bulkConfirmed || bulkCandidates.length === 0) return;
 
@@ -711,7 +722,7 @@ export default function PolicyProposalsPage() {
             );
 
             return (
-              <section key={section.key}>
+              <section key={section.key} id={section.key} style={{ scrollMarginTop: 16 }}>
                 <div
                   style={{
                     display: "flex",
