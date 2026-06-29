@@ -81,10 +81,12 @@ export default function ForumAdminReportsPage() {
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [authRequired, setAuthRequired] = useState(false);
 
   async function loadReports() {
     setLoading(true);
     setError(null);
+    setAuthRequired(false);
 
     try {
       const response = await fetch(`/api/forum/admin/reports?status=${status}`, {
@@ -94,12 +96,17 @@ export default function ForumAdminReportsPage() {
 
       if (!response.ok) {
         setReports([]);
+        if (response.status === 401 || response.status === 403) {
+          setAuthRequired(true);
+          return;
+        }
         setError(json?.error || "通報一覧を読み込めませんでした。");
         return;
       }
 
       const loadedReports = (json.reports ?? []) as ReportRow[];
       setReports(loadedReports);
+      setAuthRequired(false);
       setNotes(
         Object.fromEntries(
           loadedReports.map((report) => [report.id, report.admin_note ?? ""])
@@ -189,37 +196,39 @@ export default function ForumAdminReportsPage() {
         </p>
       </section>
 
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 8,
-          marginBottom: 18,
-        }}
-      >
-        {(["pending", "reviewing", "resolved", "dismissed", "all"] as const).map(
-          (item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setStatus(item)}
-              style={{
-                border: "1px solid #cbd5e1",
-                borderRadius: 999,
-                background: status === item ? "#111827" : "#fff",
-                color: status === item ? "#fff" : "#111827",
-                cursor: "pointer",
-                fontWeight: 800,
-                padding: "7px 12px",
-              }}
-            >
-              {statusLabels[item]}
-            </button>
-          )
-        )}
-      </div>
+      {!authRequired && (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 8,
+            marginBottom: 18,
+          }}
+        >
+          {(["pending", "reviewing", "resolved", "dismissed", "all"] as const).map(
+            (item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setStatus(item)}
+                style={{
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 999,
+                  background: status === item ? "#111827" : "#fff",
+                  color: status === item ? "#fff" : "#111827",
+                  cursor: "pointer",
+                  fontWeight: 800,
+                  padding: "7px 12px",
+                }}
+              >
+                {statusLabels[item]}
+              </button>
+            )
+          )}
+        </div>
+      )}
 
-      {error && (
+      {error && !authRequired && (
         <div
           style={{
             marginBottom: 14,
@@ -238,6 +247,39 @@ export default function ForumAdminReportsPage() {
       {loading ? (
         <div style={{ color: "#64748b", fontWeight: 800 }}>
           通報一覧を読み込んでいます...
+        </div>
+      ) : authRequired ? (
+        <div
+          style={{
+            border: "1px solid #bfdbfe",
+            borderRadius: 10,
+            background: "#eff6ff",
+            padding: 18,
+            color: "#1e3a8a",
+            lineHeight: 1.7,
+          }}
+        >
+          <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 6 }}>
+            管理者ログインが必要です。
+          </div>
+          <p style={{ margin: "0 0 12px" }}>
+            通報一覧を見るには、先に管理画面で管理者認証を行ってください。
+          </p>
+          <Link
+            href={`/${tenant}/forum/admin`}
+            style={{
+              display: "inline-flex",
+              border: "1px solid #2563eb",
+              borderRadius: 999,
+              background: "#2563eb",
+              color: "#ffffff",
+              fontWeight: 900,
+              padding: "8px 12px",
+              textDecoration: "none",
+            }}
+          >
+            管理トップへ戻る
+          </Link>
         </div>
       ) : reports.length === 0 ? (
         <div
