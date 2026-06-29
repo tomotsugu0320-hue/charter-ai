@@ -95,6 +95,135 @@ const pageStyle: CSSProperties = {
   color: "#111827",
 };
 
+const policyDecisionTheoryCards = [
+  {
+    title: "AD-AS分析",
+    description: "需要不足・需要超過・供給制約を分け、物価上昇の原因を確認します。",
+  },
+  {
+    title: "需給ギャップ",
+    description: "需要不足か過熱状態かを見て、財政・金融政策の方向を判断します。",
+  },
+  {
+    title: "フィリップス曲線",
+    description: "失業率・求人倍率・賃金・物価の関係から、雇用と物価の持続性を確認します。",
+  },
+  {
+    title: "テイラー・ルール",
+    description: "利上げや利下げを判断するとき、物価だけでなく需給ギャップや雇用も確認します。",
+  },
+  {
+    title: "財政乗数",
+    description: "減税・給付・公共投資などが需要不足局面でどれくらい効くかを考えます。",
+  },
+  {
+    title: "マンデル＝フレミング・モデル",
+    description: "金利・為替・財政政策・金融政策・輸出入のつながりを整理します。",
+  },
+  {
+    title: "コストプッシュインフレ分析",
+    description: "円安・輸入物価・エネルギー価格が家計や実質賃金に与える影響を見ます。",
+  },
+];
+
+const policyDecisionMetrics = [
+  "実質賃金",
+  "個人消費",
+  "完全失業率",
+  "有効求人倍率",
+  "CPI / コアCPI / コアコアCPI",
+  "GDPデフレーター",
+  "需給ギャップ",
+  "為替レート",
+  "輸入物価",
+  "名目成長率と金利",
+  "政府債務の利払い費",
+];
+
+function PolicyDecisionTheoryMetricsSection() {
+  return (
+    <section
+      style={{
+        marginTop: 18,
+        border: "1px solid #dbe3ef",
+        borderRadius: 8,
+        background: "#ffffff",
+        padding: 16,
+      }}
+    >
+      <h2 style={{ margin: 0, fontSize: 22, lineHeight: 1.45 }}>
+        この政策判断に使う主な理論・指標
+      </h2>
+      <p style={{ margin: "8px 0 0", color: "#475569", lineHeight: 1.75 }}>
+        AIは、政策案を単なる賛否ではなく、経済理論・前提条件・因果関係・反論・検証指標に照らして整理します。
+      </p>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+          gap: 12,
+          marginTop: 14,
+        }}
+      >
+        <section
+          style={{
+            border: "1px solid #dbeafe",
+            borderRadius: 8,
+            background: "#f8fbff",
+            padding: 12,
+            minWidth: 0,
+          }}
+        >
+          <h3 style={{ margin: 0, color: "#1e3a8a", fontSize: 18 }}>主な経済理論</h3>
+          <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+            {policyDecisionTheoryCards.map((theory) => (
+              <article
+                key={theory.title}
+                style={{
+                  borderTop: "1px solid #dbeafe",
+                  paddingTop: 8,
+                  minWidth: 0,
+                }}
+              >
+                <div style={{ color: "#0f172a", fontWeight: 900, lineHeight: 1.45 }}>
+                  {theory.title}
+                </div>
+                <p style={{ margin: "4px 0 0", color: "#475569", lineHeight: 1.65 }}>
+                  {theory.description}
+                </p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section
+          style={{
+            border: "1px solid #bbf7d0",
+            borderRadius: 8,
+            background: "#f8fff9",
+            padding: 12,
+            minWidth: 0,
+          }}
+        >
+          <h3 style={{ margin: 0, color: "#14532d", fontSize: 18 }}>
+            確認すべき主な指標
+          </h3>
+          <ul style={{ margin: "10px 0 0", paddingLeft: 20, color: "#334155", lineHeight: 1.75 }}>
+            {policyDecisionMetrics.map((metric) => (
+              <li key={metric}>{metric}</li>
+            ))}
+          </ul>
+        </section>
+      </div>
+
+      <p style={{ margin: "12px 0 0", color: "#64748b", lineHeight: 1.7, fontSize: 14 }}>
+        すべての理論・指標を毎回使うのではなく、政策テーマに関係するものをAIが優先して参照します。
+      </p>
+    </section>
+  );
+}
+
 function getParam(value: string | string[] | undefined, fallback = "") {
   return Array.isArray(value) ? value[0] ?? fallback : value ?? fallback;
 }
@@ -704,6 +833,8 @@ export default function PolicyProposalDetailPage() {
               投稿 {proposal.post_count}件 / AI分類済みコメント {proposal.classified_comment_count}件
             </div>
           </header>
+
+          <PolicyDecisionTheoryMetricsSection />
 
           {isAdminStatusChecked && isForumAdmin && (
             <section
