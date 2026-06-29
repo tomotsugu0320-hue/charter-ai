@@ -367,7 +367,14 @@ export default function PolicyDetailPage() {
 
       {policy && (
         <article style={{ marginTop: 22 }}>
-          <header style={{ borderBottom: "1px solid #cbd5e1", paddingBottom: 18 }}>
+          <header
+            style={{
+              border: "1px solid #dbe3ef",
+              borderRadius: 10,
+              background: "#ffffff",
+              padding: 16,
+            }}
+          >
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               <span
                 style={{
@@ -396,13 +403,13 @@ export default function PolicyDetailPage() {
                 {formatProposalStatus(policy.status)}
               </span>
             </div>
-            <h1 style={{ margin: "10px 0 0", fontSize: 30, lineHeight: 1.45, letterSpacing: 0 }}>
+            <h1 style={{ margin: "10px 0 0", color: "#0f172a", fontSize: 30, lineHeight: 1.45, letterSpacing: 0 }}>
               {proposal.title || policy.title}
             </h1>
-            <p style={{ margin: "10px 0 0", fontSize: 18, fontWeight: 800, lineHeight: 1.7 }}>
+            <p style={{ margin: "10px 0 0", color: "#334155", fontSize: 18, fontWeight: 800, lineHeight: 1.7 }}>
               {proposal.one_line_proposal || policy.one_line_proposal || "未記載"}
             </p>
-            <div style={{ marginTop: 10, color: "#64748b", fontSize: 13 }}>
+            <div style={{ marginTop: 10, color: "#475569", fontSize: 13 }}>
               公開日: {formatDate(policy.published_at)}
             </div>
             <div style={{ marginTop: 10, fontSize: 18, fontWeight: 900 }}>

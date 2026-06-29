@@ -668,17 +668,39 @@ export default function PolicyProposalDetailPage() {
 
         return (
         <article style={{ marginTop: 22 }}>
-          <header style={{ borderBottom: "1px solid #cbd5e1", paddingBottom: 18 }}>
-            <div style={{ color: "#475569", fontSize: 13, fontWeight: 800 }}>
+          <header
+            style={{
+              border: "1px solid #dbe3ef",
+              borderRadius: 10,
+              background: "#ffffff",
+              padding: 16,
+            }}
+          >
+            <div style={{ color: "#334155", fontSize: 13, fontWeight: 900 }}>
               {proposal.category} / AI生成の提言候補
             </div>
-            <h1 style={{ margin: "8px 0 0", fontSize: 30, lineHeight: 1.45, letterSpacing: 0 }}>
+            <h1 style={{ margin: "8px 0 0", color: "#0f172a", fontSize: 30, lineHeight: 1.45, letterSpacing: 0 }}>
               {proposal.title}
             </h1>
-            <p style={{ margin: "12px 0 0", color: "#475569", lineHeight: 1.8 }}>
+            <p style={{ margin: "12px 0 0", color: "#334155", lineHeight: 1.8 }}>
               AI再総括済みの議論材料を、政策判断に必要な項目へ機械的に並べ替えた確認ページです。確定判断や正式な政策提言ではありません。
             </p>
-            <div style={{ marginTop: 10, color: "#64748b", fontSize: 13 }}>
+            <p
+              style={{
+                margin: "10px 0 0",
+                border: "1px solid #bfdbfe",
+                borderRadius: 8,
+                background: "#eff6ff",
+                color: "#1e3a8a",
+                padding: "8px 10px",
+                fontSize: 14,
+                fontWeight: 800,
+                lineHeight: 1.7,
+              }}
+            >
+              このページは、Forum投稿とAI再総括をもとに生成された政策提言候補です。管理人の最終回答ではなく、議論と検証のためのたたき台として読んでください。
+            </p>
+            <div style={{ marginTop: 10, color: "#475569", fontSize: 13 }}>
               投稿 {proposal.post_count}件 / AI分類済みコメント {proposal.classified_comment_count}件
             </div>
           </header>
