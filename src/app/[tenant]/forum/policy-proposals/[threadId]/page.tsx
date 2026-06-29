@@ -834,8 +834,6 @@ export default function PolicyProposalDetailPage() {
             </div>
           </header>
 
-          <PolicyDecisionTheoryMetricsSection />
-
           {isAdminStatusChecked && isForumAdmin && (
             <section
               style={{
@@ -1125,6 +1123,8 @@ export default function PolicyProposalDetailPage() {
               )}
             </section>
           )}
+
+          <PolicyDecisionTheoryMetricsSection />
 
           <section style={{ marginTop: 24 }}>
             <h2 style={{ margin: 0, fontSize: 24 }}>掲示板から得られた議論材料</h2>

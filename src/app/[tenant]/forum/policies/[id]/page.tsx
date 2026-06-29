@@ -553,8 +553,6 @@ export default function PolicyDetailPage() {
             </p>
           </header>
 
-          <PolicyDecisionTheoryMetricsSection />
-
           <section style={{ marginTop: 18, ...sectionStyle }}>
             <h2 style={{ margin: 0, fontSize: 22 }}>まず結論</h2>
             <div style={{ marginTop: 10, fontWeight: 900 }}>
@@ -613,6 +611,8 @@ export default function PolicyDetailPage() {
             items={asStringArray(proposal.review_conditions)}
           />
           <ListSection title="不足情報" items={asStringArray(proposal.missing_information)} />
+
+          <PolicyDecisionTheoryMetricsSection />
 
           <section style={{ marginTop: 18, ...sectionStyle }}>
             <h2 style={{ margin: 0, fontSize: 22 }}>参考スレッド</h2>
