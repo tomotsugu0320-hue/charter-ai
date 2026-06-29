@@ -123,6 +123,37 @@ type ThreadSummary = {
   };
 };
 
+const threadEconomicTheoryCards = [
+  {
+    title: "AD-AS分析",
+    description: "需要不足・需要超過・供給制約を分け、物価上昇の原因を確認します。",
+  },
+  {
+    title: "需給ギャップ",
+    description: "経済が需要不足か過熱状態かを見て、財政・金融政策の方向を判断します。",
+  },
+  {
+    title: "フィリップス曲線",
+    description: "失業率・求人倍率・賃金・物価の関係から、雇用と物価の持続性を確認します。",
+  },
+  {
+    title: "テイラー・ルール",
+    description: "利上げや利下げを判断するとき、物価だけでなく需給ギャップや雇用も確認します。",
+  },
+  {
+    title: "コストプッシュインフレ分析",
+    description: "円安・輸入物価・エネルギー価格が家計や実質賃金に与える影響を見ます。",
+  },
+  {
+    title: "財政乗数",
+    description: "減税・給付・公共投資などが需要不足局面でどれくらい効くかを考えます。",
+  },
+  {
+    title: "マンデル＝フレミング・モデル",
+    description: "金利・為替・財政政策・金融政策・輸出入のつながりを整理します。",
+  },
+];
+
 function postCreatedTime(post?: PostRow | null) {
   const time = new Date(post?.created_at ?? "").getTime();
   return Number.isFinite(time) ? time : 0;
@@ -3802,7 +3833,7 @@ function renderDiscussionCard({
 {shouldShowMacroEconomyGuide && (
   <SectionCard variant="white" style={{ marginTop: 24 }}>
     <SectionTitle style={{ fontSize: currentFont.title, color: "#111827" }}>
-      マクロ経済で見るための確認ポイント
+      この議論に関係しやすい経済理論
     </SectionTitle>
 
     <p
@@ -3813,7 +3844,7 @@ function renderDiscussionCard({
         lineHeight: 1.7,
       }}
     >
-      経済・政策カテゴリの議論を、理論・前提・指標・反論リスクに分けて読むための固定フレームです。AIによる結論ではありません。
+      AIは、投稿内容に応じて以下の理論をすべてではなく必要なものだけ使い、前提・因果・反論・検証指標を整理します。
     </p>
 
     <div
@@ -3823,77 +3854,33 @@ function renderDiscussionCard({
         gap: 12,
       }}
     >
-      <div
-        style={{
-          border: "1px solid #bfdbfe",
-          borderRadius: 8,
-          background: "#eff6ff",
-          color: "#1e3a8a",
-          padding: 12,
-        }}
-      >
-        <div style={{ fontWeight: 900, marginBottom: 8 }}>関連する理論</div>
-        <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
-          <li>有効需要 / 需給ギャップ</li>
-          <li>財政乗数 / 可処分所得 / 消費性向</li>
-          <li>IS-LM / AD-AS / フィリップス曲線</li>
-          <li>クラウディングアウト / リカードの等価定理</li>
-        </ul>
-      </div>
-
-      <div
-        style={{
-          border: "1px solid #bbf7d0",
-          borderRadius: 8,
-          background: "#f0fdf4",
-          color: "#14532d",
-          padding: 12,
-        }}
-      >
-        <div style={{ fontWeight: 900, marginBottom: 8 }}>前提として見ること</div>
-        <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
-          <li>需要不足なのか、供給制約なのか</li>
-          <li>低金利・デフレ圧力が残っているか</li>
-          <li>家計、企業、政府のどこに効果が出るか</li>
-          <li>理論上の効果と制度上の実行可能性を分ける</li>
-        </ul>
-      </div>
-
-      <div
-        style={{
-          border: "1px solid #fde68a",
-          borderRadius: 8,
-          background: "#fffbeb",
-          color: "#78350f",
-          padding: 12,
-        }}
-      >
-        <div style={{ fontWeight: 900, marginBottom: 8 }}>検証ポイント</div>
-        <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
-          <li>現在の需給ギャップはマイナスか</li>
-          <li>減税・給付分は消費や投資に回るか</li>
-          <li>雇用、賃金、物価にどう波及するか</li>
-          <li>短期効果と長期副作用を分けているか</li>
-        </ul>
-      </div>
-
-      <div
-        style={{
-          border: "1px solid #fecaca",
-          borderRadius: 8,
-          background: "#fef2f2",
-          color: "#7f1d1d",
-          padding: 12,
-        }}
-      >
-        <div style={{ fontWeight: 900, marginBottom: 8 }}>反論・リスク</div>
-        <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
-          <li>財政赤字や将来負担への懸念</li>
-          <li>供給制約下では物価上昇に回る可能性</li>
-          <li>金融政策との組み合わせが弱い場合の限界</li>
-          <li>分配、対象漏れ、行政コストの問題</li>
-        </ul>
-      </div>
+      {threadEconomicTheoryCards.map((theory) => (
+        <div
+          key={theory.title}
+          style={{
+            border: "1px solid #dbe3ef",
+            borderRadius: 8,
+            background: "#f8fafc",
+            color: "#0f172a",
+            padding: 12,
+            minWidth: 0,
+          }}
+        >
+          <div style={{ fontWeight: 900, marginBottom: 6, lineHeight: 1.45 }}>
+            {theory.title}
+          </div>
+          <p
+            style={{
+              margin: 0,
+              color: "#475569",
+              fontSize: currentFont.base * 0.92,
+              lineHeight: 1.65,
+            }}
+          >
+            {theory.description}
+          </p>
+        </div>
+      ))}
     </div>
   </SectionCard>
 )}
